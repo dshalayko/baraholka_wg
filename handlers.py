@@ -1,5 +1,6 @@
 from telegram import Update, InputMediaPhoto, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
+from datetime import datetime
 from config import *
 from keyboards import *
 from utils import is_subscribed, show_menu, check_subscription_message
@@ -278,63 +279,6 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         else:
             await update.callback_query.message.reply_text(message, reply_markup=keyboard)
 
-async def confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    ann_id = context.user_data.get('edit_ann_id')
-    if ann_id:
-        description = context.user_data.get('new_description', context.user_data.get('description'))
-        price = context.user_data.get('new_price', context.user_data.get('price'))
-        photos = context.user_data.get('photos', [])  # Updated photos
-
-        # Get old message IDs for deletion
-        async with aiosqlite.connect('announcements.db') as db:
-            cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
-            row = await cursor.fetchone()
-            if row:
-                old_message_ids = json.loads(row[0])
-
-                # Delete old messages
-                for message_id in old_message_ids:
-                    try:
-                        await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
-                    except Exception as e:
-                        logger.error(f"Error deleting old message {message_id}: {e}")
-
-                # Prepare and send the updated advertisement
-                message_text = f"Описание: {description}\nЦена: {price}\n\nОбновлено"
-                new_message_ids = []
-
-                # If there are photos, send the updated photo set
-                if photos:
-                    media = []
-                    for idx, photo_id in enumerate(photos):
-                        if idx == 0:
-                            media.append(InputMediaPhoto(media=photo_id, caption=message_text))
-                        else:
-                            media.append(InputMediaPhoto(media=photo_id))
-
-                    # Send new media group
-                    sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
-                    new_message_ids = [msg.message_id for msg in sent_messages]
-                else:
-                    # Send text if no photos are provided
-                    sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text)
-                    new_message_ids = [sent_message.message_id]
-
-                # Update the database with the new message_ids and photos
-                await db.execute('''
-                    UPDATE announcements
-                    SET description = ?, price = ?, message_ids = ?, photo_file_ids = ?
-                    WHERE id = ?
-                ''', (
-                    description, price, json.dumps(new_message_ids), json.dumps(photos), ann_id
-                ))
-                await db.commit()
-
-                # Confirmation to the user
-                await query.message.reply_text('Ваше объявление было успешно обновлено!', reply_markup=markup)
 async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -358,25 +302,71 @@ async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.message.reply_text('Произошла ошибка при размещении объявления.', reply_markup=markup)
         return CHOOSING
     elif data == 'confirm_edit':
-        if 'edit_ann_id' in context.user_data:
-            # Обработка редактирования существующего объявления
-            ann_id = context.user_data['edit_ann_id']
-            post_link = await edit_announcement(ann_id, context)
+        ann_id = context.user_data.get('edit_ann_id')
+        if ann_id:
+            # Use new description and price if provided
+            description = context.user_data.get('new_description', context.user_data.get('description'))
+            price = context.user_data.get('new_price', context.user_data.get('price'))
+            photos = context.user_data.get('photos', [])  # Updated photos
 
-            if post_link:
-                await query.message.reply_text(f'Ваше объявление было обновлено!\nСсылка: {post_link}', reply_markup=markup)
-            else:
-                await query.message.reply_text('Не удалось обновить объявление.', reply_markup=markup)
-            return CHOOSING
+            # Get the current date and time for the "Updated" message
+            current_time = datetime.now().strftime('%d %B %Y')
+
+            # Generate the updated message text with the current date
+            message_text = f"Описание: {description}\nЦена: {price}\n\nОбновлено {current_time}"
+
+            # Retrieve old message IDs to delete old messages
+            async with aiosqlite.connect('announcements.db') as db:
+                cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
+                row = await cursor.fetchone()
+                if row:
+                    old_message_ids = json.loads(row[0])
+
+                    # Delete old messages (photos and text) from the channel
+                    for message_id in old_message_ids:
+                        try:
+                            await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+                        except Exception as e:
+                            logger.error(f"Ошибка при удалении старого сообщения {message_id}: {e}")
+
+                    # Send new photos and text with the updated message
+                    new_message_ids = []
+                    if photos:
+                        media = []
+                        for idx, photo_id in enumerate(photos):
+                            if idx == 0:
+                                media.append(InputMediaPhoto(media=photo_id, caption=message_text))
+                            else:
+                                media.append(InputMediaPhoto(media=photo_id))
+
+                        # Send a new group of photos
+                        sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
+                        new_message_ids = [msg.message_id for msg in sent_messages]
+                    else:
+                        sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text)
+                        new_message_ids = [sent_message.message_id]
+
+                    # Update the database with the new message IDs and photo_file_ids
+                    await db.execute('''
+                        UPDATE announcements
+                        SET description = ?, price = ?, message_ids = ?, photo_file_ids = ?
+                        WHERE id = ?
+                    ''', (
+                        description,  # Updated description
+                        price,        # Updated price
+                        json.dumps(new_message_ids),  # Save new message IDs
+                        json.dumps(photos),  # Save updated photos
+                        ann_id
+                    ))
+                    await db.commit()
+
+                    # Confirm success to the user
+                    await query.message.reply_text('Ваше объявление было успешно обновлено!', reply_markup=markup)
+                else:
+                    await query.message.reply_text('Ошибка: не удалось найти объявление для редактирования.')
         else:
-            # Создание нового объявления и подтверждение редактирования
-            post_link = await send_announcement(context, update)
-
-            if post_link:
-                await query.message.reply_text(f'Ваше объявление размещено!\nСсылка: {post_link}', reply_markup=markup)
-            else:
-                await query.message.reply_text('Произошла ошибка при размещении объявления.', reply_markup=markup)
-            return CHOOSING
+            await query.message.reply_text('Ошибка: не удалось получить ID объявления.')
+        return CHOOSING
 
 async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
