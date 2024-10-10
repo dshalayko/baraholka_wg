@@ -17,19 +17,41 @@ async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
         return False
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Show the menu with options based on whether the user has ads or not.
+    :param update: The update object containing message or callback query.
+    :param context: The bot context for this interaction.
+    """
     user_id = update.effective_user.id
-    if await has_user_ads(user_id):
-        # Существующий пользователь: показываем меню с двумя кнопками
-        await update.message.reply_text(
-            'Выберите действие:',
-            reply_markup=markup  # Клавиатура с двумя кнопками: «Добавить объявление» и «Мои объявления»
-        )
-    else:
-        # Новый пользователь: показываем только кнопку «Добавить объявление»
-        await update.message.reply_text(
-            'Вы можете добавить свое первое объявление.',
-            reply_markup=add_advertisement_keyboard  # Клавиатура с одной кнопкой: «Добавить объявление»
-        )
+
+    # Check if the user has ads
+    has_ads = await has_user_ads(user_id)
+
+    # Check if it's a message or a callback query
+    if update.message:
+        # Responding to a regular message
+        if has_ads:
+            await update.message.reply_text(
+                'Выберите действие:',
+                reply_markup=markup  # Two buttons
+            )
+        else:
+            await update.message.reply_text(
+                'Вы можете добавить свое первое объявление.',
+                reply_markup=add_advertisement_keyboard  # Single button
+            )
+    elif update.callback_query:
+        # Responding to a callback query
+        if has_ads:
+            await update.callback_query.message.reply_text(
+                'Выберите действие:',
+                reply_markup=markup  # Two buttons
+            )
+        else:
+            await update.callback_query.message.reply_text(
+                'Вы можете добавить свое первое объявление.',
+                reply_markup=add_advertisement_keyboard  # Single button
+            )
 
 async def check_subscription_message():
     text = 'Пожалуйста, подпишитесь на наш канал, чтобы продолжить.'
