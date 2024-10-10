@@ -81,15 +81,17 @@ async def update_announcement(ann_id, description, price, message_id):
 
 async def edit_announcement(ann_id, context):
     async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute('SELECT description, price, photo_file_ids FROM announcements WHERE id = ?',
+        cursor = await db.execute('SELECT description, price, photo_file_ids, username FROM announcements WHERE id = ?',
                                   (ann_id,))
         row = await cursor.fetchone()
         if row:
-            description, price, photo_file_ids = row
+            description, price, photo_file_ids, db_username = row
             photos = json.loads(photo_file_ids) if photo_file_ids else []
-            # Формируем новое сообщение
-            user = context.user_data.get('username', 'Неизвестный пользователь')
-            message_text = f"Автор: @{user}\nОписание: {context.user_data.get('new_description', description)}\nЦена: {context.user_data.get('new_price', price)}\n\nОбновлено"
+
+            # Получаем имя пользователя из базы или контекста
+            username = context.user_data.get('username', db_username)  # Предпочтительно брать из контекста, если есть
+
+            message_text = f"Автор: @{username}\nОписание: {context.user_data.get('new_description', description)}\nЦена: {context.user_data.get('new_price', price)}\n\nОбновлено"
 
             # Удаляем старые сообщения
             cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
@@ -102,14 +104,16 @@ async def edit_announcement(ann_id, context):
                     except Exception as e:
                         logger.error(f"Ошибка при удалении сообщения {message_id}: {e}")
 
-            # Отправляем новое объявление
-            if photos:
+            # Отправляем новое сообщение с фотографиями или текстом
+            if context.user_data.get('photos', []):
+                photos = context.user_data['photos']
                 media = []
                 for idx, photo_id in enumerate(photos):
                     if idx == 0:
                         media.append(InputMediaPhoto(media=photo_id, caption=message_text))
                     else:
                         media.append(InputMediaPhoto(media=photo_id))
+
                 sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
                 new_message_ids = [msg.message_id for msg in sent_messages]
             else:
@@ -125,7 +129,7 @@ async def edit_announcement(ann_id, context):
                 context.user_data.get('new_description', description),
                 context.user_data.get('new_price', price),
                 json.dumps(new_message_ids),
-                json.dumps(photos),
+                json.dumps(photos),  # Обновляем фотографии
                 ann_id
             ))
             await db.commit()
