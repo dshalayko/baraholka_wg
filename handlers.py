@@ -123,87 +123,95 @@ async def remove_old_photos(old_message_ids, context):
             except Exception as e:
                 logger.error(f"Ошибка при удалении старого сообщения {message_id}: {e}")
 
+
 async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Начало функции добавления фотографий. User ID: %s", update.effective_user.id)
+
     if 'photos' not in context.user_data:
         context.user_data['photos'] = []
 
     text = update.message.text
+    logger.info("Полученный текст от пользователя: %s", text)
 
     if text == 'Объявление без фото':
         if not context.user_data.get('description') or not context.user_data.get('price'):
-            await update.message.reply_text('Описание и цена обязательны для создания объявления.')
-            return ADDING_PHOTOS
+            logger.info("Проверка описания и цены для создания объявления без фото.")
+
+            # Если это редактирование, загружаем описание и цену из базы данных
+            if 'edit_ann_id' in context.user_data:
+                ann_id = context.user_data['edit_ann_id']
+                logger.info("Редактирование объявления с ID: %s", ann_id)
+
+                async with aiosqlite.connect('announcements.db') as db:
+                    cursor = await db.execute('SELECT description, price FROM announcements WHERE id = ?', (ann_id,))
+                    row = await cursor.fetchone()
+                    if row:
+                        context.user_data['description'], context.user_data['price'] = row
+                        logger.info("Загруженные описание и цена: %s, %s", row[0], row[1])
+                    else:
+                        logger.error("Не удалось найти объявление с ID: %s", ann_id)
+                        await update.message.reply_text('Не удалось найти объявление для редактирования.')
+                        return CHOOSING
+            else:
+                await update.message.reply_text('Описание и цена обязательны для создания объявления.')
+                logger.warning("Описание и цена не найдены для нового объявления.")
+                return ADDING_PHOTOS
 
         await send_preview(update, context)
         return CONFIRMATION
 
     elif text == 'Закончить загрузку фото' or text == '/done':
+        logger.info("Пользователь завершил загрузку фото.")
+
+        # Проверяем наличие описания и цены при завершении загрузки фото
         if not context.user_data.get('description') or not context.user_data.get('price'):
-            await update.message.reply_text('Описание и цена обязательны для создания объявления.')
-            return ADDING_PHOTOS
+            logger.info("Проверка описания и цены при завершении загрузки фото.")
 
-        if not context.user_data['photos'] and not context.user_data.get('edit_photos'):
-            await update.message.reply_text(
-                'Вы не добавили ни одной фотографии. Пожалуйста, отправьте хотя бы одну фотографию или нажмите "Объявление без фото".'
-            )
-            return ADDING_PHOTOS
+            if 'edit_ann_id' in context.user_data:
+                ann_id = context.user_data['edit_ann_id']
+                logger.info("Редактирование объявления с ID: %s", ann_id)
 
-        # Handle new announcement or edited photos
-        if context.user_data.get('edit_photos'):
-            ann_id = context.user_data.get('edit_ann_id')
-            if ann_id:
-                # Handle editing photos for an existing announcement
                 async with aiosqlite.connect('announcements.db') as db:
-                    cursor = await db.execute('SELECT description, price, message_ids FROM announcements WHERE id = ?', (ann_id,))
+                    cursor = await db.execute('SELECT description, price FROM announcements WHERE id = ?', (ann_id,))
                     row = await cursor.fetchone()
                     if row:
-                        description, price, old_message_ids = row
-                        context.user_data['description'] = description
-                        context.user_data['price'] = price
-
-                        # Remove old photos and show preview with new photos
-                        await remove_old_photos(old_message_ids, context)
-                        context.user_data.pop('edit_photos', None)
-                        await send_preview(update, context, editing=True)
-                        return CONFIRMATION
+                        context.user_data['description'], context.user_data['price'] = row
+                        logger.info("Загруженные описание и цена из базы: %s, %s", row[0], row[1])
                     else:
+                        logger.error("Не удалось найти объявление с ID: %s", ann_id)
                         await update.message.reply_text('Не удалось найти объявление для редактирования.')
                         return CHOOSING
             else:
-                # New announcement scenario
-                context.user_data.pop('edit_photos', None)
-                await send_preview(update, context)
-                return CONFIRMATION
-        else:
-            # Handle new photo upload scenario
-            await send_preview(update, context)
-            return CONFIRMATION
+                await update.message.reply_text('Описание и цена обязательны для создания объявления.')
+                logger.warning("Описание и цена не найдены для нового объявления.")
+                return ADDING_PHOTOS
 
-    elif text == 'Вернуться в меню':
-        await show_menu(update, context)
-        return CHOOSING
+        await send_preview(update, context)
+        return CONFIRMATION
 
     elif update.message.photo:
-        # Append new photos to context
+        # Логируем каждую добавленную фотографию
         photo = update.message.photo[-1]
         context.user_data['photos'].append(photo.file_id)
+        logger.info("Добавлено фото: %s", photo.file_id)
         await update.message.reply_text(
             'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
             reply_markup=finish_photo_markup_with_cancel
         )
         return ADDING_PHOTOS
+
     else:
+        logger.warning("Неподдерживаемый тип данных: %s", update.message.text)
         await update.message.reply_text(
             'Пожалуйста, отправьте фотографию, нажмите "Закончить загрузку фото", "Объявление без фото" или "Вернуться в меню".'
         )
         return ADDING_PHOTOS
 
 async def description_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text == 'Вернуться в меню':
-        await show_menu(update, context)
-        return CHOOSING
-
+    user = update.message.from_user
+    context.user_data['user_id'] = user.id  # Сохранение ID пользователя
     description = update.message.text.strip()
+
     if not description:
         await update.message.reply_text('Описание не может быть пустым. Пожалуйста, введите описание.')
         return DESCRIPTION
@@ -246,17 +254,15 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
     message = f"Автор: @{username}\nОписание: {description}\nЦена: {price}"
 
-    if editing:
-        message += "\n\nОбновлено"
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton('Редактировать', callback_data='preview_edit')],
-            [InlineKeyboardButton('Подтвердить изменения', callback_data='confirm_edit')]
-        ])
-    else:
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton('Редактировать', callback_data='preview_edit')],
-            [InlineKeyboardButton('Разместить объявление', callback_data='post')]
-        ])
+    # Проверяем, является ли это редактированием
+    if editing and 'edit_ann_id' in context.user_data:
+        current_time = datetime.now().strftime('%d %B %Y')
+        message += f"\n\nОбновлено {current_time}"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton('Редактировать', callback_data='preview_edit')],
+        [InlineKeyboardButton('Разместить объявление', callback_data='post')]
+    ])
 
     # Отправляем фотографии или текст
     if photos:
@@ -279,94 +285,174 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         else:
             await update.callback_query.message.reply_text(message, reply_markup=keyboard)
 
+async def confirm_edit_unpublished(context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Начало функции confirm_edit_unpublished")
+
+    # Если user_id отсутствует, получаем его из контекста или объекта update
+    if 'user_id' not in context.user_data:
+        context.user_data['user_id'] = update.callback_query.from_user.id
+        logger.info("user_id добавлен в context.user_data: %s", context.user_data['user_id'])
+
+    description = context.user_data.get('new_description', context.user_data.get('description'))
+    price = context.user_data.get('new_price', context.user_data.get('price'))
+    photos = context.user_data.get('photos', [])
+
+    logger.info("Описание: %s, Цена: %s, Фото: %s", description, price, photos)
+
+    user = context.user_data.get('username')
+    message_text = f"Автор: @{user}\nОписание: {description}\nЦена: {price}"
+
+    new_message_ids = []
+    if photos:
+        media = []
+        for idx, photo_id in enumerate(photos):
+            if idx == 0:
+                media.append(InputMediaPhoto(media=photo_id, caption=message_text))
+            else:
+                media.append(InputMediaPhoto(media=photo_id))
+
+        sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
+        new_message_ids = [msg.message_id for msg in sent_messages]
+        logger.info("Фотографии отправлены, новые message_ids: %s", new_message_ids)
+    else:
+        sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text)
+        new_message_ids = [sent_message.message_id]
+        logger.info("Отправлено текстовое сообщение, message_id: %s", sent_message.message_id)
+
+    # Сохраняем объявление в базе данных
+    async with aiosqlite.connect('announcements.db') as db:
+        await db.execute('''
+            INSERT INTO announcements (user_id, username, message_ids, description, price, photo_file_ids)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            context.user_data['user_id'],  # ID пользователя
+            user,  # Имя пользователя
+            json.dumps(new_message_ids),  # Новые message_ids для фото
+            description,  # Описание
+            price,  # Цена
+            json.dumps(photos)  # Фотографии (их file_id)
+        ))
+        await db.commit()
+
+    logger.info("Объявление успешно сохранено в базе данных.")
+    return f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}/{new_message_ids[0]}"
+
+async def confirm_edit_published(context: ContextTypes.DEFAULT_TYPE, ann_id: int):
+    logger.info("Начало функции confirm_edit_published с ID объявления: %s", ann_id)
+
+    description = context.user_data.get('new_description', context.user_data.get('description'))
+    price = context.user_data.get('new_price', context.user_data.get('price'))
+    photos = context.user_data.get('photos', [])  # Обновленные фотографии
+
+    logger.info("Описание: %s, Цена: %s", description, price)
+
+    # Получаем текущую дату и время для сообщения "Обновлено"
+    current_time = datetime.now().strftime('%d %B %Y')
+
+    # Формируем текст обновленного сообщения с текущей датой
+    message_text = f"Описание: {description}\nЦена: {price}\n\nОбновлено {current_time}"
+
+    # Получаем старые message_ids для удаления старых сообщений
+    async with aiosqlite.connect('announcements.db') as db:
+        cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
+        row = await cursor.fetchone()
+        if row:
+            old_message_ids = json.loads(row[0])
+
+            # Удаляем старые сообщения (фотографии и текст) из канала
+            for message_id in old_message_ids:
+                try:
+                    await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+                except Exception as e:
+                    logger.error(f"Ошибка при удалении старого сообщения {message_id}: {e}")
+
+            # Отправляем новые фотографии и текст с обновленным сообщением
+            new_message_ids = []
+            if photos:
+                media = []
+                for idx, photo_id in enumerate(photos):
+                    if idx == 0:
+                        media.append(InputMediaPhoto(media=photo_id, caption=message_text))
+                    else:
+                        media.append(InputMediaPhoto(media=photo_id))
+
+                # Отправляем новую группу фотографий
+                sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
+                new_message_ids = [msg.message_id for msg in sent_messages]
+            else:
+                sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text)
+                new_message_ids = [sent_message.message_id]
+
+            # Обновляем базу данных с новыми message_ids и photo_file_ids
+            await db.execute('''
+                UPDATE announcements
+                SET description = ?, price = ?, message_ids = ?, photo_file_ids = ?
+                WHERE id = ?
+            ''', (
+                description,  # Обновленное описание
+                price,        # Обновленная цена
+                json.dumps(new_message_ids),  # Сохраняем новые message_ids
+                json.dumps(photos),  # Сохраняем обновленные фотографии
+                ann_id
+            ))
+            await db.commit()
+
+            logger.info("Объявление успешно обновлено.")
+            return f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}/{new_message_ids[0]}"
+        else:
+            logger.error("Ошибка: не удалось найти объявление с ID %s.", ann_id)
+            return None
+
 async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
 
+    logger.info("Начало функции confirmation_handler с данными: %s", data)
+
     if data == 'preview_edit':
+        logger.info("Пользователь выбрал редактирование.")
         await query.message.reply_text('Что вы хотите изменить?', reply_markup=edit_markup_with_cancel)
         return EDIT_CHOICE
+
     elif data == 'post':
-        # Проверка на наличие обязательных полей
+        logger.info("Пользователь выбрал размещение объявления.")
+
         if not context.user_data.get('description') or not context.user_data.get('price'):
+            logger.warning("Описание и цена обязательны для создания объявления.")
             await query.message.reply_text('Описание и цена обязательны для создания объявления.')
             return DESCRIPTION
 
-        # Отправляем объявление и получаем ссылку
-        post_link = await send_announcement(context, update)
+        if 'edit_ann_id' not in context.user_data:
+            post_link = await confirm_edit_unpublished(context)
+            logger.info("Ссылка на новое объявление: %s", post_link)
 
-        if post_link:
-            await query.message.reply_text(f'Ваше объявление размещено!\nСсылка: {post_link}', reply_markup=markup)
-        else:
-            await query.message.reply_text('Произошла ошибка при размещении объявления.', reply_markup=markup)
-        return CHOOSING
-    elif data == 'confirm_edit':
-        ann_id = context.user_data.get('edit_ann_id')
-        if ann_id:
-            # Use new description and price if provided
-            description = context.user_data.get('new_description', context.user_data.get('description'))
-            price = context.user_data.get('new_price', context.user_data.get('price'))
-            photos = context.user_data.get('photos', [])  # Updated photos
+            if post_link:
+                await query.message.reply_text(f'Ваше объявление размещено!\nСсылка: {post_link}', reply_markup=markup)
+            else:
+                logger.error("Ошибка при размещении нового объявления.")
+                await query.message.reply_text('Произошла ошибка при размещении объявления.', reply_markup=markup)
+            return CHOOSING
 
-            # Get the current date and time for the "Updated" message
-            current_time = datetime.now().strftime('%d %B %Y')
+        # Если это редактирование опубликованного объявления
+        elif 'edit_ann_id' in context.user_data:
+            ann_id = context.user_data.get('edit_ann_id')
+            if ann_id:
+                logger.info("Редактируемое объявление ID: %s", ann_id)
 
-            # Generate the updated message text with the current date
-            message_text = f"Описание: {description}\nЦена: {price}\n\nОбновлено {current_time}"
+                # Вызов функции confirm_edit_published
+                post_link = await confirm_edit_published(context, ann_id)
+                logger.info("Ссылка на обновленное объявление: %s", post_link)
 
-            # Retrieve old message IDs to delete old messages
-            async with aiosqlite.connect('announcements.db') as db:
-                cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
-                row = await cursor.fetchone()
-                if row:
-                    old_message_ids = json.loads(row[0])
-
-                    # Delete old messages (photos and text) from the channel
-                    for message_id in old_message_ids:
-                        try:
-                            await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
-                        except Exception as e:
-                            logger.error(f"Ошибка при удалении старого сообщения {message_id}: {e}")
-
-                    # Send new photos and text with the updated message
-                    new_message_ids = []
-                    if photos:
-                        media = []
-                        for idx, photo_id in enumerate(photos):
-                            if idx == 0:
-                                media.append(InputMediaPhoto(media=photo_id, caption=message_text))
-                            else:
-                                media.append(InputMediaPhoto(media=photo_id))
-
-                        # Send a new group of photos
-                        sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
-                        new_message_ids = [msg.message_id for msg in sent_messages]
-                    else:
-                        sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text)
-                        new_message_ids = [sent_message.message_id]
-
-                    # Update the database with the new message IDs and photo_file_ids
-                    await db.execute('''
-                        UPDATE announcements
-                        SET description = ?, price = ?, message_ids = ?, photo_file_ids = ?
-                        WHERE id = ?
-                    ''', (
-                        description,  # Updated description
-                        price,        # Updated price
-                        json.dumps(new_message_ids),  # Save new message IDs
-                        json.dumps(photos),  # Save updated photos
-                        ann_id
-                    ))
-                    await db.commit()
-
-                    # Confirm success to the user
-                    await query.message.reply_text('Ваше объявление было успешно обновлено!', reply_markup=markup)
+                if post_link:
+                    await query.message.reply_text(f'Ваше объявление обновлено!\nСсылка: {post_link}', reply_markup=markup)
                 else:
-                    await query.message.reply_text('Ошибка: не удалось найти объявление для редактирования.')
-        else:
-            await query.message.reply_text('Ошибка: не удалось получить ID объявления.')
-        return CHOOSING
+                    logger.error("Ошибка при редактировании объявления.")
+                    await query.message.reply_text('Произошла ошибка при редактировании объявления.', reply_markup=markup)
+            else:
+                logger.error("Ошибка: не удалось получить ID объявления.")
+                await query.message.reply_text('Ошибка: не удалось получить ID объявления.')
+            return CHOOSING
 
 async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
