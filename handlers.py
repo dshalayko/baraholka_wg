@@ -1,4 +1,4 @@
-from telegram import Update, InputMediaPhoto, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, InputMediaPhoto, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
 from datetime import datetime
 from config import *
@@ -84,7 +84,9 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if choice == 'Добавить объявление':
         # Очищаем все данные пользователя
         context.user_data.clear()
-        await update.message.reply_text('Пожалуйста, отправьте описание вашего объявления.', reply_markup=cancel_markup)
+
+        # Убираем клавиатуру с кнопкой "Вернуться в меню"
+        await update.message.reply_text('Пожалуйста, отправьте описание вашего объявления.', reply_markup=ReplyKeyboardRemove())
         return DESCRIPTION
     elif choice == 'Мои объявления':
         await show_user_announcements(update, context)
@@ -176,14 +178,10 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
     logger.info(
         f"Начало функции добавления фотографий для неопубликованного объявления. User ID: {update.effective_user.id}")
 
-    # Обрабатываем нажатие кнопки "Вернуться в меню"
-    if update.message.text == 'Вернуться в меню':
-        await show_menu(update, context)
-        return CHOOSING
-
     if 'photos' not in context.user_data:
         context.user_data['photos'] = []
 
+    # Проверка на отправку фотографии
     if update.message.photo:
         photo = update.message.photo[-1]
         context.user_data['photos'].append(photo.file_id)
@@ -192,17 +190,37 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
             'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
             reply_markup=finish_photo_markup_with_cancel
         )
-    elif update.message.text == 'Закончить загрузку фото':
-        logger.info("Пользователь завершил загрузку фото для неопубликованного объявления.")
 
+    # Проверка на нажатие кнопки "Объявление без фото"
+    elif update.message.text == 'Объявление без фото':
+        logger.info("Пользователь выбрал создание объявления без фото.")
+
+        # Проверяем, что описание и цена уже указаны
         if not context.user_data.get('description') or not context.user_data.get('price'):
             await update.message.reply_text('Описание и цена обязательны для создания объявления.')
             return ADDING_PHOTOS
 
+        # Переходим к предварительному просмотру объявления без фото
         await send_preview(update, context, editing=False)
         return CONFIRMATION
+
+    # Если пользователь завершил загрузку фото
+    elif update.message.text == 'Закончить загрузку фото':
+        logger.info("Пользователь завершил загрузку фото для неопубликованного объявления.")
+
+        # Проверяем, что описание и цена уже указаны
+        if not context.user_data.get('description') or not context.user_data.get('price'):
+            await update.message.reply_text('Описание и цена обязательны для создания объявления.')
+            return ADDING_PHOTOS
+
+        # Переходим к предварительному просмотру объявления
+        await send_preview(update, context, editing=False)
+        return CONFIRMATION
+
     else:
-        await update.message.reply_text('Пожалуйста, отправьте фотографию или нажмите "Закончить загрузку фото".')
+        await update.message.reply_text(
+            'Пожалуйста, отправьте фотографию или нажмите "Закончить загрузку фото" либо "Объявление без фото".'
+        )
     return ADDING_PHOTOS
 
 # Вносим изменения в основной обработчик
@@ -228,7 +246,7 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
         return DESCRIPTION
 
     context.user_data['description'] = description
-    await update.message.reply_text('Теперь укажите цену.', reply_markup=cancel_markup)
+    await update.message.reply_text('Теперь укажите цену.')  # Убираем кнопку "Вернуться в меню"
     return PRICE
 
 async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -248,7 +266,7 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'Теперь отправьте фото вашего объявления.\n'
         'Когда закончите, нажмите кнопку "Закончить загрузку фото" или отправьте команду /done.\n'
         'Если хотите создать объявление без фото, нажмите кнопку ниже.',
-        reply_markup=photo_markup_with_cancel
+        reply_markup=photo_markup_with_cancel  # Оставляем кнопки для фото
     )
     context.user_data['photos'] = []
     return ADDING_PHOTOS
