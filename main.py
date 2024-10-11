@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 from handlers import (
     start, menu, check_subscription, handle_choice, button_handler,
-    adding_photos, description_received, price_received, confirmation_handler,
+    handle_add_photos, description_received, price_received, confirmation_handler,
     edit_choice_handler, edit_description_received, edit_price_received,
     cancel, error_handler, get_chat_id, relevance_button_handler, check_subscription_callback
 )
@@ -44,7 +44,7 @@ async def main():
             DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_received)],
             PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, price_received)],
             ADDING_PHOTOS: [
-                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, adding_photos),
+                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, handle_add_photos),
             ],
             CONFIRMATION: [CallbackQueryHandler(confirmation_handler, pattern='^(preview_edit|post|confirm_edit)$')],
             EDIT_CHOICE: [
