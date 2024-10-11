@@ -212,9 +212,14 @@ async def handle_add_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def description_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
-    context.user_data['user_id'] = user.id  # Сохранение ID пользователя
     description = update.message.text.strip()
 
+    # Проверка на количество символов (4096 символов для описания)
+    if len(description) > 4096:
+        await update.message.reply_text(f'Описание слишком длинное. Максимум 4096 символов. Сейчас: {len(description)} символов.')
+        return DESCRIPTION
+
+    # Проверяем, что описание не пустое
     if not description:
         await update.message.reply_text('Описание не может быть пустым. Пожалуйста, введите описание.')
         return DESCRIPTION
@@ -224,18 +229,20 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
     return PRICE
 
 async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text == 'Вернуться в меню':
-        await show_menu(update, context)
-        return CHOOSING
-
     price = update.message.text.strip()
+
+    # Установим ограничение на 255 символов для цены (можно менять по необходимости)
+    if len(price) > 255:
+        await update.message.reply_text(f'Цена слишком длинная. Максимум 255 символов. Сейчас: {len(price)} символов.')
+        return PRICE
+
     if not price:
         await update.message.reply_text('Цена не может быть пустой. Пожалуйста, введите цену.')
         return PRICE
 
     context.user_data['price'] = price
     await update.message.reply_text(
-        'Теперь отправьте фото вашего объявления. Вы можете отправить несколько фотографий по очереди.\n'
+        'Теперь отправьте фото вашего объявления.\n'
         'Когда закончите, нажмите кнопку "Закончить загрузку фото" или отправьте команду /done.\n'
         'Если хотите создать объявление без фото, нажмите кнопку ниже.',
         reply_markup=photo_markup_with_cancel
@@ -255,20 +262,17 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
     username = user.username if user.username else user.first_name
     context.user_data['username'] = username  # Сохраняем username в context.user_data
 
+    # Формируем сообщение
     message = f"Автор: @{username}\nОписание: {description}\nЦена: {price}"
 
-    # Проверяем, является ли это редактированием опубликованного объявления
+    # Добавляем "Обновлено", если это редактирование опубликованного объявления
     if editing and 'edit_ann_id' in context.user_data:
-        ann_id = context.user_data.get('edit_ann_id')
+        current_time = datetime.now().strftime('%d %B %Y')
+        message += f"\n\nОбновлено {current_time}"
 
-        # Проверим, опубликовано ли это объявление
-        async with aiosqlite.connect('announcements.db') as db:
-            cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
-            row = await cursor.fetchone()
-
-        if row:
-            current_time = datetime.now().strftime('%d %B %Y')
-            message += f"\n\nОбновлено {current_time}"
+    # Обрезаем сообщение до 1024 символов
+    if len(message) > 1024:
+        message = message[:1024]
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton('Редактировать', callback_data='preview_edit')],
@@ -432,6 +436,10 @@ async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     elif data == 'post':
         logger.info("Пользователь выбрал размещение объявления.")
 
+        # Если нет user_id в контексте, устанавливаем его
+        if 'user_id' not in context.user_data:
+            context.user_data['user_id'] = query.from_user.id  # Получаем ID пользователя из callback запроса
+
         # Проверим, опубликованное ли это объявление или нет
         ann_id = context.user_data.get('edit_ann_id')
 
@@ -439,7 +447,7 @@ async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.info(f"Редактируемое объявление ID: {ann_id}")
             post_link = await confirm_edit_published(context, update, ann_id)
         else:
-            logger.info("Новое неопубликованное объявление.")
+            logger.info(f"Новое объявление, создание с нуля.")
             post_link = await confirm_edit_unpublished(context)
 
         if post_link:
@@ -725,7 +733,11 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         ann_id, message_ids_json, description, price, photo_file_ids_json = row
         message_ids = json.loads(message_ids_json)
         photos = json.loads(photo_file_ids_json) if photo_file_ids_json else []
+
+        # Формируем сообщение с ограничением по длине
         message = f"Описание: {description}\nЦена: {price}"
+        if len(message) > 1024:
+            message = message[:1024]
 
         keyboard = InlineKeyboardMarkup([
             [
