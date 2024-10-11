@@ -146,13 +146,7 @@ async def remove_old_photos(old_message_ids, context):
 
 # Добавляем новую функцию для опубликованных объявлений
 async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(
-        f"Начало функции добавления фотографий для опубликованного объявления. User ID: {update.effective_user.id}")
-
-    # Обрабатываем нажатие кнопки "Вернуться в меню"
-    if update.message.text == 'Вернуться в меню':
-        await show_menu(update, context)
-        return CHOOSING
+    logger.info(f"Начало функции добавления фотографий для опубликованного объявления. User ID: {update.effective_user.id}")
 
     if 'photos' not in context.user_data:
         context.user_data['photos'] = []
@@ -163,7 +157,7 @@ async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_
         logger.info(f"Добавлено фото: {photo.file_id}")
         await update.message.reply_text(
             'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
-            reply_markup=finish_photo_markup_with_cancel
+            reply_markup=finish_photo_markup_no_menu  # Клавиатура без кнопки "Вернуться в меню"
         )
     elif update.message.text == 'Закончить загрузку фото':
         logger.info("Пользователь завершил загрузку фото для опубликованного объявления.")
@@ -193,48 +187,37 @@ async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_
 
 # Добавляем новую функцию для неопубликованных объявлений
 async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(
-        f"Начало функции добавления фотографий для неопубликованного объявления. User ID: {update.effective_user.id}")
+    logger.info(f"Начало функции добавления фотографий для неопубликованного объявления. User ID: {update.effective_user.id}")
 
     if 'photos' not in context.user_data:
         context.user_data['photos'] = []
 
-    # Проверка на отправку фотографии
     if update.message.photo:
         photo = update.message.photo[-1]
         context.user_data['photos'].append(photo.file_id)
         logger.info(f"Добавлено фото: {photo.file_id}")
         await update.message.reply_text(
             'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
-            reply_markup=finish_photo_markup_with_cancel
+            reply_markup=finish_photo_markup_no_menu  # Клавиатура без кнопки "Вернуться в меню"
         )
-
-    # Проверка на нажатие кнопки "Объявление без фото"
     elif update.message.text == 'Объявление без фото':
         logger.info("Пользователь выбрал создание объявления без фото.")
 
-        # Проверяем, что описание и цена уже указаны
         if not context.user_data.get('description') or not context.user_data.get('price'):
             await update.message.reply_text('Описание и цена обязательны для создания объявления.')
             return ADDING_PHOTOS
 
-        # Переходим к предварительному просмотру объявления без фото
         await send_preview(update, context, editing=False)
         return CONFIRMATION
-
-    # Если пользователь завершил загрузку фото
     elif update.message.text == 'Закончить загрузку фото':
         logger.info("Пользователь завершил загрузку фото для неопубликованного объявления.")
 
-        # Проверяем, что описание и цена уже указаны
         if not context.user_data.get('description') or not context.user_data.get('price'):
             await update.message.reply_text('Описание и цена обязательны для создания объявления.')
             return ADDING_PHOTOS
 
-        # Переходим к предварительному просмотру объявления
         await send_preview(update, context, editing=False)
         return CONFIRMATION
-
     else:
         await update.message.reply_text(
             'Пожалуйста, отправьте фотографию или нажмите "Закончить загрузку фото" либо "Объявление без фото".'

@@ -21,16 +21,20 @@ cancel_markup = ReplyKeyboardMarkup(cancel_keyboard, resize_keyboard=True)
 # Клавиатура для добавления фотографий
 photo_keyboard = [
     [KeyboardButton('Объявление без фото')],
-    [KeyboardButton('Вернуться в меню')]
 ]
 photo_markup_with_cancel = ReplyKeyboardMarkup(photo_keyboard, resize_keyboard=True)
 
 # Клавиатура для завершения загрузки фотографий
 finish_photo_keyboard = [
     [KeyboardButton('Закончить загрузку фото')],
-    [KeyboardButton('Вернуться в меню')]
 ]
 finish_photo_markup_with_cancel = ReplyKeyboardMarkup(finish_photo_keyboard, resize_keyboard=True)
+
+finish_photo_markup_no_menu = ReplyKeyboardMarkup(
+    [['Закончить загрузку фото']],
+    one_time_keyboard=True,
+    resize_keyboard=True
+)
 
 # Клавиатура для редактирования
 edit_keyboard = [
