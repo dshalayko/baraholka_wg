@@ -257,10 +257,18 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
     message = f"Автор: @{username}\nОписание: {description}\nЦена: {price}"
 
-    # Проверяем, является ли это редактированием
+    # Проверяем, является ли это редактированием опубликованного объявления
     if editing and 'edit_ann_id' in context.user_data:
-        current_time = datetime.now().strftime('%d %B %Y')
-        message += f"\n\nОбновлено {current_time}"
+        ann_id = context.user_data.get('edit_ann_id')
+
+        # Проверим, опубликовано ли это объявление
+        async with aiosqlite.connect('announcements.db') as db:
+            cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
+            row = await cursor.fetchone()
+
+        if row:
+            current_time = datetime.now().strftime('%d %B %Y')
+            message += f"\n\nОбновлено {current_time}"
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton('Редактировать', callback_data='preview_edit')],
@@ -287,6 +295,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
             await update.message.reply_text(message, reply_markup=keyboard)
         else:
             await update.callback_query.message.reply_text(message, reply_markup=keyboard)
+
 
 async def confirm_edit_unpublished(context):
     logger.info("Начало функции confirm_edit_unpublished")
@@ -332,7 +341,7 @@ async def confirm_edit_unpublished(context):
         await db.commit()
 
     # Сохраняем ID объявления в context.user_data
-    context.user_data['edit_ann_id'] = ann_id
+    context.user_data['edit_ann_id'] = ann_id  # Эта строка важна
 
     logger.info(f"Объявление успешно сохранено в базе данных с ID: {ann_id}")
 
@@ -423,20 +432,20 @@ async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     elif data == 'post':
         logger.info("Пользователь выбрал размещение объявления.")
 
-        # Если это опубликованное объявление
-        if 'edit_ann_id' in context.user_data:
-            ann_id = context.user_data['edit_ann_id']
+        # Проверим, опубликованное ли это объявление или нет
+        ann_id = context.user_data.get('edit_ann_id')
+
+        if ann_id:
             logger.info(f"Редактируемое объявление ID: {ann_id}")
             post_link = await confirm_edit_published(context, update, ann_id)
         else:
-            # Если это новое объявление
+            logger.info("Новое неопубликованное объявление.")
             post_link = await confirm_edit_unpublished(context)
 
         if post_link:
             await query.message.reply_text(f'Ваше объявление размещено!\nСсылка: {post_link}', reply_markup=markup)
         else:
             await query.message.reply_text('Произошла ошибка при размещении объявления.', reply_markup=markup)
-
         return CHOOSING
 
 async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
