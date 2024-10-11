@@ -14,7 +14,8 @@ from handlers import (
     start, menu, check_subscription, handle_choice, button_handler,
     handle_add_photos, description_received, price_received, confirmation_handler,
     edit_choice_handler, edit_description_received, edit_price_received,
-    cancel, error_handler, get_chat_id, relevance_button_handler, check_subscription_callback
+    cancel, error_handler, get_chat_id, relevance_button_handler, check_subscription_callback,
+    menu_button_handler
 )
 from database import init_db
 from config import (
@@ -61,6 +62,8 @@ async def main():
     app.add_handler(conv_handler)
     app.add_handler(CallbackQueryHandler(check_subscription, pattern='^check_subscription$'))
     app.add_handler(CallbackQueryHandler(relevance_button_handler, pattern=r'^(extend|remove)_\d+$'))
+    app.add_handler(CommandHandler('menu', menu))
+    app.add_handler(CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'))
     app.add_handler(CommandHandler('get_chat_id', get_chat_id))
     app.add_error_handler(error_handler)
 

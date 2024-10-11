@@ -44,25 +44,43 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
+
+    # Проверяем подписку
     if not await is_subscribed(user_id, context):
         text, keyboard = await check_subscription_message()
         await update.message.reply_text(text, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
     else:
+        # Создаем клавиатуру с двумя кнопками
+        keyboard = [
+            [InlineKeyboardButton("Добавить обьявление", callback_data='add_advertisement')],
+            [InlineKeyboardButton("Мои обьявления", callback_data='my_advertisements')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         # Проверяем, есть ли у пользователя объявления
         if await has_user_ads(user_id):
             # Существующий пользователь: показываем меню с двумя кнопками
-            await update.message.reply_text(
-                'Выберите действие:',
-                reply_markup=markup  # Клавиатура с двумя кнопками
-            )
+            await update.message.reply_text('Выберите действие:', reply_markup=reply_markup)
         else:
             # Новый пользователь: показываем только кнопку «Добавить объявление»
             await update.message.reply_text(
                 'Вы можете добавить свое первое объявление.',
-                reply_markup=add_advertisement_keyboard  # Клавиатура с одной кнопкой
+                reply_markup=reply_markup
             )
         return CHOOSING
+
+async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # Обработка кнопки "Добавить обьявление"
+    if query.data == 'add_advertisement':
+        await handle_choice(update, context)
+
+    # Обработка кнопки "Мои обьявления"
+    elif query.data == 'my_advertisements':
+        await show_user_announcements(update, context)
 
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -747,9 +765,11 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
     reply_message = update.effective_message
 
     if not rows:
+        # Если нет объявлений, показываем сообщение и существующую клавиатуру
         await reply_message.reply_text('У вас пока нет объявлений.', reply_markup=markup)
         return CHOOSING  # Бот остается в состоянии выбора действия
 
+    # Перебираем все объявления пользователя
     for row in rows:
         ann_id, message_ids_json, description, price, photo_file_ids_json = row
         message_ids = json.loads(message_ids_json)
@@ -760,6 +780,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         if len(message) > 1024:
             message = message[:1024]
 
+        # Клавиатура для редактирования или удаления объявления
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton('Редактировать', callback_data=f'edit_{ann_id}'),
@@ -767,6 +788,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
             ]
         ])
 
+        # Отправляем фото, если они есть
         if photos:
             media = []
             for idx, photo_id in enumerate(photos):
@@ -777,7 +799,14 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
             await reply_message.reply_media_group(media=media)
             await reply_message.reply_text('Ваше объявление:', reply_markup=keyboard)
         else:
+            # Если фото нет, просто отправляем сообщение с текстом
             await reply_message.reply_text(message, reply_markup=keyboard)
+
+    # После показа всех объявлений выводим основную клавиатуру
+    await reply_message.reply_text(
+        'Выберите действие:',
+        reply_markup=markup  # Существующая клавиатура с кнопками "Добавить обьявление" и "Мои обьявления"
+    )
 
     return CHOOSING  # Бот остается в состоянии выбора действия
 
