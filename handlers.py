@@ -308,15 +308,21 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
     username = user.username if user.username else user.first_name
     context.user_data['username'] = username  # Сохраняем username в context.user_data
 
-    # Формируем сообщение
     message = f"Автор: @{username}\nОписание: {description}\nЦена: {price}"
 
-    # Добавляем "Обновлено", если это редактирование опубликованного объявления
+    # Проверяем, является ли это редактированием опубликованного объявления
     if editing and 'edit_ann_id' in context.user_data:
-        current_time = datetime.now().strftime('%d %B %Y')
-        message += f"\n\nОбновлено {current_time}"
+        ann_id = context.user_data.get('edit_ann_id')
 
-    # Обрезаем сообщение до 1024 символов
+        # Проверяем, опубликовано ли объявление (по наличию ann_id)
+        async with aiosqlite.connect('announcements.db') as db:
+            cursor = await db.execute('SELECT * FROM announcements WHERE id = ?', (ann_id,))
+            row = await cursor.fetchone()
+            if row:
+                current_time = datetime.now().strftime('%d %B %Y')
+                message += f"\n\nОбновлено {current_time}"
+
+     # Обрезаем сообщение до 1024 символов
     if len(message) > 1024:
         message = message[:1024]
 
