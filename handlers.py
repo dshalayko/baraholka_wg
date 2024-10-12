@@ -157,16 +157,22 @@ async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_
         context.user_data['photos'] = []
 
     if update.message.photo:
-        photo = update.message.photo[-1]
-        context.user_data['photos'].append(photo.file_id)
-        logger.info(f"Добавлено фото: {photo.file_id}")
+        # Проверка на количество фотографий
+        if len(context.user_data['photos']) < 10:
+            photo = update.message.photo[-1]
+            context.user_data['photos'].append(photo.file_id)
+            logger.info(f"Добавлено фото: {photo.file_id}")
 
-        # Отправляем сообщение один раз после загрузки первого фото
-        if len(context.user_data['photos']) == 1:
-            await update.message.reply_text(
-                'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
-                reply_markup=finish_photo_markup_with_cancel
-            )
+            # Отправляем сообщение один раз после загрузки первого фото
+            if len(context.user_data['photos']) == 1:
+                await update.message.reply_text(
+                    'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
+                    reply_markup=finish_photo_markup_with_cancel
+                )
+        elif 'limit_reached' not in context.user_data:
+            # Предупреждаем о лимите и сохраняем флаг, чтобы не отправлять это сообщение повторно
+            await update.message.reply_text('Вы можете загрузить не более 10 фотографий. Лишние фото не будут сохранены.')
+            context.user_data['limit_reached'] = True
 
     elif update.message.text == 'Закончить загрузку фото':
         logger.info("Пользователь завершил загрузку фото для опубликованного объявления.")
@@ -201,16 +207,22 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
         context.user_data['photos'] = []
 
     if update.message.photo:
-        photo = update.message.photo[-1]
-        context.user_data['photos'].append(photo.file_id)
-        logger.info(f"Добавлено фото: {photo.file_id}")
+        # Проверка на количество фотографий
+        if len(context.user_data['photos']) < 10:
+            photo = update.message.photo[-1]
+            context.user_data['photos'].append(photo.file_id)
+            logger.info(f"Добавлено фото: {photo.file_id}")
 
-        # Отправляем сообщение один раз после загрузки первого фото
-        if len(context.user_data['photos']) == 1:
-            await update.message.reply_text(
-                'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
-                reply_markup=finish_photo_markup_with_cancel
-            )
+            # Отправляем сообщение один раз после загрузки первого фото
+            if len(context.user_data['photos']) == 1:
+                await update.message.reply_text(
+                    'Фото добавлено. Вы можете отправить еще одно или нажать "Закончить загрузку фото".',
+                    reply_markup=finish_photo_markup_with_cancel
+                )
+        elif 'limit_reached' not in context.user_data:
+            # Предупреждаем о лимите и сохраняем флаг, чтобы не отправлять это сообщение повторно
+            await update.message.reply_text('Вы можете загрузить не более 10 фотографий. Лишние фото не будут сохранены.')
+            context.user_data['limit_reached'] = True
 
     elif update.message.text == 'Объявление без фото':
         logger.info("Пользователь выбрал создание объявления без фото.")
@@ -231,7 +243,9 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
         return CONFIRMATION
 
     else:
-        await update.message.reply_text('Пожалуйста, отправьте фотографию или нажмите "Закончить загрузку фото" либо "Объявление без фото".')
+        await update.message.reply_text(
+            'Пожалуйста, отправьте фотографию или нажмите "Закончить загрузку фото" либо "Объявление без фото".'
+        )
     return ADDING_PHOTOS
 
 # Вносим изменения в основной обработчик
