@@ -61,11 +61,11 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Проверяем, есть ли у пользователя объявления
         if await has_user_ads(user_id):
             # Существующий пользователь: показываем меню с двумя кнопками
-            await update.message.reply_text('Выберите действие:', reply_markup=reply_markup)
+            await update.message.reply_text('Выберите действие:⤵️', reply_markup=reply_markup)
         else:
             # Новый пользователь: показываем только кнопку «Добавить объявление»
             await update.message.reply_text(
-                'Вы можете добавить свое первое объявление.',
+                '💥Вы можете добавить свое первое объявление.',
                 reply_markup=reply_markup
             )
         return CHOOSING
@@ -88,7 +88,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     if await is_subscribed(user_id, context):
         await query.message.reply_text(
-            'Спасибо за подписку!',
+            'Спасибо за подписку! 💃🏻',
         )
         await show_menu(query, context)
         return CHOOSING
@@ -240,7 +240,7 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
         )
 
         if not context.user_data.get('description') or not context.user_data.get('price'):
-            await update.message.reply_text('Описание и цена обязательны для создания объявления.')
+            await update.message.reply_text('❗Описание и цена обязательны для создания объявления.')
             return ADDING_PHOTOS
 
         await send_preview(update, context, editing=False)
@@ -256,7 +256,7 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
         )
 
         if not context.user_data.get('description') or not context.user_data.get('price'):
-            await update.message.reply_text('Описание и цена обязательны для создания объявления.')
+            await update.message.reply_text('❗Описание и цена обязательны для создания объявления.')
             return ADDING_PHOTOS
 
         await send_preview(update, context, editing=False)
@@ -282,12 +282,12 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Проверка на количество символов (4096 символов для описания)
     if len(description) > 4096:
-        await update.message.reply_text(f'Описание слишком длинное. Максимум 4096 символов. Сейчас: {len(description)} символов.')
+        await update.message.reply_text(f'❗Описание слишком длинное. Максимум 4096 символов. Сейчас: {len(description)} символов.')
         return DESCRIPTION
 
     # Проверяем, что описание не пустое
     if not description:
-        await update.message.reply_text('Описание не может быть пустым. Пожалуйста, введите описание.')
+        await update.message.reply_text('❗Описание не может быть пустым. Пожалуйста, введите описание.')
         return DESCRIPTION
 
     context.user_data['description'] = description
@@ -299,17 +299,17 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Установим ограничение на 255 символов для цены (можно менять по необходимости)
     if len(price) > 255:
-        await update.message.reply_text(f'Цена слишком длинная. Максимум 255 символов. Сейчас: {len(price)} символов.')
+        await update.message.reply_text(f'❗Цена слишком длинная. Максимум 255 символов. Сейчас: {len(price)} символов.')
         return PRICE
 
     if not price:
-        await update.message.reply_text('Цена не может быть пустой. Пожалуйста, введите цену.')
+        await update.message.reply_text('❗Цена не может быть пустой. Пожалуйста, введите цену.')
         return PRICE
 
     context.user_data['price'] = price
     await update.message.reply_text(
         'Теперь отправьте фото вашего объявления.\n'
-        'Когда закончите, нажмите кнопку "Закончить загрузку фото" или отправьте команду /done.\n'
+        'Когда закончите, нажмите кнопку "Закончить загрузку фото"\n'
         'Если хотите создать объявление без фото, нажмите кнопку ниже.',
         reply_markup=photo_markup_with_cancel  # Оставляем кнопки для фото
     )
@@ -347,7 +347,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
             row = await cursor.fetchone()
             if row:
                 current_time = datetime.now().strftime('%d %B %Y')
-                message += f"\n\nОбновлено {current_time}"
+                message += f"\n\n🆙 {current_time}"
 
     # Обрезаем сообщение до 1024 символов
     if len(message) > 1024:
@@ -387,14 +387,20 @@ async def confirm_edit_unpublished(context):
     price = context.user_data.get('new_price', context.user_data.get('price'))
     photos = context.user_data.get('photos', [])
 
-    logger.info(f"Описание: {description}, Цена: {price}, Фото: {photos}")
+    # Получаем username или first_name для автора объявления
+    username = context.user_data['username']
+
+    logger.info(f"Описание: {description}, Цена: {price}, Фото: {photos}, Автор: {username}")
+
+    # Формируем сообщение с указанием автора
+    message_text = f"Автор: @{username}\nОписание: {description}\nЦена: {price}"
 
     # Отправляем фото или текст, если фото нет
     if photos:
         media = []
         for idx, photo_id in enumerate(photos):
             if idx == 0:
-                media.append(InputMediaPhoto(media=photo_id, caption=f"Описание: {description}\nЦена: {price}"))
+                media.append(InputMediaPhoto(media=photo_id, caption=message_text))
             else:
                 media.append(InputMediaPhoto(media=photo_id))
 
@@ -402,7 +408,7 @@ async def confirm_edit_unpublished(context):
         message_ids = [msg.message_id for msg in sent_messages]
         logger.info(f"Фотографии отправлены, новые message_ids: {message_ids}")
     else:
-        sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=f"Описание: {description}\nЦена: {price}")
+        sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text)
         message_ids = [sent_message.message_id]
         logger.info(f"Отправлено текстовое сообщение, message_id: {message_ids[0]}")
 
@@ -442,7 +448,14 @@ async def confirm_edit_published(context, update, ann_id):
     price = context.user_data.get('new_price', context.user_data.get('price'))
     photos = context.user_data.get('photos', [])
 
-    logger.info(f"Описание: {description}, Цена: {price}, Фотографии: {photos}")
+    # Получаем username или first_name для автора объявления
+    username = context.user_data['username']
+
+    logger.info(f"Описание: {description}, Цена: {price}, Фотографии: {photos}, Автор: {username}")
+
+    # Формируем текст с "Обновлено" для опубликованного объявления
+    current_time = datetime.now().strftime('%d %B %Y')
+    message_text = f"Автор: @{username}\nОписание: {description}\nЦена: {price}\n\nОбновлено {current_time}"
 
     # Получаем старые message_ids для удаления
     async with aiosqlite.connect('announcements.db') as db:
@@ -458,7 +471,7 @@ async def confirm_edit_published(context, update, ann_id):
 
             # Формируем текст с "Обновлено" для опубликованного объявления
             current_time = datetime.now().strftime('%d %B %Y')
-            message_text = f"Описание: {description}\nЦена: {price}\n\nОбновлено {current_time}"
+            message_text = f"Описание: {description}\nЦена: {price}\n\n🆙 {current_time}"
 
             # Отправляем новые фото и текст
             if photos:
@@ -529,7 +542,7 @@ async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             post_link = await confirm_edit_unpublished(context)
 
         if post_link:
-            await query.message.reply_text(f'Ваше объявление размещено!\nСсылка: {post_link}', reply_markup=markup)
+            await query.message.reply_text(f'💥Ваше объявление размещено!\nСсылка: {post_link}', reply_markup=markup)
         else:
             await query.message.reply_text('Произошла ошибка при размещении объявления.', reply_markup=markup)
         return CHOOSING
@@ -571,7 +584,7 @@ async def edit_description_received(update: Update, context: ContextTypes.DEFAUL
 
     new_description = update.message.text.strip()
     if not new_description:
-        await update.message.reply_text('Описание не может быть пустым. Пожалуйста, введите описание.')
+        await update.message.reply_text('❗Описание не может быть пустым. Пожалуйста, введите описание.')
         return EDIT_DESCRIPTION
 
     context.user_data['new_description'] = new_description
@@ -602,7 +615,7 @@ async def edit_description_received(update: Update, context: ContextTypes.DEFAUL
                 await send_preview(update, context, editing=True)
                 return CONFIRMATION
             else:
-                await update.message.reply_text('Не удалось найти объявление для редактирования.')
+                await update.message.reply_text('❗Не удалось найти объявление для редактирования.')
                 return CHOOSING
     else:
         # Создание нового объявления
@@ -616,7 +629,7 @@ async def edit_price_received(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     new_price = update.message.text.strip()
     if not new_price:
-        await update.message.reply_text('Цена не может быть пустой. Пожалуйста, введите цену.')
+        await update.message.reply_text('❗Цена не может быть пустой. Пожалуйста, введите цену.')
         return EDIT_PRICE
 
     context.user_data['new_price'] = new_price
@@ -647,7 +660,7 @@ async def edit_price_received(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await send_preview(update, context, editing=True)
                 return CONFIRMATION
             else:
-                await update.message.reply_text('Не удалось найти объявление для редактирования.')
+                await update.message.reply_text('❗Не удалось найти объявление для редактирования.')
                 return CHOOSING
     else:
         # Создание нового объявления
@@ -715,14 +728,24 @@ async def send_announcement(context: ContextTypes.DEFAULT_TYPE, update: Update):
     photos = context.user_data.get('photos', [])
     description = context.user_data['description']
     price = context.user_data['price']
+
+    # Получаем username или first_name для автора объявления
     user = update.callback_query.from_user if update.callback_query else update.message.from_user
     username = user.username if user.username else user.first_name
+    context.user_data['username'] = username
+
+    # Формируем сообщение с указанием автора
     message = f"Автор: @{username}\nОписание: {description}\nЦена: {price}"
+
+    # Обрезаем сообщение до 1024 символов
+    if len(message) > 1024:
+        message = message[:1024]
 
     if photos:
         media = []
         for idx, photo_id in enumerate(photos):
             if idx == 0:
+                # Добавляем автора и описание в первое фото
                 media.append(InputMediaPhoto(media=photo_id, caption=message))
             else:
                 media.append(InputMediaPhoto(media=photo_id))
@@ -885,9 +908,12 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
         await show_menu(update, context)
         return CHOOSING
     else:
+        # Получаем сообщение и клавиатуру для проверки подписки
+        text, keyboard = await check_subscription_message()
+
         # Пользователь не подписан: уведомляем об этом
         await query.message.reply_text(
-            'Вы еще не подписались на канал. Пожалуйста, подпишитесь, чтобы продолжить.',
-            reply_markup=check_subscription_message()[1]  # Повторно показываем кнопки
+            text,  # Сообщение о необходимости подписки
+            reply_markup=keyboard  # Повторно показываем кнопки
         )
         return CHECK_SUBSCRIPTION
