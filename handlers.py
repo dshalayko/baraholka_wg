@@ -177,6 +177,12 @@ async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_
     elif update.message.text == 'Закончить загрузку фото':
         logger.info("Пользователь завершил загрузку фото для опубликованного объявления.")
 
+        # Скрываем клавиатуру
+        await update.message.reply_text(
+            "Обработка фотографий...",
+            reply_markup=ReplyKeyboardRemove()  # Убираем клавиатуру
+        )
+
         # Проверяем, есть ли описание и цена в контексте
         if not context.user_data.get('description') or not context.user_data.get('price'):
             ann_id = context.user_data.get('edit_ann_id')
@@ -226,6 +232,13 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
 
     elif update.message.text == 'Объявление без фото':
         logger.info("Пользователь выбрал создание объявления без фото.")
+
+        # Скрываем клавиатуру
+        await update.message.reply_text(
+            "Обработка объявления без фото...",
+            reply_markup=ReplyKeyboardRemove()  # Убираем клавиатуру
+        )
+
         if not context.user_data.get('description') or not context.user_data.get('price'):
             await update.message.reply_text('Описание и цена обязательны для создания объявления.')
             return ADDING_PHOTOS
@@ -235,6 +248,13 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
 
     elif update.message.text == 'Закончить загрузку фото':
         logger.info("Пользователь завершил загрузку фото для неопубликованного объявления.")
+
+        # Скрываем клавиатуру
+        await update.message.reply_text(
+            "Обработка фотографий...",
+            reply_markup=ReplyKeyboardRemove()  # Убираем клавиатуру
+        )
+
         if not context.user_data.get('description') or not context.user_data.get('price'):
             await update.message.reply_text('Описание и цена обязательны для создания объявления.')
             return ADDING_PHOTOS
@@ -310,6 +330,13 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
     message = f"Автор: @{username}\nОписание: {description}\nЦена: {price}"
 
+    # Убираем текущую клавиатуру (если она активна)
+    if update.message and update.message.reply_markup:
+        await update.message.reply_text(
+            "Ожидайте предварительный просмотр...",
+            reply_markup=ReplyKeyboardRemove()  # Убираем текущую клавиатуру
+        )
+
     # Проверяем, является ли это редактированием опубликованного объявления
     if editing and 'edit_ann_id' in context.user_data:
         ann_id = context.user_data.get('edit_ann_id')
@@ -322,7 +349,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
                 current_time = datetime.now().strftime('%d %B %Y')
                 message += f"\n\nОбновлено {current_time}"
 
-     # Обрезаем сообщение до 1024 символов
+    # Обрезаем сообщение до 1024 символов
     if len(message) > 1024:
         message = message[:1024]
 
@@ -351,7 +378,6 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
             await update.message.reply_text(message, reply_markup=keyboard)
         else:
             await update.callback_query.message.reply_text(message, reply_markup=keyboard)
-
 
 async def confirm_edit_unpublished(context):
     logger.info("Начало функции confirm_edit_unpublished")
@@ -744,10 +770,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return EDIT_CHOICE
     elif data.startswith('delete_'):
         ann_id = int(data.split('_')[1])
-        await delete_announcement_by_id(ann_id, context)
+        await delete_announcement_by_id(ann_id, context, query)
         await query.message.reply_text('Ваше объявление было удалено.')
-        # Обновляем список объявлений
-        await show_user_announcements(update, context)
         return CHOOSING
     else:
         # Обработка других callback данных, если необходимо
@@ -755,21 +779,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return CHOOSING  # Убедимся, что бот остается в состоянии выбора действия
 
-async def delete_announcement_by_id(ann_id, context):
+async def delete_announcement_by_id(ann_id, context, query):
     async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
+        cursor = await db.execute('SELECT message_ids, photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         if row:
-            message_ids = json.loads(row[0])  # Получаем все message_id
+            message_ids = json.loads(row[0])  # Получаем все message_id из канала
+            photos = json.loads(row[1]) if row[1] else []
+
+            # Удаляем сообщения в канале
             for message_id in message_ids:
                 try:
                     await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+                    logger.info(f"Сообщение с ID {message_id} удалено из канала.")
                 except Exception as e:
                     logger.error(f"Ошибка при удалении сообщения {message_id}: {e}")
 
             # Удаляем запись об объявлении из базы данных
             await db.execute('DELETE FROM announcements WHERE id = ?', (ann_id,))
             await db.commit()
+
+            # Удаляем сообщение с объявлениями у пользователя без отправки нового
+            try:
+                await query.message.delete()
+                logger.info("Сообщение с объявлением у пользователя удалено.")
+            except Exception as e:
+                logger.error(f"Ошибка при удалении сообщения у пользователя: {e}")
+
 
 async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -778,11 +814,9 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
     reply_message = update.effective_message
 
     if not rows:
-        # Если нет объявлений, показываем сообщение и существующую клавиатуру
         await reply_message.reply_text('У вас пока нет объявлений.', reply_markup=markup)
         return CHOOSING  # Бот остается в состоянии выбора действия
 
-    # Перебираем все объявления пользователя
     for row in rows:
         ann_id, message_ids_json, description, price, photo_file_ids_json = row
         message_ids = json.loads(message_ids_json)
@@ -793,7 +827,13 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         if len(message) > 1024:
             message = message[:1024]
 
-        # Клавиатура для редактирования или удаления объявления
+        # Добавляем ссылку на полную версию объявления, если больше одной фотографии
+        if len(photos) > 1:
+            channel_username = CHANNEL_USERNAME.replace('@', '')  # Убираем @ из названия канала
+            post_link = f"https://t.me/{channel_username}/{message_ids[0]}"
+            message += f"\n\n[Смотреть полную версию с фотографиями]({post_link})"
+
+        # Формируем клавиатуру с кнопками "Редактировать" и "Удалить"
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton('Редактировать', callback_data=f'edit_{ann_id}'),
@@ -801,25 +841,12 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
             ]
         ])
 
-        # Отправляем фото, если они есть
+        # Если есть фотографии, отправляем только первую с кнопками и ссылкой на полную версию
         if photos:
-            media = []
-            for idx, photo_id in enumerate(photos):
-                if idx == 0:
-                    media.append(InputMediaPhoto(media=photo_id, caption=message))
-                else:
-                    media.append(InputMediaPhoto(media=photo_id))
-            await reply_message.reply_media_group(media=media)
-            await reply_message.reply_text('Ваше объявление:', reply_markup=keyboard)
+            await reply_message.reply_photo(photo=photos[0], caption=message, reply_markup=keyboard, parse_mode='Markdown')
         else:
-            # Если фото нет, просто отправляем сообщение с текстом
-            await reply_message.reply_text(message, reply_markup=keyboard)
-
-    # После показа всех объявлений выводим основную клавиатуру
-    await reply_message.reply_text(
-        'Выберите действие:',
-        reply_markup=markup  # Существующая клавиатура с кнопками "Добавить обьявление" и "Мои обьявления"
-    )
+            # Если нет фотографий, отправляем просто текст объявления с кнопками
+            await reply_message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
 
     return CHOOSING  # Бот остается в состоянии выбора действия
 
