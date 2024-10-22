@@ -554,11 +554,11 @@ async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if data == 'edit_description':
         context.user_data.pop('new_description', None)
-        await query.message.reply_text('Пожалуйста, отправьте новое описание.', reply_markup=cancel_markup)
+        await query.message.reply_text('Пожалуйста, отправьте новое описание.', reply_markup=ReplyKeyboardRemove())
         return EDIT_DESCRIPTION
     elif data == 'edit_price':
         context.user_data.pop('new_price', None)
-        await query.message.reply_text('Пожалуйста, укажите новую цену.', reply_markup=cancel_markup)
+        await query.message.reply_text('Пожалуйста, укажите новую цену.', reply_markup=ReplyKeyboardRemove())
         return EDIT_PRICE
     elif data == 'edit_photos':
         # Ensure `edit_ann_id` is set if editing an existing announcement
