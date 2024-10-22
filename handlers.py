@@ -346,7 +346,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
             cursor = await db.execute('SELECT * FROM announcements WHERE id = ?', (ann_id,))
             row = await cursor.fetchone()
             if row:
-                current_time = datetime.now().strftime('%d %B %Y')
+                current_time = datetime.now().strftime('%d.%m.%Y')
                 message += f"\n\n🆙 {current_time}"
 
     # Обрезаем сообщение до 1024 символов
@@ -419,7 +419,7 @@ async def confirm_edit_unpublished(context):
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             context.user_data['user_id'],  # ID пользователя
-            context.user_data['username'],  # Имя пользователя
+            username,  # Имя пользователя
             json.dumps(message_ids),  # ID сообщений
             description,
             price,
@@ -447,15 +447,9 @@ async def confirm_edit_published(context, update, ann_id):
     description = context.user_data.get('new_description', context.user_data.get('description'))
     price = context.user_data.get('new_price', context.user_data.get('price'))
     photos = context.user_data.get('photos', [])
+    username = context.user_data.get('username')  # Получаем имя пользователя
 
-    # Получаем username или first_name для автора объявления
-    username = context.user_data['username']
-
-    logger.info(f"Описание: {description}, Цена: {price}, Фотографии: {photos}, Автор: {username}")
-
-    # Формируем текст с "Обновлено" для опубликованного объявления
-    current_time = datetime.now().strftime('%d %B %Y')
-    message_text = f"Автор: @{username}\nОписание: {description}\nЦена: {price}\n\nОбновлено {current_time}"
+    logger.info(f"Описание: {description}, Цена: {price}, Фотографии: {photos}")
 
     # Получаем старые message_ids для удаления
     async with aiosqlite.connect('announcements.db') as db:
@@ -470,8 +464,8 @@ async def confirm_edit_published(context, update, ann_id):
             await remove_old_photos(old_message_ids, context)
 
             # Формируем текст с "Обновлено" для опубликованного объявления
-            current_time = datetime.now().strftime('%d %B %Y')
-            message_text = f"Описание: {description}\nЦена: {price}\n\n🆙 {current_time}"
+            current_time = datetime.now().strftime('%d.%m.%Y')
+            message_text = f"Автор: @{username}\nОписание: {description}\nЦена: {price}\n\n🆙 _Обновлено_ {current_time}"
 
             # Отправляем новые фото и текст
             if photos:
