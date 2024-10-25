@@ -1,5 +1,7 @@
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton
 
+from texts import *
+
 # Основная клавиатура с двумя кнопками: «Добавить объявление» и «Мои объявления»
 reply_keyboard = [
     ['Новое хрустящее объявление', 'Мои объявления'],
@@ -26,12 +28,12 @@ photo_markup_with_cancel = ReplyKeyboardMarkup(photo_keyboard, resize_keyboard=T
 
 # Клавиатура для завершения загрузки фотографий
 finish_photo_keyboard = [
-    [KeyboardButton('С фото закончили, давайте дальше')],
+    [KeyboardButton(FINISH_PHOTO_UPLOAD)],
 ]
 finish_photo_markup_with_cancel = ReplyKeyboardMarkup(finish_photo_keyboard, resize_keyboard=True)
 
 finish_photo_markup_no_menu = ReplyKeyboardMarkup(
-    [['С фото закончили, давайте дальше']],
+    [[FINISH_PHOTO_UPLOAD]],
     one_time_keyboard=True,
     resize_keyboard=True
 )

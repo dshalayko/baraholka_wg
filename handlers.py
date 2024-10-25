@@ -265,7 +265,7 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return PRICE
 
     context.user_data['price'] = price
-    await update.message.reply_text(ASK_FOR_PHOTOS, reply_markup=photo_markup_with_cancel)
+    await update.message.reply_text(ASK_FOR_PHOTOS, reply_markup=photo_markup_with_cancel, parse_mode='Markdown')
     context.user_data['photos'] = []
     return ADDING_PHOTOS
 
@@ -443,7 +443,7 @@ async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             post_link = await confirm_edit_unpublished(context)
 
         if post_link:
-            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup)
+            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup, parse_mode='Markdown')
         else:
             await query.message.reply_text(POST_FAILURE_MESSAGE, reply_markup=markup)
         return CHOOSING
@@ -604,7 +604,7 @@ async def relevance_button_handler(update: Update, context: ContextTypes.DEFAULT
         message_id = int(data.split('_')[1])
         # Удаляем объявление из канала и базы данных
         await delete_announcement_by_message_id(message_id, context)
-        await query.message.reply_text(REMOVED_MESSAGE)
+        await query.message.reply_text(DELETE_SUCCESS_MESSAGE)
 
 async def send_announcement(context: ContextTypes.DEFAULT_TYPE, update: Update):
     channel_id = CHANNEL_USERNAME
