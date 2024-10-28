@@ -740,10 +740,10 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         if len(message) > MAX_MESSAGE_LENGTH:
             message = message[:MAX_MESSAGE_LENGTH]
 
-        if len(photos) > 1:
-            channel_username = CHANNEL_USERNAME.replace('@', '')
-            post_link = f"https://t.me/{channel_username}/{message_ids[0]}"
-            message += f"\n\n[{FULL_VERSION_MESSAGE}]({post_link})"
+        # Добавляем ссылку на объявление в канале
+        channel_username = CHANNEL_USERNAME.replace('@', '')
+        post_link = f"https://t.me/{channel_username}/{message_ids[0]}"
+        message += f"\n\n[{FULL_VERSION_MESSAGE}]({post_link})"
 
         keyboard = InlineKeyboardMarkup([
             [
