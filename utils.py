@@ -2,6 +2,8 @@ from telegram.ext import ContextTypes
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from config import CHANNEL_USERNAME
 import logging
+from datetime import datetime
+import pytz
 
 from database import has_user_ads
 from keyboards import markup, add_advertisement_keyboard
@@ -60,3 +62,16 @@ async def check_subscription_message():
         [InlineKeyboardButton('Я подписался', callback_data='check_subscription')]
     ])
     return text, keyboard
+
+
+def get_serbia_time():
+    # Определяем временную зону для Сербии (Europe/Belgrade)
+    serbia_tz = pytz.timezone('Europe/Belgrade')
+
+    # Получаем текущее время в UTC и переводим в часовую зону Сербии
+    serbia_time = datetime.now(pytz.utc).astimezone(serbia_tz)
+
+    # Форматируем время в нужный формат
+    formatted_time = serbia_time.strftime('%d.%m.%Y в %H:%M')
+
+    return formatted_time

@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from datetime import datetime
 from config import *
 from keyboards import *
-from utils import is_subscribed, show_menu, check_subscription_message
+from utils import is_subscribed, show_menu, check_subscription_message, get_serbia_time
 from texts import *  # Импортируем все тексты
 from database import (
     save_announcement, get_user_announcements,
@@ -53,12 +53,17 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(WELCOME_NEW_USER, reply_markup=reply_markup)
         return CHOOSING
 
+
 async def format_announcement_text(description, price, username, is_updated=False):
-    current_time = datetime.now().strftime('%d.%m.%Y в %H:%M')
+    # Получаем текущее время в часовой зоне Сербии
+    current_time = get_serbia_time()
+
+    # Формируем текст объявления
     message = f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
     message += f"{CONTACT_TEXT}\n@{username}"
 
+    # Если это обновленное объявление, добавляем отметку об обновлении
     if is_updated:
         message += f"\n\n{UPDATED_TEXT.format(current_time=current_time)}"
 
@@ -470,9 +475,17 @@ async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.message.reply_text(EDIT_PHOTOS_PROMPT, reply_markup=finish_photo_markup_with_cancel)
         return ADDING_PHOTOS
     elif data == 'cancel_edit':
-        is_editing = 'edit_ann_id' in context.user_data
-        await send_preview(update, context, editing=is_editing)
-        return CONFIRMATION
+        # Если это неопубликованное объявление, оставляем предварительный просмотр
+        if 'edit_ann_id' not in context.user_data:
+            # Оставляем прежний функционал для неопубликованных объявлений
+            is_editing = 'edit_ann_id' in context.user_data
+            await send_preview(update, context, editing=is_editing)
+            return CONFIRMATION
+        else:
+            # Убираем текущее сообщение и переходим в CHOOSING для опубликованных объявлений
+            await query.message.delete()
+            return CHOOSING
+
 
 async def edit_description_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == MAIN_MENU:
@@ -604,7 +617,7 @@ async def relevance_button_handler(update: Update, context: ContextTypes.DEFAULT
         message_id = int(data.split('_')[1])
         # Удаляем объявление из канала и базы данных
         await delete_announcement_by_message_id(message_id, context)
-        await query.message.reply_text(DELETE_SUCCESS_MESSAGE)
+        # await query.message.reply_text(DELETE_SUCCESS_MESSAGE)
 
 async def send_announcement(context: ContextTypes.DEFAULT_TYPE, update: Update):
     channel_id = CHANNEL_USERNAME
@@ -676,7 +689,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith('delete_'):
         ann_id = int(data.split('_')[1])
         await delete_announcement_by_id(ann_id, context, query)
-        await query.message.reply_text(DELETE_SUCCESS_MESSAGE)
+        # await query.message.reply_text(DELETE_SUCCESS_MESSAGE)
         return CHOOSING
     else:
         # Обработка других callback данных, если необходимо
@@ -748,7 +761,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text(CANCEL_MESSAGE, reply_markup=add_advertisement_keyboard)
+    await update.message.reply_text(CANCEL_MESSAGE, reply_markup=markup)
     return CHOOSING
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
