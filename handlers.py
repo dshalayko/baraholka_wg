@@ -1,3 +1,4 @@
+import telegram
 from telegram import Update, InputMediaPhoto, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
 from datetime import datetime
@@ -458,8 +459,11 @@ async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     data = query.data
 
-    # Удаление текущего сообщения перед отправкой нового
-    await query.message.delete()
+    # Удаляем текущее сообщение, если оно существует
+    try:
+        await query.message.delete()
+    except telegram.error.BadRequest:
+        pass  # Игнорируем ошибку, если сообщение не найдено
 
     if data == 'edit_description':
         context.user_data.pop('new_description', None)
@@ -481,16 +485,14 @@ async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ADDING_PHOTOS
 
     elif data == 'cancel_edit':
-        # Если это неопубликованное объявление, оставляем предварительный просмотр
         if 'edit_ann_id' not in context.user_data:
+            # Для неопубликованных объявлений оставляем предварительный просмотр
             is_editing = 'edit_ann_id' in context.user_data
             await send_preview(update, context, editing=is_editing)
             return CONFIRMATION
         else:
-            # Убираем текущее сообщение и переходим в CHOOSING для опубликованных объявлений
-            await query.message.delete()
+            # Для опубликованных объявлений возвращаемся в состояние CHOOSING
             return CHOOSING
-
 
 async def edit_description_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == MAIN_MENU:
