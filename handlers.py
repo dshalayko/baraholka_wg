@@ -9,7 +9,8 @@ from texts import *  # Импортируем все тексты
 from database import (
     save_announcement, get_user_announcements,
     delete_announcement_by_id as db_delete_announcement_by_id,
-    update_announcement, has_user_ads, edit_announcement
+    has_user_ads, edit_announcement, update_announcement_description, get_announcement_for_edit,
+    update_announcement_price
 )
 import json
 import logging
@@ -53,7 +54,6 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(WELCOME_NEW_USER, reply_markup=reply_markup)
         return CHOOSING
-
 
 async def format_announcement_text(description, price, username, is_updated=False):
     # Получаем текущее время в часовой зоне Сербии
@@ -131,7 +131,6 @@ async def remove_old_photos(old_message_ids, context):
             except Exception as e:
                 logger.error(f"{DELETE_OLD_MESSAGE_ERROR} {message_id}: {e}")
 
-
 # Добавляем новую функцию для опубликованных объявлений
 async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"{ADDING_PHOTOS_STARTED_LOG} {update.effective_user.id}")
@@ -183,7 +182,6 @@ async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_
     else:
         await update.message.reply_text(SEND_PHOTO_OR_FINISH)
     return ADDING_PHOTOS
-
 # Добавляем новую функцию для неопубликованных объявлений
 async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"{ADDING_PHOTOS_STARTED_LOG} {update.effective_user.id}")
@@ -192,48 +190,33 @@ async def adding_photos_unpublished(update: Update, context: ContextTypes.DEFAUL
         context.user_data['photos'] = []
 
     if update.message.photo:
-        # Проверка на количество фотографий
         if len(context.user_data['photos']) < 10:
             photo = update.message.photo[-1]
             context.user_data['photos'].append(photo.file_id)
             logger.info(f"{PHOTO_ADDED_LOG} {photo.file_id}")
 
-            # Отправляем сообщение один раз после загрузки первого фото
             if len(context.user_data['photos']) == 1:
                 await update.message.reply_text(ADD_PHOTO_TEXT, reply_markup=finish_photo_markup_with_cancel)
         elif 'limit_reached' not in context.user_data:
             await update.message.reply_text(MAX_PHOTOS_REACHED)
             context.user_data['limit_reached'] = True
 
-    elif update.message.text == NO_PHOTO_AD:
-        logger.info(NO_PHOTO_CHOSEN_LOG)
-
-        await update.message.reply_text(NO_PHOTO_ACCEPTED, reply_markup=ReplyKeyboardRemove())
-
-        if not context.user_data.get('description') or not context.user_data.get('price'):
-            await update.message.reply_text(DESC_PRICE_REQUIRED)
-            return ADDING_PHOTOS
-
-        await send_preview(update, context, editing=False)
-        return CONFIRMATION
-
-    elif update.message.text == FINISH_PHOTO_UPLOAD:
-        logger.info(PHOTO_UPLOAD_FINISHED_LOG)
-
+    elif update.message.text in [NO_PHOTO_AD, FINISH_PHOTO_UPLOAD]:
         await update.message.reply_text(PROCESSING_PHOTOS, reply_markup=ReplyKeyboardRemove())
 
         if not context.user_data.get('description') or not context.user_data.get('price'):
             await update.message.reply_text(DESC_PRICE_REQUIRED)
             return ADDING_PHOTOS
 
-        await send_preview(update, context, editing=False)
+        # Сохраняем состояние без публикации, убирая отметку "обновлено"
+        await edit_unpublished_announcement(update, context)
         return CONFIRMATION
 
     else:
         await update.message.reply_text(SEND_PHOTO_OR_FINISH_OR_NO_PHOTO)
+
     return ADDING_PHOTOS
 
-# Вносим изменения в основной обработчик
 async def handle_add_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Определяет, какое объявление редактируется — опубликованное или неопубликованное, и вызывает соответствующую функцию."""
     if 'edit_ann_id' in context.user_data:
@@ -275,21 +258,19 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['photos'] = []
     return ADDING_PHOTOS
 
-async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editing=None):
-    # Используем новые значения описания и цены, если они были предоставлены
+async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editing=None, is_published=True):
     description = context.user_data.get('new_description', context.user_data.get('description'))
     price = context.user_data.get('new_price', context.user_data.get('price'))
     photos = context.user_data.get('photos', [])
 
-    # Получаем username или first_name из контекста
     user = update.message.from_user if update.message else update.callback_query.from_user
     username = user.username if user.username else user.first_name
     context.user_data['username'] = username
 
-    # Формируем текст объявления
-    message = await format_announcement_text(description, price, username, editing)
+    # Формирование текста объявления, без отметки "обновлено" для неопубликованных объявлений
+    is_updated = editing and is_published
+    message = await format_announcement_text(description, price, username, is_updated=is_updated)
 
-    # Убираем текущую клавиатуру (если она активна)
     if update.message and update.message.reply_markup:
         await update.message.reply_text(PREVIEW_LOADING, reply_markup=ReplyKeyboardRemove())
 
@@ -299,13 +280,8 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
     ])
 
     if photos:
-        media = []
-        for idx, photo_id in enumerate(photos):
-            if idx == 0:
-                media.append(InputMediaPhoto(media=photo_id, caption=message, parse_mode='Markdown'))
-            else:
-                media.append(InputMediaPhoto(media=photo_id))
-
+        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
+                 for idx, photo_id in enumerate(photos)]
         if update.message:
             await update.message.reply_media_group(media=media)
             await update.message.reply_text(PREVIEW_TEXT, reply_markup=keyboard)
@@ -420,6 +396,46 @@ async def confirm_edit_published(context, update, ann_id):
             logger.error(AD_NOT_FOUND_ERROR.format(ann_id))
             return None
 
+async def edit_unpublished_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция для редактирования неопубликованных объявлений."""
+    description = context.user_data.get('new_description', context.user_data.get('description'))
+    price = context.user_data.get('new_price', context.user_data.get('price'))
+    photos = context.user_data.get('photos', [])
+
+    # Формирование предварительного просмотра без отметки об обновлении
+    user = update.message.from_user if update.message else update.callback_query.from_user
+    username = user.username if user.username else user.first_name
+    context.user_data['username'] = username
+
+    # Формируем текст без отметки "обновлено"
+    message = await format_announcement_text(description, price, username, is_updated=False)
+
+    # Отправляем новый предварительный просмотр
+    if update.message and update.message.reply_markup:
+        await update.message.reply_text(PREVIEW_LOADING, reply_markup=ReplyKeyboardRemove())
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(EDIT, callback_data='preview_edit')],
+        [InlineKeyboardButton(POST, callback_data='post')]
+    ])
+
+    if photos:
+        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
+                 for idx, photo_id in enumerate(photos)]
+        if update.message:
+            await update.message.reply_media_group(media=media)
+            await update.message.reply_text(PREVIEW_TEXT, reply_markup=keyboard)
+        else:
+            await update.callback_query.message.reply_media_group(media=media)
+            await update.callback_query.message.reply_text(PREVIEW_TEXT, reply_markup=keyboard)
+    else:
+        if update.message:
+            await update.message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
+        else:
+            await update.callback_query.message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
+
+    return CONFIRMATION
+
 async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -495,22 +511,22 @@ async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             return CHOOSING
 
 async def edit_description_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text == MAIN_MENU:
-        await show_menu(update, context)
-        return CHOOSING
-
     new_description = update.message.text.strip()
+
     if not new_description:
         await update.message.reply_text(EMPTY_DESCRIPTION_ERROR)
         return EDIT_DESCRIPTION
 
     context.user_data['new_description'] = new_description
 
-    if 'edit_ann_id' in context.user_data:
-        # Редактирование существующего объявления
+    if 'edit_ann_id' not in context.user_data:
+        # Обновление данных для неопубликованного объявления
+        await edit_unpublished_announcement(update, context)
+        return CONFIRMATION
+    else:
+        # Обработка для опубликованного объявления
         ann_id = context.user_data['edit_ann_id']
 
-        # Получаем текущие данные объявления из базы данных
         async with aiosqlite.connect('announcements.db') as db:
             cursor = await db.execute('SELECT price, photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
             row = await cursor.fetchone()
@@ -520,68 +536,45 @@ async def edit_description_received(update: Update, context: ContextTypes.DEFAUL
                 context.user_data['photos'] = photos
                 context.user_data['price'] = current_price
 
-                # Сохраняем изменения в базу данных
-                await db.execute('''
-                    UPDATE announcements
-                    SET description = ?
-                    WHERE id = ?
-                ''', (new_description, ann_id))
+                await db.execute('UPDATE announcements SET description = ? WHERE id = ?', (new_description, ann_id))
                 await db.commit()
 
-                # Показываем Вот как это будет выглядеть
-                await send_preview(update, context, editing=True)
+                await send_preview(update, context, editing=True, is_published=True)
                 return CONFIRMATION
             else:
                 await update.message.reply_text(ANNOUNCEMENT_NOT_FOUND)
                 return CHOOSING
-    else:
-        # Создание нового объявления
-        await send_preview(update, context)
-        return CONFIRMATION
 
 async def edit_price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text == MAIN_MENU:
-        await show_menu(update, context)
-        return CHOOSING
-
+    """
+    Обрабатывает ввод новой цены для редактирования объявления.
+    """
     new_price = update.message.text.strip()
+
+    # Проверка на пустую цену
     if not new_price:
         await update.message.reply_text(EMPTY_PRICE_ERROR)
-        return EDIT_PRICE
+        return CHOOSING
 
     context.user_data['new_price'] = new_price
 
+    # Если это существующее объявление, обновляем его в базе данных
     if 'edit_ann_id' in context.user_data:
-        # Редактирование существующего объявления
         ann_id = context.user_data['edit_ann_id']
 
-        # Получаем текущие данные объявления из базы данных
-        async with aiosqlite.connect('announcements.db') as db:
-            cursor = await db.execute('SELECT description, photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
-            row = await cursor.fetchone()
-            if row:
-                current_description, photo_file_ids = row
-                photos = json.loads(photo_file_ids) if photo_file_ids else []
-                context.user_data['photos'] = photos
-                context.user_data['description'] = current_description
-
-                # Сохраняем изменения в базу данных
-                await db.execute('''
-                    UPDATE announcements
-                    SET price = ?
-                    WHERE id = ?
-                ''', (new_price, ann_id))
-                await db.commit()
-
-                # Показываем Вот как это будет выглядеть
-                await send_preview(update, context, editing=True)
-                return CONFIRMATION
-            else:
-                await update.message.reply_text(ANNOUNCEMENT_NOT_FOUND)
-                return CHOOSING
+        # Получаем текущие данные объявления из базы
+        announcement = await get_announcement_for_edit(ann_id)
+        if announcement:
+            # Обновляем только цену
+            await update_announcement_price(ann_id, new_price)
+            await send_preview(update, context, editing=True)
+            return CONFIRMATION
+        else:
+            await update.message.reply_text(ANNOUNCEMENT_NOT_FOUND)
+            return CHOOSING
     else:
-        # Создание нового объявления
-        await send_preview(update, context)
+        # Обрабатываем для нового объявления
+        await send_preview(update, context, editing=False, is_published=False)
         return CONFIRMATION
 
 async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
