@@ -28,7 +28,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHECK_SUBSCRIPTION
     else:
         if await has_user_ads(user_id):
-            await update.message.reply_text(WHAT_TO_DO, reply_markup=markup)
+            await update.message.reply_text(WELCOME_NEW_USER, reply_markup=markup)
         else:
             await update.message.reply_text(WELCOME_NEW_USER, reply_markup=add_advertisement_keyboard)
         return CHOOSING
@@ -48,7 +48,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if await has_user_ads(user_id):
-            await update.message.reply_text(WHAT_TO_DO, reply_markup=reply_markup)
+            await update.message.reply_text(WELCOME_NEW_USER, reply_markup=reply_markup)
         else:
             await update.message.reply_text(WELCOME_NEW_USER, reply_markup=reply_markup)
         return CHOOSING
@@ -458,14 +458,19 @@ async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     data = query.data
 
+    # Удаление текущего сообщения перед отправкой нового
+    await query.message.delete()
+
     if data == 'edit_description':
         context.user_data.pop('new_description', None)
         await query.message.reply_text(EDIT_DESCRIPTION_PROMPT, reply_markup=ReplyKeyboardRemove())
         return EDIT_DESCRIPTION
+
     elif data == 'edit_price':
         context.user_data.pop('new_price', None)
         await query.message.reply_text(EDIT_PRICE_PROMPT, reply_markup=ReplyKeyboardRemove())
         return EDIT_PRICE
+
     elif data == 'edit_photos':
         if 'edit_ann_id' not in context.user_data:
             context.user_data['edit_ann_id'] = context.user_data.get('current_ann_id')
@@ -474,10 +479,10 @@ async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         await query.message.reply_text(EDIT_PHOTOS_PROMPT, reply_markup=finish_photo_markup_with_cancel)
         return ADDING_PHOTOS
+
     elif data == 'cancel_edit':
         # Если это неопубликованное объявление, оставляем предварительный просмотр
         if 'edit_ann_id' not in context.user_data:
-            # Оставляем прежний функционал для неопубликованных объявлений
             is_editing = 'edit_ann_id' in context.user_data
             await send_preview(update, context, editing=is_editing)
             return CONFIRMATION

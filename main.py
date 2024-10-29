@@ -1,5 +1,6 @@
 import asyncio
 import nest_asyncio
+
 nest_asyncio.apply()
 
 from telegram.ext import (
@@ -15,7 +16,7 @@ from handlers import (
     handle_add_photos, description_received, price_received, confirmation_handler,
     edit_choice_handler, edit_description_received, edit_price_received,
     cancel, error_handler, get_chat_id, relevance_button_handler, check_subscription_callback,
-    menu_button_handler
+    menu_button_handler, show_user_announcements
 )
 from database import init_db
 from config import (
@@ -35,8 +36,13 @@ async def main():
     await init_db()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Обновленный ConversationHandler
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start), CommandHandler('menu', menu)],
+        entry_points=[
+            CommandHandler('start', start),
+            CommandHandler('menu', menu),
+            CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'),
+        ],
         states={
             CHOOSING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice),
@@ -49,8 +55,7 @@ async def main():
             ],
             CONFIRMATION: [CallbackQueryHandler(confirmation_handler, pattern='^(preview_edit|post|confirm_edit)$')],
             EDIT_CHOICE: [
-                CallbackQueryHandler(edit_choice_handler,
-                                     pattern='^(edit_description|edit_price|edit_photos|cancel_edit)$')
+                CallbackQueryHandler(edit_choice_handler, pattern='^(edit_description|edit_price|edit_photos|cancel_edit)$')
             ],
             EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_description_received)],
             EDIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_price_received)],
@@ -63,8 +68,8 @@ async def main():
     app.add_handler(CallbackQueryHandler(check_subscription, pattern='^check_subscription$'))
     app.add_handler(CallbackQueryHandler(relevance_button_handler, pattern=r'^(extend|remove)_\d+$'))
     app.add_handler(CommandHandler('menu', menu))
-    app.add_handler(CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'))
     app.add_handler(CommandHandler('get_chat_id', get_chat_id))
+    app.add_handler(CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'))
     app.add_error_handler(error_handler)
 
     # Запускаем бота с очисткой неподтвержденных обновлений
