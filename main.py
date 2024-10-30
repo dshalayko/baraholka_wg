@@ -84,7 +84,7 @@ async def main():
     app.add_error_handler(error_handler)
 
     # Запускаем бота без удаления неподтвержденных обновлений
-    await app.run_polling(drop_pending_updates=False)
+    await app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     asyncio.run(main())
