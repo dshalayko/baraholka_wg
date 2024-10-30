@@ -58,9 +58,9 @@ LONG_PRICE_ERROR = "❗Цена слишком длинная. Максимум 
 EMPTY_PRICE_ERROR = "❗Цена не может быть пустой. Пожалуйста, введите цену."
 EMPTY_DESCRIPTION_ERROR = "❗Описание не может быть пустым. Пожалуйста, введите описание."
 ANNOUNCEMENT_NOT_FOUND = "❗Не удалось найти объявление для редактирования."
-AD_NOT_FOUND_ERROR = "Не удалось найти объявление с ID {}."
-SEND_MESSAGE_ERROR = "Ошибка при отправке сообщения пользователю: {}"
-DELETE_MESSAGE_ERROR = "Ошибка при удалении сообщения из канала: {}"
+AD_NOT_FOUND_ERROR = "❗Не удалось найти объявление с ID {}."
+SEND_MESSAGE_ERROR = "❗Ошибка при отправке сообщения пользователю: {}"
+DELETE_MESSAGE_ERROR = "❗Ошибка при удалении сообщения из канала: {}"
 
 # Логи
 CONFIRMATION_HANDLER_LOG = "Начало функции confirmation_handler с данными: {}"
