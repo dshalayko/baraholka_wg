@@ -64,16 +64,27 @@ async def main():
         fallbacks=[CommandHandler('cancel', cancel), MessageHandler(filters.Regex('^Вернуться в меню$'), cancel)],
     )
 
+    # Добавляем ConversationHandler
     app.add_handler(conv_handler)
-    app.add_handler(CallbackQueryHandler(check_subscription, pattern='^check_subscription$'))
-    app.add_handler(CallbackQueryHandler(relevance_button_handler, pattern=r'^(extend|remove)_\d+$'))
+
+    # Обработчики на верхнем уровне для команд
     app.add_handler(CommandHandler('menu', menu))
     app.add_handler(CommandHandler('get_chat_id', get_chat_id))
     app.add_handler(CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'))
+
+    # Обработчики для сообщений и команд вне состояния
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice))
+    app.add_handler(CallbackQueryHandler(button_handler, pattern=r'^(edit|delete)_\d+$'))
+
+    # Обработчик для проверки подписки
+    app.add_handler(CallbackQueryHandler(check_subscription, pattern='^check_subscription$'))
+    app.add_handler(CallbackQueryHandler(relevance_button_handler, pattern=r'^(extend|remove)_\d+$'))
+
+    # Обработчик ошибок
     app.add_error_handler(error_handler)
 
-    # Запускаем бота с очисткой неподтвержденных обновлений
-    await app.run_polling(drop_pending_updates=True)
+    # Запускаем бота без удаления неподтвержденных обновлений
+    await app.run_polling(drop_pending_updates=False)
 
 if __name__ == '__main__':
     asyncio.run(main())
