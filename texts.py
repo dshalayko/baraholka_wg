@@ -60,7 +60,7 @@ EMPTY_DESCRIPTION_ERROR = "❗Описание не может быть пуст
 ANNOUNCEMENT_NOT_FOUND = "❗Не удалось найти объявление для редактирования."
 AD_NOT_FOUND_ERROR = "❗Не удалось найти объявление с ID {}."
 SEND_MESSAGE_ERROR = "❗Ошибка при отправке сообщения пользователю: {}"
-DELETE_MESSAGE_ERROR = "❗Ошибка при удалении сообщения из канала: {}"
+DELETE_MESSAGE_ERROR = "Ошибка при удалении сообщения из канала: {}"
 
 # Логи
 CONFIRMATION_HANDLER_LOG = "Начало функции confirmation_handler с данными: {}"
