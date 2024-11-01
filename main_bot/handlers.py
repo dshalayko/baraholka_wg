@@ -166,7 +166,7 @@ async def adding_photos_published(update: Update, context: ContextTypes.DEFAULT_
             ann_id = context.user_data.get('edit_ann_id')
             logger.info(f"{EDITING_AD_LOG} {ann_id}")
 
-            async with aiosqlite.connect('announcements.db') as db:
+            async with aiosqlite.connect('../announcements.db') as db:
                 cursor = await db.execute('SELECT description, price FROM announcements WHERE id = ?', (ann_id,))
                 row = await cursor.fetchone()
                 if row:
@@ -321,7 +321,7 @@ async def confirm_edit_unpublished(context):
         message_ids = [sent_message.message_id]
         logger.info(f"Отправлено текстовое сообщение, message_id: {message_ids[0]}")
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect('../announcements.db') as db:
         cursor = await db.execute('''
             INSERT INTO announcements (user_id, username, message_ids, description, price, photo_file_ids)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -352,7 +352,7 @@ async def confirm_edit_published(context, update, ann_id):
     photos = context.user_data.get('photos', [])
     username = context.user_data.get('username')
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect('../announcements.db') as db:
         cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
 
@@ -527,7 +527,7 @@ async def edit_description_received(update: Update, context: ContextTypes.DEFAUL
         # Обработка для опубликованного объявления
         ann_id = context.user_data['edit_ann_id']
 
-        async with aiosqlite.connect('announcements.db') as db:
+        async with aiosqlite.connect('../announcements.db') as db:
             cursor = await db.execute('SELECT price, photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
             row = await cursor.fetchone()
             if row:
@@ -600,7 +600,7 @@ async def delete_announcement_by_message_id(message_id, context: ContextTypes.DE
         logger.error(DELETE_MESSAGE_ERROR.format(e))
 
     # Удаляем запись из базы данных
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect('../announcements.db') as db:
         await db.execute('DELETE FROM announcements WHERE message_id = ?', (message_id,))
         await db.commit()
 
@@ -698,7 +698,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CHOOSING
 
 async def delete_announcement_by_id(ann_id, context, query):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect('../announcements.db') as db:
         cursor = await db.execute('SELECT message_ids, photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         if row:
@@ -791,3 +791,14 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
         text, keyboard = await check_subscription_message()
         await query.message.reply_text(text, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
+
+async def send_greeting_to_userbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await context.bot.send_message(chat_id=USERBOT_ID, text="Привет, userbot!")
+        logger.info(f"Сообщение отправлено userbot с ID {USERBOT_ID}")
+    except telegram.error.TelegramError as e:
+        logger.error(f"Ошибка при отправке сообщения userbot: {e}")
+
+async def handle_userbot_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id == USERBOT_ID:
+        logger.info("Получено сообщение от userbot: %s", update.message.text)

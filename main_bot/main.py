@@ -16,12 +16,12 @@ from handlers import (
     handle_add_photos, description_received, price_received, confirmation_handler,
     edit_choice_handler, edit_description_received, edit_price_received,
     cancel, error_handler, get_chat_id, relevance_button_handler, check_subscription_callback,
-    menu_button_handler, show_user_announcements
+    menu_button_handler, show_user_announcements, send_greeting_to_userbot, handle_userbot_message
 )
 from database import init_db
 from config import (
     BOT_TOKEN, CHOOSING, ADDING_PHOTOS, DESCRIPTION, PRICE, CONFIRMATION,
-    EDIT_CHOICE, EDIT_DESCRIPTION, EDIT_PRICE, CHECK_SUBSCRIPTION
+    EDIT_CHOICE, EDIT_DESCRIPTION, EDIT_PRICE, CHECK_SUBSCRIPTION, USERBOT_ID
 )
 import logging
 
@@ -70,6 +70,7 @@ async def main():
     # Обработчики на верхнем уровне для команд
     app.add_handler(CommandHandler('menu', menu))
     app.add_handler(CommandHandler('get_chat_id', get_chat_id))
+    app.add_handler(CommandHandler('greet_userbot', send_greeting_to_userbot))
     app.add_handler(CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'))
 
     # Обработчики для сообщений и команд вне состояния
@@ -79,6 +80,9 @@ async def main():
     # Обработчик для проверки подписки
     app.add_handler(CallbackQueryHandler(check_subscription, pattern='^check_subscription$'))
     app.add_handler(CallbackQueryHandler(relevance_button_handler, pattern=r'^(extend|remove)_\d+$'))
+
+    # Добавляем обработчик для сообщений от userbot
+    app.add_handler(MessageHandler(filters.User(USERBOT_ID), handle_userbot_message))
 
     # Обработчик ошибок
     app.add_error_handler(error_handler)
