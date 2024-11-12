@@ -2,7 +2,7 @@ import aiosqlite
 import json
 from telegram import InputMediaPhoto
 from logger import logger  # Импорт логгера
-from config import CHANNEL_USERNAME
+from config import PRIVATE_CHANNEL_ID
 
 # Инициализация базы данных
 async def init_db():
@@ -63,7 +63,7 @@ async def delete_announcement_by_id(ann_id, context):
             message_ids = json.loads(row[0])
             for message_id in message_ids:
                 try:
-                    await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+                    await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
                 except Exception as e:
                     logger.error(f"Ошибка при удалении сообщения {message_id}: {e}")
             await db.execute('DELETE FROM announcements WHERE id = ?', (ann_id,))
@@ -106,7 +106,7 @@ async def edit_announcement(ann_id, new_description, new_price, new_photos, cont
             old_message_ids = json.loads(row[0])
             for message_id in old_message_ids:
                 try:
-                    await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+                    await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
                 except Exception as e:
                     logger.error(f"Ошибка при удалении сообщения {message_id}: {e}")
 
@@ -114,10 +114,10 @@ async def edit_announcement(ann_id, new_description, new_price, new_photos, cont
         message_text = f"Описание: {new_description}\nЦена: {new_price}\n\nОбновлено"
         if new_photos:
             media = [InputMediaPhoto(media=photo_id, caption=message_text if idx == 0 else None) for idx, photo_id in enumerate(new_photos)]
-            sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
+            sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media)
             new_message_ids = [msg.message_id for msg in sent_messages]
         else:
-            sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text)
+            sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message_text)
             new_message_ids = [sent_message.message_id]
 
         # Обновление записи в базе данных
@@ -134,7 +134,10 @@ async def edit_announcement(ann_id, new_description, new_price, new_photos, cont
         ))
         await db.commit()
 
-        # Возвращаем ссылку на обновленное объявление
-        channel_username = CHANNEL_USERNAME.replace('@', '')
-        post_link = f"https://t.me/{channel_username}/{new_message_ids[0]}"
+        # Формирование ссылки на сообщение в приватном канале
+        channel_id_str = str(PRIVATE_CHANNEL_ID)
+        if channel_id_str.startswith('-100'):
+            channel_id_str = channel_id_str[4:]
+        post_link = f"https://t.me/c/{channel_id_str}/{new_message_ids[0]}"
         return post_link
+
