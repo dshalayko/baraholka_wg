@@ -17,7 +17,7 @@ import logging
 from datetime import timedelta
 import aiosqlite
 
-from config import CHANNEL_USERNAME
+from config import PRIVATE_CHANNEL_ID
 from logger import logger
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(WELCOME_NEW_USER, reply_markup=add_advertisement_keyboard)
         return CHOOSING
+
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
@@ -127,7 +128,7 @@ async def remove_old_photos(old_message_ids, context):
     if old_message_ids:
         for message_id in old_message_ids:
             try:
-                await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+                await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
             except Exception as e:
                 logger.error(f"{DELETE_OLD_MESSAGE_ERROR} {message_id}: {e}")
 
@@ -313,11 +314,11 @@ async def confirm_edit_unpublished(context):
             else:
                 media.append(InputMediaPhoto(media=photo_id))
 
-        sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
+        sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media)
         message_ids = [msg.message_id for msg in sent_messages]
         logger.info(f"Фотографии отправлены, новые message_ids: {message_ids}")
     else:
-        sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text, parse_mode='Markdown')
+        sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message_text, parse_mode='Markdown')
         message_ids = [sent_message.message_id]
         logger.info(f"Отправлено текстовое сообщение, message_id: {message_ids[0]}")
 
@@ -338,11 +339,12 @@ async def confirm_edit_unpublished(context):
 
     context.user_data['edit_ann_id'] = ann_id
 
-    channel_username = CHANNEL_USERNAME.replace('@', '')
-    post_link = f"https://t.me/{channel_username}/{message_ids[0]}"
+    # Формируем ссылку на пост в приватном канале
+    post_link = f"https://t.me/c/{str(PRIVATE_CHANNEL_ID)[4:]}/{message_ids[0]}"
     logger.info(f"Ссылка на новое объявление: {post_link}")
 
     return post_link
+
 
 async def confirm_edit_published(context, update, ann_id):
     logger.info(f"Начало функции confirm_edit_published для объявления ID: {ann_id}")
@@ -370,11 +372,11 @@ async def confirm_edit_published(context, update, ann_id):
                     else:
                         media.append(InputMediaPhoto(media=photo_id))
 
-                sent_messages = await context.bot.send_media_group(chat_id=CHANNEL_USERNAME, media=media)
+                sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media)
                 new_message_ids = [msg.message_id for msg in sent_messages]
                 logger.info(f"Новые фотографии отправлены, новые message_ids: {new_message_ids}")
             else:
-                sent_message = await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=message_text, parse_mode='Markdown')
+                sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message_text, parse_mode='Markdown')
                 new_message_ids = [sent_message.message_id]
                 logger.info(f"Отправлено текстовое сообщение, message_id: {new_message_ids[0]}")
 
@@ -387,8 +389,7 @@ async def confirm_edit_published(context, update, ann_id):
             ))
             await db.commit()
 
-            channel_username = CHANNEL_USERNAME.replace('@', '')
-            post_link = f"https://t.me/{channel_username}/{new_message_ids[0]}"
+            post_link = f"https://t.me/c/{str(PRIVATE_CHANNEL_ID)[4:]}/{new_message_ids[0]}"
             logger.info(f"Ссылка на обновленное объявление: {post_link}")
 
             return post_link
@@ -595,7 +596,7 @@ async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
 async def delete_announcement_by_message_id(message_id, context: ContextTypes.DEFAULT_TYPE):
     # Удаляем сообщение из канала
     try:
-        await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+        await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
     except Exception as e:
         logger.error(DELETE_MESSAGE_ERROR.format(e))
 
@@ -620,7 +621,7 @@ async def relevance_button_handler(update: Update, context: ContextTypes.DEFAULT
         # await query.message.reply_text(DELETE_SUCCESS_MESSAGE)
 
 async def send_announcement(context: ContextTypes.DEFAULT_TYPE, update: Update):
-    channel_id = CHANNEL_USERNAME
+    channel_id = PRIVATE_CHANNEL_ID
     photos = context.user_data.get('photos', [])
     description = context.user_data['description']
     price = context.user_data['price']
@@ -668,8 +669,7 @@ async def send_announcement(context: ContextTypes.DEFAULT_TYPE, update: Update):
     )
 
     # Создаем ссылку на объявление
-    channel_username = CHANNEL_USERNAME.replace('@', '')
-    post_link = f"https://t.me/{channel_username}/{message_ids[0]}"
+    post_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
 
     return post_link
 
@@ -707,7 +707,7 @@ async def delete_announcement_by_id(ann_id, context, query):
 
             for message_id in message_ids:
                 try:
-                    await context.bot.delete_message(chat_id=CHANNEL_USERNAME, message_id=message_id)
+                    await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
                     logger.info(DELETE_SUCCESS_LOG.format(message_id))
                 except Exception as e:
                     logger.error(DELETE_ERROR_LOG.format(message_id, e))
@@ -741,8 +741,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
             message = message[:MAX_MESSAGE_LENGTH]
 
         # Добавляем ссылку на объявление в канале
-        channel_username = CHANNEL_USERNAME.replace('@', '')
-        post_link = f"https://t.me/{channel_username}/{message_ids[0]}"
+        post_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
         message += f"\n\n[{FULL_VERSION_MESSAGE}]({post_link})"
 
         keyboard = InlineKeyboardMarkup([
@@ -782,12 +781,19 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
     await query.answer()
     user_id = query.from_user.id
 
-    is_user_subscribed = await is_subscribed(user_id, context)
-
-    if is_user_subscribed:
+    if await is_subscribed(user_id, context):
+        await query.message.reply_text(SUBSCRIPTION_SUCCESS)
         await show_menu(update, context)
         return CHOOSING
     else:
         text, keyboard = await check_subscription_message()
-        await query.message.reply_text(text, reply_markup=keyboard)
+        await query.message.reply_text("Вы еще не подписаны на канал.", reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
+
+
+
+def get_private_channel_post_link(channel_id, message_id):
+    channel_id_str = str(channel_id)
+    if channel_id_str.startswith('-100'):
+        channel_id_str = channel_id_str[4:]
+    return f"https://t.me/c/{channel_id_str}/{message_id}"

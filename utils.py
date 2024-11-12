@@ -1,22 +1,24 @@
 from telegram.ext import ContextTypes
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from config import CHANNEL_USERNAME
+from config import PRIVATE_CHANNEL_ID, INVITE_LINK
 import logging
 from datetime import datetime
 import pytz
 
 from database import has_user_ads
 from keyboards import markup, add_advertisement_keyboard
+from texts import NEW_AD_CHOICE
 
 logger = logging.getLogger(__name__)
 
 async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
     try:
-        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        return member.status != 'left'
+        member = await context.bot.get_chat_member(chat_id=PRIVATE_CHANNEL_ID, user_id=user_id)
+        return member.status in ['member', 'creator', 'administrator']
     except Exception as e:
-        logger.error(f"Error checking subscription: {e}")
+        logger.error(f"Ошибка при проверке подписки: {e}")
         return False
+
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -39,7 +41,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_text(
-                'Вы можете добавить свое первое объявление.',
+                NEW_AD_CHOICE,
                 reply_markup=add_advertisement_keyboard  # Single button
             )
     elif update.callback_query:
@@ -51,14 +53,14 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.callback_query.message.reply_text(
-                'Вы можете добавить свое первое объявление.',
+                NEW_AD_CHOICE,
                 reply_markup=add_advertisement_keyboard  # Single button
             )
 
 async def check_subscription_message():
     text = 'Пожалуйста, подпишитесь на наш канал, чтобы продолжить.'
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton('Подписаться на канал', url=f'https://t.me/{CHANNEL_USERNAME.replace("@", "")}')],
+        [InlineKeyboardButton('Подписаться на канал', url=INVITE_LINK)],
         [InlineKeyboardButton('Я подписался', callback_data='check_subscription')]
     ])
     return text, keyboard

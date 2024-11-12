@@ -12,11 +12,11 @@ from telegram.ext import (
     ConversationHandler,
 )
 from handlers import (
-    start, menu, check_subscription, handle_choice, button_handler,
+    start, menu, handle_choice, button_handler,
     handle_add_photos, description_received, price_received, confirmation_handler,
     edit_choice_handler, edit_description_received, edit_price_received,
-    cancel, error_handler, get_chat_id, relevance_button_handler, check_subscription_callback,
-    menu_button_handler, show_user_announcements
+    cancel, error_handler, get_chat_id, relevance_button_handler,
+    menu_button_handler, show_user_announcements, check_subscription_callback
 )
 from database import init_db
 from config import (
@@ -36,7 +36,6 @@ async def main():
     await init_db()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Обновленный ConversationHandler
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler('start', start),
@@ -55,7 +54,8 @@ async def main():
             ],
             CONFIRMATION: [CallbackQueryHandler(confirmation_handler, pattern='^(preview_edit|post|confirm_edit)$')],
             EDIT_CHOICE: [
-                CallbackQueryHandler(edit_choice_handler, pattern='^(edit_description|edit_price|edit_photos|cancel_edit)$')
+                CallbackQueryHandler(edit_choice_handler,
+                                     pattern='^(edit_description|edit_price|edit_photos|cancel_edit)$')
             ],
             EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_description_received)],
             EDIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_price_received)],
@@ -76,8 +76,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice))
     app.add_handler(CallbackQueryHandler(button_handler, pattern=r'^(edit|delete)_\d+$'))
 
-    # Обработчик для проверки подписки
-    app.add_handler(CallbackQueryHandler(check_subscription, pattern='^check_subscription$'))
+    # Обработчик для релевантности объявлений
     app.add_handler(CallbackQueryHandler(relevance_button_handler, pattern=r'^(extend|remove)_\d+$'))
 
     # Обработчик ошибок

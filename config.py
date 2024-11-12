@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-CHANNEL_USERNAME = os.getenv('CHANNEL_USERNAME')  # Например, '@my_channel'
-
+PRIVATE_CHANNEL_ID =  os.getenv('PRIVATE_CHANNEL_ID')
+INVITE_LINK =  os.getenv('INVITE_LINK')
 
 # Состояния для ConversationHandler
 CHECK_SUBSCRIPTION = range(999)
