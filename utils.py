@@ -7,7 +7,7 @@ import pytz
 
 from database import has_user_ads
 from keyboards import markup, add_advertisement_keyboard
-from texts import NEW_AD_CHOICE
+from texts import CHOOSE_ACTION_NEW
 
 logger = logging.getLogger(__name__)
 
@@ -36,24 +36,24 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Responding to a regular message
         if has_ads:
             await update.message.reply_text(
-                'Выберите действие:',
+                CHOOSE_ACTION_NEW,
                 reply_markup=markup  # Two buttons
             )
         else:
             await update.message.reply_text(
-                NEW_AD_CHOICE,
+                CHOOSE_ACTION_NEW,
                 reply_markup=add_advertisement_keyboard  # Single button
             )
     elif update.callback_query:
         # Responding to a callback query
         if has_ads:
             await update.callback_query.message.reply_text(
-                'Выберите действие:',
+                CHOOSE_ACTION_NEW,
                 reply_markup=markup  # Two buttons
             )
         else:
             await update.callback_query.message.reply_text(
-                NEW_AD_CHOICE,
+                CHOOSE_ACTION_NEW,
                 reply_markup=add_advertisement_keyboard  # Single button
             )
 
