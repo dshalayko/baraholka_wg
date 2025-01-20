@@ -63,7 +63,7 @@ async def format_announcement_text(description, price, username, is_updated=Fals
     # Формируем текст объявления
     message = f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
-    message += f"{CONTACT_TEXT}\n@{username}"
+    message += f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
 
     # Если это обновленное объявление, добавляем отметку об обновлении
     if is_updated:
