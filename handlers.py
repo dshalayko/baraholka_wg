@@ -57,15 +57,11 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHOOSING
 
 async def format_announcement_text(description, price, username, is_updated=False):
-    # Получаем текущее время в часовой зоне Сербии
     current_time = get_serbia_time()
-
-    # Формируем текст объявления
     message = f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
-    message += f"{CONTACT_TEXT}\n@{username}"
+    message += f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
 
-    # Если это обновленное объявление, добавляем отметку об обновлении
     if is_updated:
         message += f"\n\n{UPDATED_TEXT.format(current_time=current_time)}"
 
@@ -268,12 +264,8 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
     username = user.username if user.username else user.first_name
     context.user_data['username'] = username
 
-    # Формирование текста объявления, без отметки "обновлено" для неопубликованных объявлений
     is_updated = editing and is_published
     message = await format_announcement_text(description, price, username, is_updated=is_updated)
-
-    if update.message and update.message.reply_markup:
-        await update.message.reply_text(PREVIEW_LOADING, reply_markup=ReplyKeyboardRemove())
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(EDIT, callback_data='preview_edit')],
