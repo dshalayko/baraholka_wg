@@ -1,7 +1,7 @@
 import json
 import logging
 import aiosqlite
-from datetime import timedelta
+from datetime import datetime
 from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from config import *
@@ -148,8 +148,9 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
     photos = context.user_data.get('photos', [])
     username = context.user_data.get('username', '')
 
-    # Формируем текст объявления
-    message = await format_announcement_text(description, price, username, ann_id=ann_id, is_updated=editing)
+    is_updated = context.user_data.get('is_editing', False)  # Проверяем, редактируется ли объявление
+
+    message = await format_announcement_text(description, price, username, ann_id=ann_id, is_updated=is_updated)
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(EDIT, callback_data='preview_edit')],
@@ -172,36 +173,50 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
             await update.callback_query.message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
 
 async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE, ann_id):
-    """Публикация объявления в канал и обновление записи в БД."""
+    """Публикация объявления в канал с обновлением timestamp и удалением старой версии."""
     async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute('SELECT description, price, username, photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
+        cursor = await db.execute('SELECT description, price, username, photo_file_ids, message_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
 
         if not row:
             logger.error(f"Ошибка: объявление {ann_id} не найдено.")
             return None
 
-        description, price, username, photo_file_ids = row
+        description, price, username, photo_file_ids, message_ids_json = row
         photos = json.loads(photo_file_ids) if photo_file_ids else []
+        old_message_ids = json.loads(message_ids_json) if message_ids_json else []
 
-    # Формируем сообщение с ID объявления
-    message = await format_announcement_text(description, price, username, ann_id=ann_id)
+    is_updated = context.user_data.get('is_editing', False)
+    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Получаем текущее время
 
-    # Отправляем объявление в канал
+    # Удаляем старое объявление
+    if old_message_ids:
+        for message_id in old_message_ids:
+            try:
+                await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
+                logger.info(f"Удалено старое объявление {message_id} из канала.")
+            except Exception as e:
+                logger.error(f"Ошибка при удалении старого объявления {message_id}: {e}")
+
+    # Формируем новое сообщение
+    message = await format_announcement_text(description, price, username, ann_id=ann_id, is_updated=is_updated, message_ids=old_message_ids)
+
+    # Публикуем новое объявление
     if photos:
         media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown') for idx, photo_id in enumerate(photos)]
         sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media)
-        message_ids = [msg.message_id for msg in sent_messages]
+        new_message_ids = [msg.message_id for msg in sent_messages]
     else:
         sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message, parse_mode='Markdown')
-        message_ids = [sent_message.message_id]
+        new_message_ids = [sent_message.message_id]
 
-    # Обновляем запись в базе, добавляя message_id
+    # Обновляем запись в базе, включая `timestamp`
     async with aiosqlite.connect('announcements.db') as db:
-        await db.execute('UPDATE announcements SET message_ids = ? WHERE id = ?', (json.dumps(message_ids), ann_id))
+        await db.execute('UPDATE announcements SET message_ids = ?, timestamp = ? WHERE id = ?',
+                         (json.dumps(new_message_ids), current_timestamp, ann_id))
         await db.commit()
 
-    return get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
+    return get_private_channel_post_link(PRIVATE_CHANNEL_ID, new_message_ids[0])
 
 async def delete_announcement_by_id(ann_id, context, query):
     """Удаляет объявление из базы данных и, если опубликовано, удаляет его из канала."""
@@ -259,16 +274,16 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
     return CHOOSING
 
-async def format_announcement_text(description, price, username, ann_id=None, is_updated=False):
+async def format_announcement_text(description, price, username, ann_id, message_ids=None, is_updated=False):
     current_time = get_serbia_time()
     message = ""
-    if ann_id:
-        message += f"📌 ID объявления: {ann_id}\n\n"
+
+    message += f"📌 ID объявления: {ann_id}\n\n"
     message = f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
     message += f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
 
-    if is_updated:
+    if is_updated and message_ids:
         message += f"\n\n{UPDATED_TEXT.format(current_time=current_time)}"
 
     return message

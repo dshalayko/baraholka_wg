@@ -8,16 +8,17 @@ from config import PRIVATE_CHANNEL_ID
 async def init_db():
     async with aiosqlite.connect('announcements.db') as db:
         await db.execute('''
-            CREATE TABLE IF NOT EXISTS announcements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                username TEXT,
-                message_ids TEXT, -- JSON-массив message_id
-                description TEXT NOT NULL,
-                price TEXT NOT NULL,
-                photo_file_ids TEXT -- JSON-массив file_id фотографий
-            )
-        ''')
+                    CREATE TABLE IF NOT EXISTS announcements (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        username TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        price TEXT NOT NULL,
+                        photo_file_ids TEXT,
+                        message_ids TEXT,
+                        timestamp TEXT  -- Новая колонка для даты публикации
+                    )
+                ''')
         await db.commit()
 
 # Проверка наличия объявлений у пользователя
