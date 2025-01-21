@@ -18,6 +18,7 @@ from handlers import (
     cancel, error_handler, get_chat_id, relevance_button_handler,
     menu_button_handler, show_user_announcements, check_subscription_callback
 )
+from comments import register_handlers as register_comment_handlers  # Добавляем обработчики комментариев
 from database import init_db
 from config import (
     BOT_TOKEN, CHOOSING, ADDING_PHOTOS, DESCRIPTION, PRICE, CONFIRMATION,
@@ -72,8 +73,12 @@ async def main():
     app.add_handler(CommandHandler('get_chat_id', get_chat_id))
     app.add_handler(CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'))
 
+    # Регистрируем обработчики комментариев
+
+    register_comment_handlers(app)
     # Обработчики для сообщений и команд вне состояния
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice))
+    #app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Chat(CHAT_ID), handle_choice))
+
     app.add_handler(CallbackQueryHandler(button_handler, pattern=r'^(edit|delete)_\d+$'))
 
     # Обработчик для релевантности объявлений
@@ -81,7 +86,6 @@ async def main():
 
     # Обработчик ошибок
     app.add_error_handler(error_handler)
-
     # Запускаем бота без удаления неподтвержденных обновлений
     await app.run_polling(drop_pending_updates=True)
 
