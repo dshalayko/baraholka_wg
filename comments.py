@@ -53,16 +53,16 @@ async def log_group_messages(update: Update, context: CallbackContext):
         # Условие логирования: First Name: Telegram и Нет треда
         if first_name == "Telegram" and username is None and last_name == "" and thread_id == "Нет треда":
             log_text = (
-                f"[LOG] Message Info (No Thread):\n"
-                f"- User ID: {user_id}\n"
-                f"- Username: {username}\n"
-                f"- First Name: {first_name}\n"
-                f"- Last Name: {last_name}\n"
-                f"- Message ID: {message_id}\n"
-                f"- Thread ID: {thread_id}\n"
+                f"[LOG] Message Info (No Thread):"
+                f"- User ID: {user_id} "
+                f"- Username: {username} "
+                f"- First Name: {first_name} "
+                f"- Last Name: {last_name} "
+                f"- Message ID: {message_id} "
+                f"- Thread ID: {thread_id} "
                 f"- Text: {text}"
             )
-            logger.info(log_text)
+            print(log_text)
 
             # Сохраняем в базу данных
             cursor.execute(
@@ -75,15 +75,15 @@ async def log_group_messages(update: Update, context: CallbackContext):
         if thread_id != "Нет треда":
             log_text = (
                 f"[LOG] Message Info (Thread ID Present):\n"
-                f"- User ID: {user_id}\n"
-                f"- Username: {username}\n"
-                f"- First Name: {first_name}\n"
-                f"- Last Name: {last_name}\n"
-                f"- Message ID: {message_id}\n"
-                f"- Thread ID: {thread_id}\n"
+                f"- User ID: {user_id} "
+                f"- Username: {username} "
+                f"- First Name: {first_name} "
+                f"- Last Name: {last_name} "
+                f"- Message ID: {message_id} "
+                f"- Thread ID: {thread_id} "
                 f"- Text: {text}"
             )
-            logger.info(log_text)
+            print(log_text)
 
             # Сохраняем в базу данных как комментарий
             cursor.execute(
