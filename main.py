@@ -13,25 +13,22 @@ from telegram.ext import (
 )
 from handlers import (
     start, menu, handle_choice, button_handler,
-    handle_add_photos, description_received, price_received, confirmation_handler,
-    edit_choice_handler, edit_description_received, edit_price_received,
-    cancel, error_handler, get_chat_id, relevance_button_handler,
-    menu_button_handler, show_user_announcements, check_subscription_callback
+    confirmation_handler, edit_choice_handler,
+    cancel, error_handler, get_chat_id,
+    menu_button_handler, check_subscription_callback
 )
-from comments import register_handlers as register_comment_handlers  # Добавляем обработчики комментариев
+from announcements import (
+    create_announcement, adding_photos, description_received,
+    price_received, show_user_announcements, publish_announcement,
+    delete_announcement_by_id
+)
+from comments import register_handlers as register_comment_handlers
 from database import init_db
 from config import (
     BOT_TOKEN, CHOOSING, ADDING_PHOTOS, DESCRIPTION, PRICE, CONFIRMATION,
-    EDIT_CHOICE, EDIT_DESCRIPTION, EDIT_PRICE, CHECK_SUBSCRIPTION
+    EDIT_CHOICE, CHECK_SUBSCRIPTION, EDIT_DESCRIPTION, EDIT_PRICE
 )
-import logging
 
-# Настройка логирования
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
 
 async def main():
     await init_db()
@@ -51,15 +48,15 @@ async def main():
             DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_received)],
             PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, price_received)],
             ADDING_PHOTOS: [
-                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, handle_add_photos),
+                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, adding_photos),
             ],
             CONFIRMATION: [CallbackQueryHandler(confirmation_handler, pattern='^(preview_edit|post|confirm_edit)$')],
             EDIT_CHOICE: [
                 CallbackQueryHandler(edit_choice_handler,
                                      pattern='^(edit_description|edit_price|edit_photos|cancel_edit)$')
             ],
-            EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_description_received)],
-            EDIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_price_received)],
+            EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_received)],  # Добавлено
+            EDIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, price_received)],  # Добавлено
             CHECK_SUBSCRIPTION: [CallbackQueryHandler(check_subscription_callback, pattern='^check_subscription$')],
         },
         fallbacks=[CommandHandler('cancel', cancel), MessageHandler(filters.Regex('^Вернуться в меню$'), cancel)],
@@ -74,18 +71,16 @@ async def main():
     app.add_handler(CallbackQueryHandler(menu_button_handler, pattern='^(add_advertisement|my_advertisements)$'))
 
     # Регистрируем обработчики комментариев
-
     register_comment_handlers(app)
-    # Обработчики для сообщений и команд вне состояния
-    #app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Chat(CHAT_ID), handle_choice))
 
+    # Обработчики для объявлений (из announcements.py)
     app.add_handler(CallbackQueryHandler(button_handler, pattern=r'^(edit|delete)_\d+$'))
-
-    # Обработчик для релевантности объявлений
-    app.add_handler(CallbackQueryHandler(relevance_button_handler, pattern=r'^(extend|remove)_\d+$'))
+    app.add_handler(CommandHandler('my_ads', show_user_announcements))
+    app.add_handler(CallbackQueryHandler(publish_announcement, pattern='^post$'))
 
     # Обработчик ошибок
     app.add_error_handler(error_handler)
+
     # Запускаем бота без удаления неподтвержденных обновлений
     await app.run_polling(drop_pending_updates=True)
 

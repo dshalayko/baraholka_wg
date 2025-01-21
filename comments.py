@@ -60,9 +60,9 @@ async def log_group_messages(update: Update, context: CallbackContext):
                 f"- Last Name: {last_name} "
                 f"- Message ID: {message_id} "
                 f"- Thread ID: {thread_id} "
-                f"- Text: {text}"
+
             )
-            print(log_text)
+            logger.info(log_text)
 
             # Сохраняем в базу данных
             cursor.execute(
@@ -81,9 +81,9 @@ async def log_group_messages(update: Update, context: CallbackContext):
                 f"- Last Name: {last_name} "
                 f"- Message ID: {message_id} "
                 f"- Thread ID: {thread_id} "
-                f"- Text: {text}"
+
             )
-            print(log_text)
+            logger.info(log_text)
 
             # Сохраняем в базу данных как комментарий
             cursor.execute(

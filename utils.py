@@ -77,3 +77,9 @@ def get_serbia_time():
     formatted_time = serbia_time.strftime('%d.%m.%Y в %H:%M')
 
     return formatted_time
+
+def get_private_channel_post_link(channel_id, message_id):
+    channel_id_str = str(channel_id)
+    if channel_id_str.startswith('-100'):
+        channel_id_str = channel_id_str[4:]
+    return f"https://t.me/c/{channel_id_str}/{message_id}"
