@@ -65,7 +65,6 @@ DELETE_MESSAGE_ERROR = "Ошибка при удалении сообщения 
 
 # Логи
 CONFIRMATION_HANDLER_LOG = "Начало функции confirmation_handler с данными: {}"
-USER_POST_CHOICE = "Пользователь выбрал размещение объявления."
 EDIT_ANNOUNCEMENT_LOG = "Редактируемое объявление ID: {}"
 NEW_ANNOUNCEMENT_LOG = "Новое объявление, создание с нуля."
 DELETE_SUCCESS_LOG = "Сообщение с ID {} удалено из канала."

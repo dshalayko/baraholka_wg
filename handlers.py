@@ -1,10 +1,5 @@
 import telegram
-from telegram import Update, InputMediaPhoto, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from telegram.ext import ContextTypes
-from datetime import datetime
-from config import *
-from keyboards import *
-from utils import is_subscribed, show_menu, check_subscription_message, get_serbia_time
+from utils import is_subscribed, show_menu, check_subscription_message
 from texts import *  # Импортируем все тексты
 from database import (
     save_announcement,
@@ -88,74 +83,13 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if choice == NEW_AD_CHOICE:
         context.user_data.clear()
         await create_announcement(update, context)  # Теперь создаём объявление перед вводом описания
-        return DESCRIPTION
+        return EDIT_DESCRIPTION
     elif choice == MY_ADS_CHOICE:
         await show_user_announcements(update, context)
         return CHOOSING
     else:
         await update.message.reply_text(CHOOSE_ACTION, reply_markup=markup)
         return CHOOSING
-
-async def confirmation_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-
-    logger.info(CONFIRMATION_HANDLER_LOG.format(data))
-
-    if data == 'preview_edit':
-        await query.message.reply_text(EDIT_PROMPT, reply_markup=edit_markup_with_cancel)
-        return EDIT_CHOICE
-
-    elif data == 'post':
-        logger.info(USER_POST_CHOICE)
-
-        # Получаем ID объявления
-        ann_id = context.user_data.get('ann_id')
-
-        if not ann_id:
-            await query.message.reply_text("Ошибка: ID объявления не найден.", reply_markup=markup)
-            return CHOOSING
-
-        # Отправляем объявление в канал и получаем ссылку на пост
-        post_link = await publish_announcement(update, context, ann_id)
-
-        if post_link:
-            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup, parse_mode='Markdown')
-        else:
-            await query.message.reply_text(POST_FAILURE_MESSAGE, reply_markup=markup)
-
-        return CHOOSING
-
-async def edit_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-
-    try:
-        await query.message.delete()
-    except telegram.error.BadRequest:
-        pass
-
-    if data == 'edit_description':
-        context.user_data['is_editing'] = True
-        await query.message.reply_text(EDIT_DESCRIPTION_PROMPT, reply_markup=ReplyKeyboardRemove())
-        return EDIT_DESCRIPTION
-
-    elif data == 'edit_price':
-        context.user_data['is_editing'] = True
-        await query.message.reply_text(EDIT_PRICE_PROMPT, reply_markup=ReplyKeyboardRemove())
-        return EDIT_PRICE
-
-    elif data == 'edit_photos':
-        context.user_data['is_editing'] = True
-        context.user_data['photos'] = []
-        await query.message.reply_text(EDIT_PHOTOS_PROMPT, reply_markup=finish_photo_markup_with_cancel)
-        return ADDING_PHOTOS
-
-    elif data == 'cancel_edit':
-        return CHOOSING
-
 
 async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
     user_data = context.job.data
@@ -172,29 +106,78 @@ async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(SEND_MESSAGE_ERROR.format(e))
 
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     data = query.data
-    if data.startswith('edit_'):
-        ann_id = int(data.split('_')[1])
-        context.user_data['edit_ann_id'] = ann_id
-        context.user_data['is_editing'] = True
-        context.user_data.pop('new_description', None)
-        context.user_data.pop('new_price', None)
-        await query.message.reply_text(EDIT_PROMPT, reply_markup=edit_markup_with_cancel)
-        return EDIT_CHOICE
-    elif data.startswith('delete_'):
-        ann_id = int(data.split('_')[1])
-        await delete_announcement_by_id(ann_id, context, query)
-        # await query.message.reply_text(DELETE_SUCCESS_MESSAGE)
+    parts = data.split('_')
+    action = parts[0]
+    ann_id = int(parts[1]) if len(parts) > 1 else None
+
+    logger.info(f"📌 [button_handler] Нажата кнопка: {data}, действие: {action}, ID объявления: {ann_id}")
+
+    if not ann_id:
+        logger.error("❌ Ошибка: не удалось определить ID объявления.")
+        await query.message.reply_text("❌ Ошибка: не удалось определить ID объявления.")
         return CHOOSING
-    else:
-        # Обработка других callback данных, если необходимо
+
+    async with aiosqlite.connect('announcements.db') as db:
+        cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
+        row = await cursor.fetchone()
+        if row:
+            message_ids_json = row[0]
+            message_ids = json.loads(message_ids_json) if message_ids_json else None
+            is_editing = bool(message_ids)  # True, если message_ids есть
+        else:
+            is_editing = False
+
+    context.user_data['ann_id'] = ann_id
+    context.user_data['is_editing'] = is_editing
+
+    try:
+        await query.message.delete()
+    except telegram.error.BadRequest:
         pass
 
-    return CHOOSING
+    if action == 'editdescription':
+        logger.info(f"✏️ Вызов функции: description_received(), ID объявления: {ann_id}")
+        await query.message.reply_text(EDIT_DESCRIPTION_PROMPT, reply_markup=ReplyKeyboardRemove())
+        return EDIT_DESCRIPTION
+
+    elif action == 'editprice':
+        logger.info(f"💰 Вызов функции: price_received(), ID объявления: {ann_id}")
+        await query.message.reply_text(EDIT_PRICE_PROMPT, reply_markup=ReplyKeyboardRemove())
+        return EDIT_PRICE
+
+    elif action == 'editphotos':
+        logger.info(f"🖼️ Вызов функции: adding_photos(), ID объявления: {ann_id}")
+        context.user_data['photos'] = []
+        await query.message.reply_text(EDIT_PHOTOS_PROMPT, reply_markup=finish_photo_markup_with_cancel)
+        return ADDING_PHOTOS
+
+    elif action == 'delete':
+        logger.info(f"❌ Вызов функции: delete_announcement_by_id(), ID объявления: {ann_id}")
+        await delete_announcement_by_id(ann_id, context, query)
+        return CHOOSING
+
+    elif action == 'up':
+        logger.info(f"🔼 Вызов функции: поднятие объявления, ID объявления: {ann_id}")
+        await query.message.reply_text("🔼 Объявление поднято!")
+        return CHOOSING
+
+    elif action == 'post':
+        logger.info(f"📢 Вызов функции: publish_announcement(), ID объявления: {ann_id}")
+        post_link = await publish_announcement(update, context, ann_id)
+
+        if post_link:
+            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup, parse_mode='Markdown')
+        else:
+            await query.message.reply_text(POST_FAILURE_MESSAGE, reply_markup=markup)
+
+        return CHOOSING
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
