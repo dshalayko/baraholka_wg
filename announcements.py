@@ -30,7 +30,7 @@ async def create_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data['username'] = username
 
     await update.message.reply_text(START_NEW_AD)
-    return DESCRIPTION
+    return EDIT_DESCRIPTION
 
 
 async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -88,7 +88,7 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Показываем предпросмотр (теперь is_editing берётся из базы)
         logger.info(f"📺 [adding_photos] Показываем предпросмотр, is_editing={is_editing}, ID объявления: {ann_id}")
         await send_preview(update, context, editing=is_editing)
-        return CONFIRMATION
+        return CHOOSING
 
     else:
         logger.warning(
@@ -143,18 +143,29 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('is_editing', False):
         logger.info(f"📺 [price_received] Показываем предпросмотр после редактирования, ID объявления: {ann_id}")
         await send_preview(update, context, editing=True)
-        return CONFIRMATION
+        return CHOOSING
 
     await update.message.reply_text(ASK_FOR_PHOTOS, reply_markup=photo_markup_with_cancel, parse_mode='Markdown')
     return ADDING_PHOTOS
 
 async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editing=False):
-
+    """Формирует и отправляет предпросмотр объявления."""
     ann_id = context.user_data.get('ann_id')
 
+    # Если ann_id нет в контексте, получаем его из БД
     if not ann_id:
-        await update.message.reply_text("Ошибка: ID объявления не найден.")
-        return CHOOSING
+        logger.warning("⚠️ [send_preview] ann_id отсутствует в context.user_data, ищем в БД.")
+        async with aiosqlite.connect('announcements.db') as db:
+            cursor = await db.execute('SELECT id FROM announcements ORDER BY id DESC LIMIT 1')
+            row = await cursor.fetchone()
+            if row:
+                ann_id = row[0]
+                context.user_data['ann_id'] = ann_id
+                logger.info(f"✅ [send_preview] Найден последний ann_id в БД: {ann_id}")
+            else:
+                logger.error("❌ [send_preview] Ошибка: не найдено ни одного объявления в БД.")
+                await update.message.reply_text("Ошибка: Не найдено ни одного объявления.")
+                return CHOOSING
 
     async with aiosqlite.connect('announcements.db') as db:
         cursor = await db.execute(
@@ -163,6 +174,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         row = await cursor.fetchone()
 
         if not row:
+            logger.error(f"❌ [send_preview] Ошибка: объявление {ann_id} не найдено в базе.")
             await update.message.reply_text("❌ Ошибка: объявление не найдено в базе.")
             return CHOOSING
 
@@ -170,11 +182,16 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         photos = json.loads(photo_file_ids) if photo_file_ids else []
         message_ids = json.loads(message_ids_json) if message_ids_json else None
 
-    is_updated = context.user_data.get('is_editing', False)
+        is_updated = bool(message_ids)  # True, если сообщение уже публиковалось
+        timestamp = timestamp if timestamp else ""
+
+    logger.info(f"📺 [send_preview] Генерация предпросмотра: ID {ann_id}, is_updated={is_updated}, timestamp={timestamp}")
 
     # Формируем текст объявления
-    message = await format_announcement_text(description, price, username, ann_id=ann_id,
-                                             is_updated=is_updated, message_ids=message_ids, timestamp=timestamp)
+    message = await format_announcement_text(
+        description, price, username, ann_id=ann_id,
+        is_updated=is_updated, message_ids=message_ids, timestamp=timestamp
+    )
 
     keyboard = InlineKeyboardMarkup([
         [
@@ -185,6 +202,8 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         [InlineKeyboardButton("📢 Опубликовать", callback_data=f'post_{ann_id}')]
     ])
 
+    logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: "
+                f"editdescription_{ann_id}, editprice_{ann_id}, editphotos_{ann_id}, post_{ann_id}")
     if photos:
         media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
                  for idx, photo_id in enumerate(photos)]
@@ -201,32 +220,37 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
             await update.callback_query.message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
 
 async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE, ann_id):
-    """Публикация объявления в канал с обновлением timestamp и удалением старой версии."""
+    logger.info(f"📢 [publish_announcement] Публикация объявления с ID {ann_id}")
+
     async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute('SELECT description, price, username, photo_file_ids, message_ids, timestamp FROM announcements WHERE id = ?', (ann_id,))
+        cursor = await db.execute('SELECT description, price, username, photo_file_ids, message_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
 
         if not row:
-            logger.error(f"Ошибка: объявление {ann_id} не найдено.")
+            logger.error(f"❌ [publish_announcement] Ошибка: объявление {ann_id} не найдено в базе.")
             return None
 
-        description, price, username, photo_file_ids, message_ids_json, timestamp = row
+        description, price, username, photo_file_ids, message_ids_json = row
         photos = json.loads(photo_file_ids) if photo_file_ids else []
         old_message_ids = json.loads(message_ids_json) if message_ids_json else []
 
-    is_updated = context.user_data.get('is_editing', False)
-    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Получаем текущее время
+        # Определяем, редактируется ли объявление
+        is_editing = bool(old_message_ids)
 
-    # Удаляем старое объявление
-    if old_message_ids:
+    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logger.info(f"📢 [publish_announcement] Публикация объявления {ann_id}, is_editing={is_editing}")
+
+    # Удаляем старое объявление, если оно опубликовано
+    if is_editing and old_message_ids:
         for message_id in old_message_ids:
             try:
                 await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
-                logger.info(f"Удалено старое объявление {message_id} из канала.")
+                logger.info(f"🗑️ Удалено старое объявление {message_id} из канала.")
             except Exception as e:
-                logger.error(f"Ошибка при удалении старого объявления {message_id}: {e}")
+                logger.error(f"❌ Ошибка при удалении старого объявления {message_id}: {e}")
 
-    message = await format_announcement_text(description, price, username, ann_id=ann_id, is_updated=is_updated, message_ids=old_message_ids, timestamp=current_timestamp)
+    # Формируем текст объявления
+    message = await format_announcement_text(description, price, username, ann_id=ann_id, is_updated=is_editing, message_ids=old_message_ids, timestamp=current_timestamp)
 
     # Публикуем новое объявление
     if photos:
@@ -236,6 +260,9 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message, parse_mode='Markdown')
         new_message_ids = [sent_message.message_id]
+
+    # Логируем новое сообщение
+    logger.info(f"✅ [publish_announcement] Новое объявление опубликовано, ID: {ann_id}, сообщения: {new_message_ids}")
 
     # Обновляем запись в базе, включая `timestamp`
     async with aiosqlite.connect('announcements.db') as db:
@@ -288,7 +315,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
         status = "📝 *Черновик*\n\n" if not message_ids else f"📌 [Опубликовано]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n\n"
 
-        message = f"📌 *ID объявления:* {ann_id}\n\n{status}{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}"
+        message = f"*#* {ann_id}\n\n{status}{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}"
 
         keyboard = InlineKeyboardMarkup([
             [
@@ -301,6 +328,9 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
         ])
 
+        logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: "
+                    f"editdescription_{ann_id}, editprice_{ann_id}, editphotos_{ann_id}, post_{ann_id}")
+
         if photos:
             await reply_message.reply_photo(photo=photos[0], caption=message, reply_markup=keyboard, parse_mode='Markdown')
         else:
@@ -308,12 +338,11 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
     return CHOOSING
 
-async def format_announcement_text(description, price, username, ann_id=123, is_updated=False, message_ids=None,  timestamp=None):
+async def format_announcement_text(description, price, username, ann_id, is_updated=False, message_ids=None,  timestamp=None):
     current_time = get_serbia_time()
-    message = ""
-    print(ann_id)
-    message += f"📌 ID объявления: 3234235435345\n\n"
-    message = f"{description}\n\n"
+
+    message = f"📌#{ann_id}\n\n"
+    message += f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
     message += f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
 
