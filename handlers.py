@@ -33,38 +33,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(WELCOME_NEW_USER, reply_markup=add_advertisement_keyboard)
         return CHOOSING
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-
-    if not await is_subscribed(user_id, context):
-        text, keyboard = await check_subscription_message()
-        await update.message.reply_text(text, reply_markup=keyboard)
-        return CHECK_SUBSCRIPTION
-    else:
-        keyboard = [
-            [InlineKeyboardButton(NEW_AD_CHOICE, callback_data='add_advertisement')],
-            [InlineKeyboardButton(MY_ADS_CHOICE, callback_data='my_advertisements')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        if await has_user_ads(user_id):
-            await update.message.reply_text(WELCOME_NEW_USER, reply_markup=reply_markup)
-        else:
-            await update.message.reply_text(WELCOME_NEW_USER, reply_markup=reply_markup)
-        return CHOOSING
-
-async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    # Обработка кнопки "Новое хрустящее объявление"
-    if query.data == 'add_advertisement':
-        await handle_choice(update, context)
-
-    # Обработка кнопки "Мои объявления"
-    elif query.data == 'my_advertisements':
-        await show_user_announcements(update, context)
-
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
@@ -82,7 +50,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text
     if choice == NEW_AD_CHOICE:
         context.user_data.clear()
-        await create_announcement(update, context)  # Теперь создаём объявление перед вводом описания
+        await create_announcement(update, context)
         return EDIT_DESCRIPTION
     elif choice == MY_ADS_CHOICE:
         await show_user_announcements(update, context)
@@ -106,12 +74,13 @@ async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(SEND_MESSAGE_ERROR.format(e))
 
-
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     data = query.data
+    logger.info(f"🔍 [button_handler] Получен callback_data: {data}")
+
     parts = data.split('_')
     action = parts[0]
     ann_id = int(parts[1]) if len(parts) > 1 else None
@@ -119,22 +88,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"📌 [button_handler] Нажата кнопка: {data}, действие: {action}, ID объявления: {ann_id}")
 
     if not ann_id:
-        logger.error("❌ Ошибка: не удалось определить ID объявления.")
+        logger.error("❌ Ошибка: не удалось определить ID объявления из callback_data.")
         await query.message.reply_text("❌ Ошибка: не удалось определить ID объявления.")
         return CHOOSING
 
+    # Проверяем наличие ann_id в БД
     async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
+        cursor = await db.execute('SELECT id FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
-        if row:
-            message_ids_json = row[0]
-            message_ids = json.loads(message_ids_json) if message_ids_json else None
-            is_editing = bool(message_ids)  # True, если message_ids есть
-        else:
-            is_editing = False
+        if not row:
+            logger.error(f"❌ Ошибка: объявление {ann_id} не найдено в БД.")
+            await query.message.reply_text("❌ Ошибка: объявление не найдено в базе.")
+            return CHOOSING
 
-    context.user_data['ann_id'] = ann_id
-    context.user_data['is_editing'] = is_editing
+    context.user_data['ann_id'] = ann_id  # Устанавливаем в контексте
+    context.user_data['is_editing'] = True  # Устанавливаем флаг редактирования
+
+    logger.info(f"📋 [button_handler] is_editing=True, ID объявления: {ann_id}")
 
     try:
         await query.message.delete()
