@@ -21,17 +21,10 @@ async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Show the menu with options based on whether the user has ads or not.
-    :param update: The update object containing message or callback query.
-    :param context: The bot context for this interaction.
-    """
     user_id = update.effective_user.id
 
-    # Check if the user has ads
     has_ads = await has_user_ads(user_id)
 
-    # Check if it's a message or a callback query
     if update.message:
         # Responding to a regular message
         if has_ads:
@@ -65,7 +58,6 @@ async def check_subscription_message():
     ])
     return text, keyboard
 
-
 def get_serbia_time():
     # Определяем временную зону для Сербии (Europe/Belgrade)
     serbia_tz = pytz.timezone('Europe/Belgrade')
@@ -83,3 +75,42 @@ def get_private_channel_post_link(channel_id, message_id):
     if channel_id_str.startswith('-100'):
         channel_id_str = channel_id_str[4:]
     return f"https://t.me/c/{channel_id_str}/{message_id}"
+
+async def notify_owner_about_comment(cursor, context, thread_id, user_id, text):
+    try:
+        cursor.execute("SELECT ann_id FROM messages WHERE message_id = ?", (thread_id,))
+        ann_id_result = cursor.fetchone()
+
+        if ann_id_result:
+            ann_id = ann_id_result[0]
+
+            cursor.execute("SELECT user_id, message_ids FROM announcements WHERE id = ?", (ann_id,))
+            owner = cursor.fetchone()
+
+            if owner:
+                owner_id = owner[0]
+                message_ids = owner[1]
+
+                first_message_id = None
+                if message_ids:
+                    message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
+                    if isinstance(message_ids_list, list) and message_ids_list:
+                        first_message_id = message_ids_list[0]
+
+                if first_message_id:
+                    announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, first_message_id)
+                    message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
+                else:
+                    message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_"
+
+                if owner_id != user_id:
+                    await context.bot.send_message(
+                        chat_id=owner_id,
+                        text=message_text,
+                        parse_mode="Markdown",
+                        disable_web_page_preview=True
+                    )
+        else:
+            logger.error(f"❌ Ошибка: Не найден ann_id по thread_id = {thread_id}.")
+    except Exception as e:
+        logger.error(f"❌ Ошибка в notify_owner_about_comment: {e}")

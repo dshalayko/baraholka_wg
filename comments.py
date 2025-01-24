@@ -6,7 +6,7 @@ import sqlite3
 import re
 from collections import defaultdict
 
-from utils import get_private_channel_post_link
+from utils import get_private_channel_post_link, notify_owner_about_comment
 
 thread_messages = defaultdict(list)
 CHAT_ID = -1002212626667  # Замените на ID вашей группы
@@ -95,40 +95,7 @@ async def log_group_messages(update: Update, context: CallbackContext):
                 )
                 logger.info(log_text)
 
-                cursor.execute("SELECT ann_id FROM messages WHERE message_id = ?", (thread_id,))
-                ann_id_result = cursor.fetchone()
-
-                if ann_id_result:
-                    ann_id = ann_id_result[0]
-                    print(f"DEBUG: ann_id = {ann_id}, type = {type(ann_id)}")
-                    cursor.execute("SELECT user_id, message_ids FROM announcements WHERE id = ?", (ann_id,))
-                    owner = cursor.fetchone()
-                    print(f"DEBUG: owner = {owner}")
-                    if owner:
-                        owner_id = owner[0]
-                        message_ids = owner[1]
-
-                        first_message_id = None
-                        if message_ids:
-                            message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
-                            if isinstance(message_ids_list, list) and message_ids_list:
-                                first_message_id = message_ids_list[0]
-
-                        if first_message_id:
-                            announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, first_message_id)
-                            message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
-                        else:
-                            message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_"
-
-                        if owner_id != user_id:
-                            await context.bot.send_message(
-                                chat_id=owner_id,
-                                text=message_text,
-                                parse_mode="Markdown",
-                                disable_web_page_preview=True
-                            )
-                else:
-                    logger.error(f"❌ Ошибка: Не найден ann_id по thread_id = {thread_id}.")
+                await notify_owner_about_comment(cursor, context, thread_id, user_id, text)
 
                 parent_message_id = update.message.reply_to_message.message_id if update.message.reply_to_message else None
                 with conn:
