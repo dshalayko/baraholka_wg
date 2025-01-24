@@ -13,13 +13,14 @@ from telegram.ext import (
 )
 from handlers import (
     start, handle_choice, button_handler,
-    cancel, error_handler, get_chat_id,
+    cancel, error_handler,
     check_subscription_callback
 )
 from announcements import (
     adding_photos, description_received,
     price_received, show_user_announcements,
 )
+
 from comments import register_handlers as register_comment_handlers
 from database import init_db
 from config import (
@@ -33,18 +34,17 @@ async def main():
 
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler('start', start),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice),
+            MessageHandler(filters.TEXT, handle_choice),
             CallbackQueryHandler(handle_choice, pattern='^(add_advertisement|my_advertisements)$'),
         ],
         states={
             CHOOSING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice),
+                MessageHandler(filters.TEXT , handle_choice),
                 CallbackQueryHandler(button_handler, pattern=r'^(editdescription|editprice|editphotos|delete|up|post)_\d+$'),
                 CallbackQueryHandler(show_user_announcements, pattern='^my_advertisements$')
             ],
             ADDING_PHOTOS: [
-                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, adding_photos),
+                MessageHandler(filters.PHOTO | filters.TEXT, adding_photos),
             ],
             EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_received)],
             EDIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, price_received)],
@@ -55,15 +55,12 @@ async def main():
         ],
     )
 
+    register_comment_handlers(app)
     # Добавляем ConversationHandler
     app.add_handler(conv_handler)
 
-    # Обработчики на верхнем уровне для команд
-    app.add_handler(CommandHandler('get_chat_id', get_chat_id))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler('my_ads', show_user_announcements))
-
-    # Регистрируем обработчики комментариев
-    register_comment_handlers(app)
 
     # Обработчик ошибок
     app.add_error_handler(error_handler)

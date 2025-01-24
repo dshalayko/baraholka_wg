@@ -1,26 +1,27 @@
 from telegram import Update
-from telegram.ext import CallbackContext, MessageHandler, filters, CommandHandler
+from telegram.ext import CallbackContext, MessageHandler, filters, CommandHandler, ContextTypes
 from logger import logger
+from config import PRIVATE_CHANNEL_ID
 import sqlite3
+import re
 from collections import defaultdict
+
+from utils import get_private_channel_post_link
+
 thread_messages = defaultdict(list)
 CHAT_ID = -1002212626667  # Замените на ID вашей группы
 
 
-# Создаем базу данных и таблицы
-conn = sqlite3.connect("announcements.db")
+
+conn = sqlite3.connect("announcements.db", check_same_thread=False)
 cursor = conn.cursor()
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
-    username TEXT,
-    first_name TEXT,
-    last_name TEXT,
     message_id INTEGER,
-    thread_id TEXT,
-    text TEXT
+    ann_id INTEGER
 )
 ''')
 
@@ -32,65 +33,109 @@ CREATE TABLE IF NOT EXISTS comments (
     first_name TEXT,
     last_name TEXT,
     message_id INTEGER,
-    thread_id TEXT,
-    text TEXT
+    thread_id INTEGER,
+    text TEXT,
+    photo_id TEXT
 )
 ''')
 
 conn.commit()
 
+def extract_ann_id(text: str) -> int:
+    """Извлекает ann_id из первой строки текста как INTEGER."""
+    lines = text.split('\n')
+    if lines:
+        match = re.search(r"#(\d+)", lines[0])
+        if match:
+            return int(match.group(1))
+    return None
+
+
 async def log_group_messages(update: Update, context: CallbackContext):
-    """Логирует сообщения, удовлетворяющие определенным условиям и сохраняет их в базу данных."""
-    if update.effective_chat.id == CHAT_ID:
-        user_id = update.effective_user.id
-        username = update.effective_user.username
-        first_name = update.effective_user.first_name
-        last_name = update.effective_user.last_name or ""
-        text = update.message.text or "Нет текста"
-        message_id = update.message.message_id
-        thread_id = update.message.message_thread_id if update.message.message_thread_id else "Нет треда"
+    """Логирует сообщения, удовлетворяющие условиям, и сохраняет их в базу данных."""
+    try:
+        if update.effective_chat.id == CHAT_ID:
+            user_id = update.effective_user.id
+            username = update.effective_user.username
+            first_name = update.effective_user.first_name
+            last_name = update.effective_user.last_name or ""
+            text = update.message.text or "Нет текста"
+            message_id = update.message.message_id
+            thread_id = update.message.message_thread_id if update.message.message_thread_id else "Нет треда"
+            ann_id = extract_ann_id(text)
+            photo_id = update.message.photo[-1].file_id if update.message.photo else None
 
-        # Условие логирования: First Name: Telegram и Нет треда
-        if first_name == "Telegram" and username is None and last_name == "" and thread_id == "Нет треда":
-            log_text = (
-                f"[LOG] Message Info (No Thread):"
-                f"- User ID: {user_id} "
-                f"- Username: {username} "
-                f"- First Name: {first_name} "
-                f"- Last Name: {last_name} "
-                f"- Message ID: {message_id} "
-                f"- Thread ID: {thread_id} "
+            if ann_id and message_id and user_id:
+                log_text = (
+                    f"[LOG] Message Info:\n"
+                    f"- User ID: {user_id}\n"
+                    f"- Message ID: {message_id}\n"
+                    f"- Announcement ID: {ann_id}\n"
+                )
+                logger.info(log_text)
 
-            )
-            logger.info(log_text)
+                with conn:
+                    cursor.execute(
+                        "INSERT INTO messages (user_id, message_id, ann_id) VALUES (?, ?, ?)",
+                        (user_id, message_id, ann_id)
+                    )
 
-            # Сохраняем в базу данных
-            cursor.execute(
-                "INSERT INTO messages (user_id, username, first_name, last_name, message_id, thread_id, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, username, first_name, last_name, message_id, thread_id, text)
-            )
-            conn.commit()
+            # Если сообщение является ответом (reply) или содержит Thread ID, сохраняем в comments
+            if thread_id != "Нет треда" or update.message.reply_to_message:
+                log_text = (
+                    f"[LOG] Message Info (Thread ID Present):\n"
+                    f"- User ID: {user_id}\n"
+                    f"- Username: {username}\n"
+                    f"- First Name: {first_name}\n"
+                    f"- Last Name: {last_name}\n"
+                    f"- Message ID: {message_id}\n"
+                    f"- Thread ID: {thread_id}\n"
+                    f"- Text: {text}"
+                    f"- Photo ID: {photo_id if photo_id else 'Нет фото'}"
+                )
+                logger.info(log_text)
 
-        # Условие логирования: Сообщения с Thread ID
-        if thread_id != "Нет треда":
-            log_text = (
-                f"[LOG] Message Info (Thread ID Present):\n"
-                f"- User ID: {user_id} "
-                f"- Username: {username} "
-                f"- First Name: {first_name} "
-                f"- Last Name: {last_name} "
-                f"- Message ID: {message_id} "
-                f"- Thread ID: {thread_id} "
+                cursor.execute("SELECT user_id FROM announcements WHERE id = ?", (ann_id,))
+                owner = cursor.fetchone()
 
-            )
-            logger.info(log_text)
+                owner_id = owner[1]
+                msg_id = owner[2]
+                print(owner_id, msg_id)
+                if owner:
+                    owner_id = owner[0]  # ID автора объявления
+                    print(owner_id)
+                    message_ids = owner[1]  # JSON или список message_id
 
-            # Сохраняем в базу данных как комментарий
-            cursor.execute(
-                "INSERT INTO comments (user_id, username, first_name, last_name, message_id, thread_id, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, username, first_name, last_name, message_id, thread_id, text)
-            )
-            conn.commit()
+                    # Если message_ids - массив, берем первый элемент
+                    first_message_id = None
+                    if message_ids:
+                        message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
+                        if isinstance(message_ids_list, list) and message_ids_list:
+                            first_message_id = message_ids_list[0]
+
+                    # Формируем ссылку, если есть message_id
+                    if first_message_id:
+                        announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, first_message_id)
+                        message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n{text}\n\n🔗 [Посмотреть объявление]({announcement_link})"
+                    else:
+                        message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n{text}"
+
+                    if owner_id != user_id:  # Не уведомлять самого себя
+                        await context.bot.send_message(
+                            chat_id=owner_id,
+                            text=message_text,
+                            parse_mode="Markdown",
+                            disable_web_page_preview=True
+                        )
+
+                parent_message_id = update.message.reply_to_message.message_id if update.message.reply_to_message else None
+                with conn:
+                    cursor.execute(
+                        "INSERT INTO comments (user_id, username, first_name, last_name, message_id, thread_id, text, photo_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (user_id, username, first_name, last_name, message_id, thread_id if thread_id != "Нет треда" else parent_message_id, text, photo_id)
+                    )
+    except Exception as e:
+        logger.error(f"Ошибка в log_group_messages: {e}")
 
 async def get_thread_comments(update: Update, context: CallbackContext):
     """Выводит все комментарии из указанного треда."""
@@ -105,7 +150,7 @@ async def get_thread_comments(update: Update, context: CallbackContext):
         await update.message.reply_text("Ошибка: ID треда должен быть числом.")
         return
 
-    cursor.execute("SELECT text FROM comments WHERE thread_id = ?", (str(thread_id),))
+    cursor.execute("SELECT text FROM comments WHERE thread_id = ?", (thread_id,))
     comments = cursor.fetchall()
 
     if not comments:
@@ -143,7 +188,18 @@ async def reply_to_message(update: Update, context: CallbackContext):
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
+async def get_chat_id(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    chat_type = chat.type
+    chat_id = chat.id
+
+    if chat_type in ['group', 'supergroup', 'channel']:
+        await update.message.reply_text(f"Chat ID этого {chat_type}: `{chat_id}`", parse_mode='Markdown')
+    else:
+        await update.message.reply_text(f"Ваш личный Chat ID: `{chat_id}`", parse_mode='Markdown')
+
 def register_handlers(app):
     app.add_handler(MessageHandler(filters.ALL & filters.Chat(CHAT_ID), log_group_messages))
-    app.add_handler(CommandHandler("get_thread", get_thread_comments))
+    app.add_handler(CommandHandler("get_thread", get_thread_comments, filters=filters.Chat(CHAT_ID)))
     app.add_handler(CommandHandler("reply", reply_to_message))
+    app.add_handler(CommandHandler('get_chat_id', get_chat_id))
