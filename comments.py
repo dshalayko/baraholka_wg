@@ -1,7 +1,9 @@
 from telegram import Update
 from telegram.ext import CallbackContext, MessageHandler, filters, CommandHandler, ContextTypes
+
+from comments_manager import forward_thread_replies
 from logger import logger
-from config import PRIVATE_CHANNEL_ID
+
 import sqlite3
 import re
 from collections import defaultdict

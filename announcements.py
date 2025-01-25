@@ -4,6 +4,8 @@ import aiosqlite
 from datetime import datetime
 from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
+
+from comments_manager import forward_thread_replies
 from config import *
 from logger import logger
 from texts import *
@@ -31,7 +33,6 @@ async def create_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await update.message.reply_text(START_NEW_AD)
     return EDIT_DESCRIPTION
-
 
 async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Добавляет фотографии к объявлению, с возможностью создания без фото."""
@@ -96,7 +97,6 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(SEND_PHOTO_OR_FINISH_OR_NO_PHOTO)
 
     return ADDING_PHOTOS
-
 
 async def description_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получение и обновление описания объявления в БД."""
@@ -223,7 +223,9 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"📢 [publish_announcement] Публикация объявления с ID {ann_id}")
 
     async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute('SELECT description, price, username, photo_file_ids, message_ids FROM announcements WHERE id = ?', (ann_id,))
+        cursor = await db.execute(
+            'SELECT description, price, username, photo_file_ids, message_ids FROM announcements WHERE id = ?',
+            (ann_id,))
         row = await cursor.fetchone()
 
         if not row:
@@ -240,28 +242,21 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     logger.info(f"📢 [publish_announcement] Публикация объявления {ann_id}, is_editing={is_editing}")
 
-    # Удаляем старое объявление, если оно опубликовано
-    if is_editing and old_message_ids:
-        for message_id in old_message_ids:
-            try:
-                await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
-                logger.info(f"🗑️ Удалено старое объявление {message_id} из канала.")
-            except Exception as e:
-                logger.error(f"❌ Ошибка при удалении старого объявления {message_id}: {e}")
-
     # Формируем текст объявления
-    message = await format_announcement_text(description, price, username, ann_id=ann_id, is_updated=is_editing, message_ids=old_message_ids, timestamp=current_timestamp)
+    message = await format_announcement_text(description, price, username, ann_id=ann_id,
+                                             is_updated=is_editing, message_ids=old_message_ids,
+                                             timestamp=current_timestamp)
 
     # Публикуем новое объявление
     if photos:
-        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown') for idx, photo_id in enumerate(photos)]
+        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
+                 for idx, photo_id in enumerate(photos)]
         sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media)
         new_message_ids = [msg.message_id for msg in sent_messages]
     else:
         sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message, parse_mode='Markdown')
         new_message_ids = [sent_message.message_id]
 
-    # Логируем новое сообщение
     logger.info(f"✅ [publish_announcement] Новое объявление опубликовано, ID: {ann_id}, сообщения: {new_message_ids}")
 
     # Обновляем запись в базе, включая `timestamp`
@@ -269,6 +264,24 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
         await db.execute('UPDATE announcements SET message_ids = ?, timestamp = ? WHERE id = ?',
                          (json.dumps(new_message_ids), current_timestamp, ann_id))
         await db.commit()
+
+    # Перенос комментариев, если объявление обновляется
+    if is_editing and old_message_ids:
+        old_message_id = old_message_ids[0]  # Берём ID первого сообщения
+        new_message_id = new_message_ids[0]  # Берём ID нового сообщения
+        logger.info(f"🔄 [publish_announcement] Перенос комментариев: {old_message_id} → {new_message_id}")
+
+        transfer_success = await forward_thread_replies(old_message_id, new_message_id)
+
+        if not transfer_success:
+            logger.warning(f"⚠️ [publish_announcement] Не удалось перенести комментарии с {old_message_id} на {new_message_id}, продолжаем выполнение.")
+
+        # Удаляем старое объявление, даже если перенос комментариев не удался
+        try:
+            await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=old_message_id)
+            logger.info(f"🗑️ [publish_announcement] Удалено старое объявление {old_message_id} из канала.")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при удалении старого объявления {old_message_id}: {e}")
 
     return get_private_channel_post_link(PRIVATE_CHANNEL_ID, new_message_ids[0])
 

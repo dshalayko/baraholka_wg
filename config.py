@@ -6,6 +6,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 PRIVATE_CHANNEL_ID =  os.getenv('PRIVATE_CHANNEL_ID')
 INVITE_LINK =  os.getenv('INVITE_LINK')
+API_ID =  os.getenv('API_ID')
+API_HASH =  os.getenv('API_HASH')
 
 # Состояния для ConversationHandler
 CHECK_SUBSCRIPTION = range(999)

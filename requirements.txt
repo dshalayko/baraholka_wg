@@ -1,5 +1,7 @@
-python-telegram-bot
-aiosqlite
-python-dotenv
+python-telegram-bot~=21.10
+aiosqlite~=0.20.0
+python-dotenv~=1.0.1
 nest_asyncio
-pytz
+pytz~=2024.2
+nest-asyncio~=1.6.0
+Pyrogram~=2.0.106
