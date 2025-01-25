@@ -79,3 +79,15 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
         logger.error(f"❌ [forward_thread_replies] Ошибка при переносе комментариев: {e}")
         await app.stop()
         return False
+
+async def main():
+    """Функция для запуска сессии Pyrogram отдельно"""
+    logger.info("🌐 [comments_manager] Запуск Pyrogram-сессии...")
+    app = Client("my_session", api_id=API_ID, api_hash=API_HASH)
+
+    async with app:
+        logger.info("✅ [comments_manager] Сессия Pyrogram успешно запущена.")
+        await asyncio.sleep(10)  # Оставляем время для аутентификации
+
+if __name__ == "__main__":
+    asyncio.run(main())
