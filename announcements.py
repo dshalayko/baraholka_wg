@@ -18,7 +18,10 @@ from database import (get_user_announcements,
 async def create_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Создаёт новое объявление в базе данных и сохраняет его ID в context.user_data."""
     user_id = update.message.from_user.id
-    username = update.message.from_user.username or update.message.from_user.first_name
+    username = update.message.from_user.username if update.message.from_user.username else "None"
+
+    if username == "None":
+        logger.warning(f"⚠️ [create_announcement] У пользователя {user_id} нет username, записываем 'None'.")
 
     async with aiosqlite.connect('announcements.db') as db:
         cursor = await db.execute('''
@@ -109,6 +112,13 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
         return CHOOSING
 
     description = update.message.text.strip()
+
+    # 🔍 Проверяем длину описания
+    if len(description) > 1024:
+        logger.warning(f"⚠️ [description_received] Введённое описание слишком длинное ({len(description)} символов), ID объявления: {ann_id}")
+        await update.message.reply_text(f"❗ Описание слишком длинное. Максимум 1024 символа. Сейчас: {len(description)} символов.\nПожалуйста, укоротите текст.")
+        return EDIT_DESCRIPTION
+
     logger.info(f"✏️ [description_received] Введено новое описание: {description}, ID объявления: {ann_id}")
 
     async with aiosqlite.connect('announcements.db') as db:
@@ -126,7 +136,6 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
 async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"💰 [price_received] начало")
 
-    """Получение и обновление цены объявления в БД."""
     ann_id = context.user_data.get('ann_id')
 
     if not ann_id:
@@ -135,6 +144,12 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHOOSING
 
     price = update.message.text.strip()
+
+    if len(price) > 1024:
+        logger.warning(f"⚠️ [price_received] Введённая цена слишком длинная ({len(price)} символов), ID объявления: {ann_id}")
+        await update.message.reply_text(f"❗ Цена слишком длинная. Максимум 1024 символа. Сейчас: {len(price)} символов.\nПожалуйста, укоротите текст.")
+        return EDIT_PRICE
+
     logger.info(f"💰 [price_received] Введена новая цена: {price}, ID объявления: {ann_id}")
 
     async with aiosqlite.connect('announcements.db') as db:
@@ -190,6 +205,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
     # Формируем текст объявления
     message = await format_announcement_text(
+        update,
         description, price, username, ann_id=ann_id,
         is_updated=is_updated, message_ids=message_ids, timestamp=timestamp
     )
@@ -244,7 +260,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"📢 [publish_announcement] Публикация объявления {ann_id}, is_editing={is_editing}")
 
     # Формируем текст объявления
-    message = await format_announcement_text(description, price, username, ann_id=ann_id,
+    message = await format_announcement_text(update,description, price, username, ann_id=ann_id,
                                              is_updated=is_editing, message_ids=old_message_ids,
                                              timestamp=current_timestamp)
 
@@ -352,13 +368,29 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
     return CHOOSING
 
-async def format_announcement_text(description, price, username, ann_id, is_updated=False, message_ids=None,  timestamp=None):
+async def format_announcement_text(update: Update, description, price, username, ann_id, is_updated=False, message_ids=None, timestamp=None):
     current_time = get_serbia_time()
+
+    # Если username = "None", используем first_name + last_name
+    if username == "None":
+        # Определяем user (берём либо из update.message, либо из update.callback_query)
+        user = update.message.from_user if update.message else update.callback_query.from_user if update.callback_query else None
+
+        if not user:
+            logger.error("❌ [format_announcement_text] Ошибка: не удалось получить данные пользователя.")
+            return "❌ Ошибка: не удалось получить данные пользователя."
+
+        first_name = user.first_name if user.first_name else "Аноним"
+        last_name = user.last_name if user.last_name else ""
+        username = f"{first_name} {last_name}".strip()  # Убираем лишний пробел, если фамилии нет
+        contact_info = f"{CONTACT_TEXT}\n{username.replace('_', '\_')}"
+    else:
+        contact_info = f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
 
     message = f"📌#{ann_id}\n\n"
     message += f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
-    message += f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
+    message += contact_info
 
     if is_updated and message_ids:
         message += f"\n\n{UPDATED_TEXT.format(current_time=current_time)}"

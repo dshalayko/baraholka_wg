@@ -55,8 +55,7 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
         found_message_id = None
         new_message_id = None
 
-        # 🔍 Ждём, пока не найдём старое сообщение (old_message_id)
-        for attempt in range(5):  # 5 попыток с интервалом 2 сек
+        for attempt in range(5):
             async for message in app.get_chat_history(chat_id):
                 if hasattr(message, "forward_from_message_id") and message.forward_from_message_id == old_thread_id:
                     found_message_id = message.id
@@ -72,8 +71,7 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
             await app.stop()
             return False
 
-        # 🔍 Ждём, пока не найдём новое сообщение (new_message_id)
-        for attempt in range(5):  # 5 попыток с интервалом 2 сек
+        for attempt in range(5):
             async for message in app.get_chat_history(chat_id):
                 if hasattr(message, "forward_from_message_id") and message.forward_from_message_id == new_thread_id:
                     new_message_id = message.id
@@ -94,13 +92,14 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
 
         async for message in app.get_chat_history(chat_id):
             if hasattr(message, "reply_to_message_id") and message.reply_to_message_id == found_message_id:
-                original_author = message.from_user.first_name if message.from_user else "Аноним"
-                username = f"@{message.from_user.username}" if message.from_user and message.from_user.username else ""
+                first_name = message.from_user.first_name if message.from_user and message.from_user.first_name else "Аноним"
+                last_name = message.from_user.last_name if message.from_user and message.from_user.last_name else ""
+                full_name = f"{first_name} {last_name}".strip()  # Если last_name пустой, не будет лишнего пробела
                 original_text = message.text or "📷 Медиа"
 
                 logger.info(f"📩 [forward_thread_replies] Пересылаем сообщение ID {message.id}, которое было ответом на {message.reply_to_message_id}")
 
-                formatted_text = f"{username}\n{original_text}"
+                formatted_text = f"{full_name}\n{original_text}"
 
                 await app.send_message(
                     chat_id=chat_id,
