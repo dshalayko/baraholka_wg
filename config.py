@@ -8,6 +8,7 @@ PRIVATE_CHANNEL_ID =  os.getenv('PRIVATE_CHANNEL_ID')
 INVITE_LINK =  os.getenv('INVITE_LINK')
 API_ID =  os.getenv('API_ID')
 API_HASH =  os.getenv('API_HASH')
+CHAT_NAME =  os.getenv('CHAT_NAME')
 
 # Состояния для ConversationHandler
 CHECK_SUBSCRIPTION = range(999)

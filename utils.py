@@ -1,7 +1,9 @@
+import aiosqlite
 from telegram.ext import ContextTypes
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from config import PRIVATE_CHANNEL_ID, INVITE_LINK
-import logging
+
+from logger import logger
 from datetime import datetime
 import pytz
 
@@ -9,7 +11,6 @@ from database import has_user_ads
 from keyboards import markup, add_advertisement_keyboard
 from texts import CHOOSE_ACTION_NEW
 
-logger = logging.getLogger(__name__)
 
 async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -76,41 +77,47 @@ def get_private_channel_post_link(channel_id, message_id):
         channel_id_str = channel_id_str[4:]
     return f"https://t.me/c/{channel_id_str}/{message_id}"
 
-async def notify_owner_about_comment(cursor, context, thread_id, user_id, text):
+async def notify_owner_about_comment(context, message_id, user_id, text):
+    """Отправляет уведомление владельцу объявления, если комментарий оставил не он сам."""
     try:
-        cursor.execute("SELECT ann_id FROM messages WHERE message_id = ?", (thread_id,))
-        ann_id_result = cursor.fetchone()
+        async with aiosqlite.connect('announcements.db') as db:
+            cursor = await db.execute("SELECT id, user_id, message_ids FROM announcements")
+            rows = await cursor.fetchall()
 
-        if ann_id_result:
-            ann_id = ann_id_result[0]
+        # 🔍 Ищем объявление, содержащее данный message_id
+        announcement = None
+        for row in rows:
+            ann_id, owner_id, message_ids = row
+            message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
+            if message_id in message_ids_list:
+                announcement = (ann_id, owner_id)
+                break
 
-            cursor.execute("SELECT user_id, message_ids FROM announcements WHERE id = ?", (ann_id,))
-            owner = cursor.fetchone()
+        if not announcement:
+            logger.error(f"❌ [notify_owner_about_comment] Объявление с message_id={message_id} не найдено.")
+            return
 
-            if owner:
-                owner_id = owner[0]
-                message_ids = owner[1]
+        ann_id, owner_id = announcement
 
-                first_message_id = None
-                if message_ids:
-                    message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
-                    if isinstance(message_ids_list, list) and message_ids_list:
-                        first_message_id = message_ids_list[0]
+        # 🔍 Проверяем, что комментарий оставил НЕ владелец объявления
+        if owner_id == user_id:
+            logger.info(f"🔕 [notify_owner_about_comment] Владелец {owner_id} сам оставил комментарий. Уведомление не требуется.")
+            return
 
-                if first_message_id:
-                    announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, first_message_id)
-                    message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
-                else:
-                    message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_"
+        # 🔗 Создаём ссылку на объявление
+        announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
 
-                if owner_id != user_id:
-                    await context.bot.send_message(
-                        chat_id=owner_id,
-                        text=message_text,
-                        parse_mode="Markdown",
-                        disable_web_page_preview=True
-                    )
-        else:
-            logger.error(f"❌ Ошибка: Не найден ann_id по thread_id = {thread_id}.")
+        # 📩 Формируем сообщение
+        message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
+
+        # ✉️ Отправляем уведомление владельцу
+        await context.bot.send_message(
+            chat_id=owner_id,
+            text=message_text,
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+        logger.info(f"📨 [notify_owner_about_comment] Уведомление отправлено владельцу {owner_id}.")
+
     except Exception as e:
-        logger.error(f"❌ Ошибка в notify_owner_about_comment: {e}")
+        logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
