@@ -39,7 +39,7 @@ async def create_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE
     return EDIT_DESCRIPTION
 
 async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Добавляет фотографии к объявлению, с возможностью создания без фото."""
+    """Добавляет фотографии к объявлению. При редактировании заменяет старые фото новыми."""
     ann_id = context.user_data.get('ann_id')
 
     if not ann_id:
@@ -59,11 +59,17 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return CHOOSING
 
         description, price, photo_file_ids, message_ids_json = row
-        photos = json.loads(photo_file_ids) if photo_file_ids else []
+        old_photos = json.loads(photo_file_ids) if photo_file_ids else []
         message_ids = json.loads(message_ids_json) if message_ids_json else None
 
 
         is_editing = bool(message_ids)
+
+    if is_editing:
+        logger.info(f"🗑️ [adding_photos] Редактируем объявление. Удаляем старые фото для ID {ann_id}.")
+        photos = []  # Очищаем список фото
+    else:
+        photos = old_photos  # Оставляем существующие фото для черновика
 
     if update.message.photo:
         if len(photos) < 10:
@@ -293,10 +299,13 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
         if not transfer_success:
             logger.warning(f"⚠️ [publish_announcement] Не удалось перенести комментарии с {old_message_id} на {new_message_id}, продолжаем выполнение.")
 
-
-        logger.info(f"🗑️ [publish_announcement] Вызываем delete_announcement_by_id() для ID {ann_id}")
-        await delete_announcement_by_id(ann_id, context, update, is_editing)
-        logger.info(f"✅ [publish_announcement] Объявление {ann_id} успешно удалено из базы и канала.")
+        logger.info(f"🗑️ [publish_announcement] Удаление старых сообщений: {old_message_ids}")
+        for message_id in old_message_ids:
+            try:
+                await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
+                logger.info(f"✅ [publish_announcement] Удалено старое сообщение {message_id} из канала.")
+            except Exception as e:
+                logger.error(f"❌ [publish_announcement] Ошибка при удалении старого объявления {message_id}: {e}")
 
     return get_private_channel_post_link(PRIVATE_CHANNEL_ID, new_message_ids[0])
 
