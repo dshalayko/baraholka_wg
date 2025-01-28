@@ -62,7 +62,7 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photos = json.loads(photo_file_ids) if photo_file_ids else []
         message_ids = json.loads(message_ids_json) if message_ids_json else None
 
-        # Определяем, редактируется ли объявление (если есть message_ids → опубликовано)
+
         is_editing = bool(message_ids)
 
     if update.message.photo:
@@ -260,7 +260,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"📢 [publish_announcement] Публикация объявления {ann_id}, is_editing={is_editing}")
 
     # Формируем текст объявления
-    message = await format_announcement_text(update,description, price, username, ann_id=ann_id,
+    message = await format_announcement_text(update, description, price, username, ann_id=ann_id,
                                              is_updated=is_editing, message_ids=old_message_ids,
                                              timestamp=current_timestamp)
 
@@ -284,8 +284,8 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Перенос комментариев, если объявление обновляется
     if is_editing and old_message_ids:
-        old_message_id = old_message_ids[0]  # Берём ID первого сообщения
-        new_message_id = new_message_ids[0]  # Берём ID нового сообщения
+        old_message_id = old_message_ids[0]
+        new_message_id = new_message_ids[0]
         logger.info(f"🔄 [publish_announcement] Перенос комментариев: {old_message_id} → {new_message_id}")
 
         transfer_success = await forward_thread_replies(old_message_id, new_message_id)
@@ -293,40 +293,35 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
         if not transfer_success:
             logger.warning(f"⚠️ [publish_announcement] Не удалось перенести комментарии с {old_message_id} на {new_message_id}, продолжаем выполнение.")
 
-        # Удаляем старое объявление, даже если перенос комментариев не удался
-        try:
-            await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=old_message_id)
-            logger.info(f"🗑️ [publish_announcement] Удалено старое объявление {old_message_id} из канала.")
-        except Exception as e:
-            logger.error(f"❌ Ошибка при удалении старого объявления {old_message_id}: {e}")
+
+        logger.info(f"🗑️ [publish_announcement] Вызываем delete_announcement_by_id() для ID {ann_id}")
+        await delete_announcement_by_id(ann_id, context, update, is_editing)
+        logger.info(f"✅ [publish_announcement] Объявление {ann_id} успешно удалено из базы и канала.")
 
     return get_private_channel_post_link(PRIVATE_CHANNEL_ID, new_message_ids[0])
 
-async def delete_announcement_by_id(ann_id, context, query):
-    """Удаляет объявление из базы данных и, если опубликовано, удаляет его из канала."""
+async def delete_announcement_by_id(ann_id, context, query, is_editing=False):
+    logger.info(f"🗑️ [delete_announcement_by_id] Удаление объявления {ann_id}, is_editing={is_editing}")
+
     async with aiosqlite.connect('announcements.db') as db:
         cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
 
         if row:
-            message_ids_json = row[0]
-            message_ids = json.loads(message_ids_json) if message_ids_json else []
-
+            message_ids = json.loads(row[0]) if row[0] else []
             for message_id in message_ids:
                 try:
                     await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
-                    logger.info(f"Удалено сообщение {message_id} из канала.")
+                    logger.info(f"✅ [delete_announcement_by_id] Удалено сообщение {message_id} из канала.")
                 except Exception as e:
-                    logger.error(f"Ошибка при удалении сообщения {message_id}: {e}")
+                    logger.error(f"❌ Ошибка при удалении сообщения {message_id}: {e}")
 
+        if not is_editing:
             await db.execute('DELETE FROM announcements WHERE id = ?', (ann_id,))
             await db.commit()
-            logger.info(f"Объявление {ann_id} удалено из базы данных.")
+            logger.info(f"✅ [delete_announcement_by_id] Объявление {ann_id} удалено из базы данных.")
 
-            try:
-                await query.message.delete()
-            except Exception as e:
-                logger.error(f"Ошибка при удалении сообщения пользователя: {e}")
+    logger.info(f"✅ [delete_announcement_by_id] Завершено удаление объявления {ann_id}.")
 
 async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Выводит список объявлений пользователя с кнопками для редактирования."""
