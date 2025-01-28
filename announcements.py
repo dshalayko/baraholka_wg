@@ -265,6 +265,9 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     logger.info(f"📢 [publish_announcement] Публикация объявления {ann_id}, is_editing={is_editing}")
 
+    disable_notification = is_editing
+    logger.info(f"🔔 [publish_announcement] disable_notification={disable_notification}")
+
     # Формируем текст объявления
     message = await format_announcement_text(update, description, price, username, ann_id=ann_id,
                                              is_updated=is_editing, message_ids=old_message_ids,
@@ -274,10 +277,12 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     if photos:
         media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
                  for idx, photo_id in enumerate(photos)]
-        sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media)
+        sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media,
+                                                           disable_notification=disable_notification)
         new_message_ids = [msg.message_id for msg in sent_messages]
     else:
-        sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message, parse_mode='Markdown')
+        sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message,
+                                                      parse_mode='Markdown', disable_notification=disable_notification)
         new_message_ids = [sent_message.message_id]
 
     logger.info(f"✅ [publish_announcement] Новое объявление опубликовано, ID: {ann_id}, сообщения: {new_message_ids}")
@@ -299,6 +304,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
         if not transfer_success:
             logger.warning(f"⚠️ [publish_announcement] Не удалось перенести комментарии с {old_message_id} на {new_message_id}, продолжаем выполнение.")
 
+        # Удаление старых объявлений
         logger.info(f"🗑️ [publish_announcement] Удаление старых сообщений: {old_message_ids}")
         for message_id in old_message_ids:
             try:
@@ -356,7 +362,6 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
                 InlineKeyboardButton("📝", callback_data=f'editdescription_{ann_id}'),
                 InlineKeyboardButton("💰", callback_data=f'editprice_{ann_id}'),
                 InlineKeyboardButton("🖼️", callback_data=f'editphotos_{ann_id}'),
-                InlineKeyboardButton("🔼", callback_data=f'up_{ann_id}'),
                 InlineKeyboardButton("❌", callback_data=f'delete_{ann_id}')
             ],
 

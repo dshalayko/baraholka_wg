@@ -40,7 +40,7 @@ async def main():
         states={
             CHOOSING: [
                 MessageHandler(filters.TEXT , handle_choice),
-                CallbackQueryHandler(button_handler, pattern=r'^(editdescription|editprice|editphotos|delete|up|post)_\d+$'),
+                CallbackQueryHandler(button_handler, pattern=r'^(editdescription|editprice|editphotos|delete|post)_\d+$'),
                 CallbackQueryHandler(show_user_announcements, pattern='^my_advertisements$')
             ],
             ADDING_PHOTOS: [

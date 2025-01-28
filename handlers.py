@@ -132,10 +132,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await delete_announcement_by_id(ann_id, context, query)
         return CHOOSING
 
-    elif action == 'up':
-        logger.info(f"🔼 Вызов функции: поднятие объявления, ID объявления: {ann_id}")
-        await query.message.reply_text("🔼 Объявление поднято!")
-        return CHOOSING
 
     elif action == 'post':
         logger.info(f"📢 Вызов функции: publish_announcement(), ID объявления: {ann_id}")
