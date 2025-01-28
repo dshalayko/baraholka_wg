@@ -90,7 +90,7 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
         comments = []
         async for message in app.get_chat_history(chat_id):
             if hasattr(message, "reply_to_message_id") and message.reply_to_message_id == found_message_id:
-                first_name = message.from_user.first_name if message.from_user and message.from_user.first_name else "Аноним"
+                first_name = message.from_user.first_name if message.from_user and message.from_user.first_name else ""
                 last_name = message.from_user.last_name if message.from_user and message.from_user.last_name else ""
                 full_name = f"{first_name} {last_name}".strip()
                 original_text = message.text or "📷 Медиа"
