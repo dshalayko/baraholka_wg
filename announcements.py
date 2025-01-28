@@ -353,9 +353,9 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         message_ids = json.loads(message_ids_json) if message_ids_json else []
         photos = json.loads(photo_file_ids_json) if photo_file_ids_json else []
 
-        status = "📝 *Черновик*\n\n" if not message_ids else f"📌 [Опубликовано]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n\n"
+        status = "📝_Черновик_\n" if not message_ids else f"[Опубликовано📌]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n"
 
-        message = f"*#* {ann_id}\n\n{status}{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}"
+        message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n{status}"
 
         keyboard = InlineKeyboardMarkup([
             [
@@ -396,12 +396,12 @@ async def format_announcement_text(update: Update, description, price, username,
     else:
         contact_info = f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
 
-    message = f"📌#{ann_id}\n\n"
-    message += f"{description}\n\n"
+
+    message = f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
     message += contact_info
 
     if is_updated and message_ids:
         message += f"\n\n{UPDATED_TEXT.format(current_time=current_time)}"
-
+    #message += f"#{ann_id}\n\n"
     return message

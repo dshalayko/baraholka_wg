@@ -34,17 +34,19 @@ async def main():
 
     conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.TEXT, handle_choice),
+            CommandHandler('start', start),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice),
             CallbackQueryHandler(handle_choice, pattern='^(add_advertisement|my_advertisements)$'),
         ],
         states={
             CHOOSING: [
-                MessageHandler(filters.TEXT , handle_choice),
-                CallbackQueryHandler(button_handler, pattern=r'^(editdescription|editprice|editphotos|delete|post)_\d+$'),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice),
+                CallbackQueryHandler(button_handler,
+                                     pattern=r'^(editdescription|editprice|editphotos|delete|post)_\d+$'),
                 CallbackQueryHandler(show_user_announcements, pattern='^my_advertisements$')
             ],
             ADDING_PHOTOS: [
-                MessageHandler(filters.PHOTO | filters.TEXT, adding_photos),
+                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, adding_photos),
             ],
             EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, description_received)],
             EDIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, price_received)],
@@ -56,16 +58,17 @@ async def main():
     )
 
     register_comment_handlers(app)
-    # Добавляем ConversationHandler
-    app.add_handler(conv_handler)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler('my_ads', show_user_announcements))
 
+    # Добавляем ConversationHandler
+    app.add_handler(conv_handler)
+
     # Обработчик ошибок
     app.add_error_handler(error_handler)
 
-    await app.run_polling(drop_pending_updates=False)
+    await app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == '__main__':

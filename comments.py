@@ -13,15 +13,6 @@ from utils import get_private_channel_post_link, notify_owner_about_comment
 thread_messages = defaultdict(list)
 CHAT_ID = -1002212626667  # Замените на ID вашей группы
 
-def extract_ann_id(text: str) -> int:
-    """Извлекает ann_id из первой строки текста как INTEGER."""
-    lines = text.split('\n')
-    if lines:
-        match = re.search(r"#(\d+)", lines[0])
-        if match:
-            return int(match.group(1))
-    return None
-
 async def log_group_messages(update: Update, context: CallbackContext):
     """Логирует ВСЕ сообщения в чате и отправляет уведомления владельцу объявления, если найден ann_id."""
     try:
@@ -54,16 +45,5 @@ async def log_group_messages(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"❌ [log_group_messages] Ошибка: {e}")
 
-async def get_chat_id(update: Update, context: CallbackContext):
-    chat = update.effective_chat
-    chat_type = chat.type
-    chat_id = chat.id
-
-    if chat_type in ['group', 'supergroup', 'channel']:
-        await update.message.reply_text(f"Chat ID этого {chat_type}: `{chat_id}`", parse_mode='Markdown')
-    else:
-        await update.message.reply_text(f"Ваш личный Chat ID: `{chat_id}`", parse_mode='Markdown')
-
 def register_handlers(app):
     app.add_handler(MessageHandler(filters.ALL & filters.Chat(CHAT_ID), log_group_messages))
-    app.add_handler(CommandHandler('get_chat_id', get_chat_id))

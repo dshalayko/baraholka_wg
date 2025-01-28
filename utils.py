@@ -80,17 +80,27 @@ def get_private_channel_post_link(channel_id, message_id):
 async def notify_owner_about_comment(context, message_id, user_id, text):
     """Отправляет уведомление владельцу объявления, если комментарий оставил не он сам."""
     try:
+        logger.info(f"🚀 [notify_owner_about_comment] Запуск с message_id={message_id}, user_id={user_id}")
+
         async with aiosqlite.connect('announcements.db') as db:
             cursor = await db.execute("SELECT id, user_id, message_ids FROM announcements")
             rows = await cursor.fetchall()
 
-        # 🔍 Ищем объявление, содержащее данный message_id
+        logger.info(f"🔍 [notify_owner_about_comment] Найдено {len(rows)} объявлений в базе, ищем соответствие message_id...")
+
         announcement = None
         for row in rows:
             ann_id, owner_id, message_ids = row
+            logger.info(f"📌 [notify_owner_about_comment] Проверяем объявление {ann_id} (владелец {owner_id})")
+
+            if not message_ids:
+                logger.warning(f"⚠️ [notify_owner_about_comment] У объявления {ann_id} отсутствуют message_ids, пропускаем.")
+                continue
+
             message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
             if message_id in message_ids_list:
                 announcement = (ann_id, owner_id)
+                logger.info(f"✅ [notify_owner_about_comment] Найдено соответствующее объявление: ID {ann_id}, владелец {owner_id}")
                 break
 
         if not announcement:
@@ -99,25 +109,24 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
 
         ann_id, owner_id = announcement
 
-        # 🔍 Проверяем, что комментарий оставил НЕ владелец объявления
         if owner_id == user_id:
             logger.info(f"🔕 [notify_owner_about_comment] Владелец {owner_id} сам оставил комментарий. Уведомление не требуется.")
             return
 
-        # 🔗 Создаём ссылку на объявление
         announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
 
         # 📩 Формируем сообщение
-        message_text = f"💬 Новый комментарий к вашему объявлению #{ann_id}:\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
+        message_text = f"💬 Новый комментарий к вашему объявлению:\n_{text}_\n🔗 [Посмотреть объявление]({announcement_link})"
 
         # ✉️ Отправляем уведомление владельцу
+        logger.info(f"📨 [notify_owner_about_comment] Отправляем уведомление владельцу {owner_id}...")
         await context.bot.send_message(
             chat_id=owner_id,
             text=message_text,
             parse_mode="Markdown",
             disable_web_page_preview=True
         )
-        logger.info(f"📨 [notify_owner_about_comment] Уведомление отправлено владельцу {owner_id}.")
+        logger.info(f"✅ [notify_owner_about_comment] Уведомление успешно отправлено владельцу {owner_id}.")
 
     except Exception as e:
         logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
