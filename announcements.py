@@ -89,7 +89,6 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif update.message.text in [NO_PHOTO_AD, FINISH_PHOTO_UPLOAD]:
         logger.info(f"📸 [adding_photos] Завершение загрузки фото, ID объявления: {ann_id}")
-        await update.message.reply_text(PROCESSING_PHOTOS, reply_markup=ReplyKeyboardRemove())
 
         if not description or not price:
             logger.warning(f"⚠️ [adding_photos] Описание или цена отсутствуют в базе, ID объявления: {ann_id}")
@@ -217,16 +216,11 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
     )
 
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📝", callback_data=f'editdescription_{ann_id}'),
-            InlineKeyboardButton("💰", callback_data=f'editprice_{ann_id}'),
-            InlineKeyboardButton("🖼️", callback_data=f'editphotos_{ann_id}')
-        ],
+        [InlineKeyboardButton("✏️ Редактировать", callback_data=f'edit_{ann_id}')],
         [InlineKeyboardButton("📢 Опубликовать", callback_data=f'post_{ann_id}')]
     ])
 
-    logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: "
-                f"editdescription_{ann_id}, editprice_{ann_id}, editphotos_{ann_id}, post_{ann_id}")
+    logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: edit_{ann_id}, post_{ann_id}")
     if photos:
         media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
                  for idx, photo_id in enumerate(photos)]
@@ -353,22 +347,18 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         message_ids = json.loads(message_ids_json) if message_ids_json else []
         photos = json.loads(photo_file_ids_json) if photo_file_ids_json else []
 
-        status = "📝_Черновик_\n" if not message_ids else f"[Опубликовано📌]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n"
+        status = "📝 _Черновик_\n" if not message_ids else f"[Опубликовано 📌]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n"
 
         message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n{status}"
 
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("📝", callback_data=f'editdescription_{ann_id}'),
-                InlineKeyboardButton("💰", callback_data=f'editprice_{ann_id}'),
-                InlineKeyboardButton("🖼️", callback_data=f'editphotos_{ann_id}'),
-                InlineKeyboardButton("❌", callback_data=f'delete_{ann_id}')
-            ],
-
+                InlineKeyboardButton("✏️ Редактировать", callback_data=f'edit_{ann_id}'),
+                InlineKeyboardButton("❌ Удалить", callback_data=f'delete_{ann_id}')
+            ]
         ])
 
-        logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: "
-                    f"editdescription_{ann_id}, editprice_{ann_id}, editphotos_{ann_id}, post_{ann_id}")
+        logger.info(f"📩 [show_user_announcements] Отправка объявления ID: {ann_id} с кнопками: edit_{ann_id}, delete_{ann_id}")
 
         if photos:
             await reply_message.reply_photo(photo=photos[0], caption=message, reply_markup=keyboard, parse_mode='Markdown')

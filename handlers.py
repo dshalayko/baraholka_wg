@@ -127,11 +127,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(EDIT_PHOTOS_PROMPT, reply_markup=finish_photo_markup_with_cancel)
         return ADDING_PHOTOS
 
+    if action == "edit":
+        return await edit_announcement_handler(update, context)  # Вызываем новое меню
+
+    elif action == 'cancel':
+        logger.info(f"❌ Вызов функции: cancel(), ID объявления: {ann_id}")
+        return CHOOSING
+
     elif action == 'delete':
         logger.info(f"❌ Вызов функции: delete_announcement_by_id(), ID объявления: {ann_id}")
         await delete_announcement_by_id(ann_id, context, query)
         return CHOOSING
-
 
     elif action == 'post':
         logger.info(f"📢 Вызов функции: publish_announcement(), ID объявления: {ann_id}")
@@ -144,6 +150,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return CHOOSING
 
+async def edit_announcement_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    ann_id = int(query.data.split("_")[1])
+    context.user_data["ann_id"] = ann_id
+
+    logger.info(f"✏️ [edit_announcement_handler] Открыто меню редактирования для объявления ID: {ann_id}")
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 Текст обьявления", callback_data=f'editdescription_{ann_id}')],
+        [InlineKeyboardButton("💰 Цену", callback_data=f'editprice_{ann_id}')],
+        [InlineKeyboardButton("🖼️ Фотографии", callback_data=f'editphotos_{ann_id}')],
+        [InlineKeyboardButton("🚫 Ничего не меняем", callback_data=f'cancel_{ann_id}')]
+    ])
+
+    await query.message.reply_text(f"Что меняем?", reply_markup=keyboard)
+
+    return CHOOSING
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()

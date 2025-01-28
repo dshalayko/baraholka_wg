@@ -14,7 +14,7 @@ from telegram.ext import (
 from handlers import (
     start, handle_choice, button_handler,
     cancel, error_handler,
-    check_subscription_callback
+    check_subscription_callback, edit_announcement_handler
 )
 from announcements import (
     adding_photos, description_received,
@@ -24,7 +24,7 @@ from announcements import (
 from comments import register_handlers as register_comment_handlers
 from database import init_db
 from config import (
-    BOT_TOKEN, CHOOSING, ADDING_PHOTOS, CHECK_SUBSCRIPTION, EDIT_DESCRIPTION, EDIT_PRICE
+    BOT_TOKEN, CHOOSING, ADDING_PHOTOS, CHECK_SUBSCRIPTION, EDIT_DESCRIPTION, EDIT_PRICE, EDIT_CHOICE
 )
 
 
@@ -42,8 +42,13 @@ async def main():
             CHOOSING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice),
                 CallbackQueryHandler(button_handler,
-                                     pattern=r'^(editdescription|editprice|editphotos|delete|post)_\d+$'),
+                                     pattern=r'^(editdescription|editprice|editphotos|delete|post|cancel)_\d+$'),
+                CallbackQueryHandler(edit_announcement_handler, pattern=r'^edit_\d+$'),
                 CallbackQueryHandler(show_user_announcements, pattern='^my_advertisements$')
+            ],
+            EDIT_CHOICE: [
+                CallbackQueryHandler(button_handler, pattern=r'^(editdescription|editprice|editphotos|cancel)_\d+$'),
+                CallbackQueryHandler(cancel, pattern='^cancel$')
             ],
             ADDING_PHOTOS: [
                 MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, adding_photos),
