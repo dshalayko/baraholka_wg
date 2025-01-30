@@ -3,6 +3,8 @@ import json
 import logging
 import aiosqlite
 from datetime import datetime
+
+import telegram
 from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
@@ -38,8 +40,86 @@ async def create_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(START_NEW_AD)
     return EDIT_DESCRIPTION
 
+async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запрашивает у пользователя, хочет ли он добавить новые фото или заменить текущие, и обрабатывает его выбор."""
+    query = update.callback_query
+    message = update.message
+
+    if query:
+        await query.answer()
+        user_id = query.from_user.id
+    else:
+        user_id = message.from_user.id
+
+    ann_id = context.user_data.get('ann_id')
+
+    if not ann_id:
+        logger.error("❌ [ask_photo_action] Ошибка: ID объявления не найден.")
+        if query:
+            await query.message.reply_text("Ошибка: ID объявления не найден.")
+        else:
+            await message.reply_text("Ошибка: ID объявления не найден.")
+        return CHOOSING
+
+    # Если обработчик вызван после нажатия кнопки
+    if query and query.data:
+        action = query.data  # Данные нажатой кнопки
+        if action.startswith("addphotos"):
+            logger.info(f"➕ [ask_photo_action] Пользователь {user_id} выбрал ДОБАВИТЬ фото в объявление {ann_id}")
+            await query.message.reply_text("📸 Отправьте новые фото. Вы можете загрузить до 10 фото.", reply_markup=finish_photo_markup_with_cancel)
+            return ADDING_PHOTOS
+
+        elif action.startswith("replacephotos"):
+            logger.info(f"♻️ [ask_photo_action] Пользователь {user_id} выбрал ЗАМЕНИТЬ фото в объявлении {ann_id}")
+
+            async with aiosqlite.connect('announcements.db') as db:
+                await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?', (json.dumps([]), ann_id))
+                await db.commit()
+
+            await query.message.reply_text("Все старые фото удалены. Отправьте новые фото.", reply_markup=finish_photo_markup_with_cancel)
+            return ADDING_PHOTOS
+
+
+        elif action.startswith("cancel_photo"):
+            logger.info(f"🚫 [ask_photo_action] Пропускаем добавление фото, ID объявления: {ann_id}")
+            async with aiosqlite.connect('announcements.db') as db:
+                cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
+                row = await cursor.fetchone()
+                message_ids = json.loads(row[0]) if row and row[0] else []
+                is_editing = bool(message_ids)
+            await send_preview(update, context, editing=is_editing)
+            return CHOOSING
+
+    # Проверяем, есть ли уже загруженные фото
+    async with aiosqlite.connect('announcements.db') as db:
+        cursor = await db.execute('SELECT photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
+        row = await cursor.fetchone()
+        existing_photos = json.loads(row[0]) if row and row[0] else []
+
+    # Если в объявлении уже есть фото
+    if existing_photos:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ Добавить новые", callback_data=f'addphotos_{ann_id}')],
+            [InlineKeyboardButton("🔄 Заменить текущие", callback_data=f'replacephotos_{ann_id}')],
+            [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
+        ])
+        message_text = "У вас уже есть загруженные фото. Хотите добавить новые или заменить текущие?"
+    else:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ Добавить фото", callback_data=f'addphotos_{ann_id}')],
+            [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
+        ])
+        message_text = ASK_FOR_PHOTOS
+
+    if query:
+        await query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
+    else:
+        await message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
+
+    return ASK_PHOTO_ACTION
+
 async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Добавляет фотографии к объявлению. При редактировании заменяет старые фото новыми."""
+    """Добавляет фотографии к объявлению, проверяет лимит в 10 фото."""
     ann_id = context.user_data.get('ann_id')
 
     if not ann_id:
@@ -47,62 +127,47 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Ошибка: ID объявления не найден.")
         return CHOOSING
 
-    # Получаем данные объявления из базы
+    # Получаем текущие фото из базы
     async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute(
-            'SELECT description, price, photo_file_ids, message_ids FROM announcements WHERE id = ?', (ann_id,))
+        cursor = await db.execute('SELECT photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
-
-        if not row:
-            logger.error(f"❌ [adding_photos] Ошибка: объявление с ID {ann_id} не найдено в базе.")
-            await update.message.reply_text("Ошибка: объявление не найдено в базе.")
-            return CHOOSING
-
-        description, price, photo_file_ids, message_ids_json = row
-        old_photos = json.loads(photo_file_ids) if photo_file_ids else []
-        message_ids = json.loads(message_ids_json) if message_ids_json else None
-
-
-        is_editing = bool(message_ids)
-
-    if is_editing:
-        logger.info(f"🗑️ [adding_photos] Редактируем объявление. Удаляем старые фото для ID {ann_id}.")
-        photos = []  # Очищаем список фото
-    else:
-        photos = old_photos  # Оставляем существующие фото для черновика
+        photos = json.loads(row[0]) if row and row[0] else []
 
     if update.message.photo:
+        photo = update.message.photo[-1]  # Берем последнее загруженное фото
         if len(photos) < 10:
-            photo = update.message.photo[-1]
             photos.append(photo.file_id)
             logger.info(f"🖼️ [adding_photos] Добавлено фото: {photo.file_id}, ID объявления: {ann_id}")
 
+            # ✅ Обновляем список фото в БД
             async with aiosqlite.connect('announcements.db') as db:
-                await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?',
-                                 (json.dumps(photos), ann_id))
+                await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?', (json.dumps(photos), ann_id))
                 await db.commit()
 
-            if len(photos) == 1:
-                await update.message.reply_text(ADD_PHOTO_TEXT, reply_markup=finish_photo_markup_with_cancel)
+            logger.info(f"📸 [adding_photos] Текущий список фото в БД для объявления {ann_id}: {photos}")
+
+            await update.message.reply_text(ADD_PHOTO_TEXT, reply_markup=finish_photo_markup_with_cancel)
         else:
             await update.message.reply_text(MAX_PHOTOS_REACHED)
 
     elif update.message.text in [NO_PHOTO_AD, FINISH_PHOTO_UPLOAD]:
         logger.info(f"📸 [adding_photos] Завершение загрузки фото, ID объявления: {ann_id}")
 
-        if not description or not price:
-            logger.warning(f"⚠️ [adding_photos] Описание или цена отсутствуют в базе, ID объявления: {ann_id}")
-            await update.message.reply_text(DESC_PRICE_REQUIRED)
-            return ADDING_PHOTOS
+        processing_message = await update.message.reply_text(PROCESSING_PHOTOS, reply_markup=ReplyKeyboardRemove())
+        await asyncio.sleep(1)
 
-        # Показываем предпросмотр (теперь is_editing берётся из базы)
-        logger.info(f"📺 [adding_photos] Показываем предпросмотр, is_editing={is_editing}, ID объявления: {ann_id}")
-        await send_preview(update, context, editing=is_editing)
+        try:
+            await processing_message.delete()
+            logger.info(f"🗑️ [adding_photos] Удалено временное сообщение о процессе, ID объявления: {ann_id}")
+        except telegram.error.BadRequest:
+            logger.warning(f"⚠️ [adding_photos] Не удалось удалить сообщение (уже удалено?), ID объявления: {ann_id}")
+
+        logger.info(f"📺 [adding_photos] Показываем предпросмотр, ID объявления: {ann_id}")
+        await send_preview(update, context, editing=True)
         return CHOOSING
 
     else:
-        logger.warning(
-            f"⚠️ [adding_photos] Непонятная команда, ожидаем фото или завершение загрузки, ID объявления: {ann_id}")
+        logger.warning(f"⚠️ [adding_photos] Непонятная команда, ожидаем фото или завершение загрузки, ID объявления: {ann_id}")
         await update.message.reply_text(SEND_PHOTO_OR_FINISH_OR_NO_PHOTO)
 
     return ADDING_PHOTOS
@@ -166,11 +231,12 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_preview(update, context, editing=True)
         return CHOOSING
 
-    await update.message.reply_text(ASK_FOR_PHOTOS, reply_markup=photo_markup_with_cancel, parse_mode='Markdown')
-    return ADDING_PHOTOS
+    logger.info(
+        f"📸 [price_received] Запрашиваем у пользователя, хочет ли он добавить или заменить фото, ID объявления: {ann_id}")
+
+    return await ask_photo_action(update, context)
 
 async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editing=False):
-    """Формирует и отправляет предпросмотр объявления."""
     ann_id = context.user_data.get('ann_id')
 
     # Если ann_id нет в контексте, получаем его из БД
@@ -338,8 +404,23 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
     rows = await get_user_announcements(user_id)
     reply_message = update.effective_message
 
+    if "announcement_message_ids" in context.user_data:
+        for msg_id in context.user_data["announcement_message_ids"]:
+            try:
+                await context.bot.delete_message(chat_id=reply_message.chat_id, message_id=msg_id)
+                logger.info(f"🗑️ [show_user_announcements] Удалено старое сообщение ID: {msg_id}")
+            except telegram.error.BadRequest:
+                logger.warning(f"⚠️ [show_user_announcements] Не удалось удалить сообщение ID: {msg_id}")
+
+    context.user_data["announcement_message_ids"] = []  # ✅ Очищаем перед добавлением новых сообщений
+
+    if rows:
+        header_message = await reply_message.reply_text(USER_ADS_MESSAGE, parse_mode="Markdown")
+        context.user_data["announcement_message_ids"].append(header_message.message_id)
+
     if not rows:
-        await reply_message.reply_text(NO_ANNOUNCEMENTS_MESSAGE, reply_markup=markup)
+        no_ads_message = await reply_message.reply_text(NO_ANNOUNCEMENTS_MESSAGE, reply_markup=markup)
+        context.user_data["announcement_message_ids"].append(no_ads_message.message_id)
         return CHOOSING
 
     for row in rows:
@@ -349,7 +430,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
         status = "📝 _Черновик_\n" if not message_ids else f"[Опубликовано 📌]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n"
 
-        message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n{status}"
+        message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n\n{status}"
 
         keyboard = InlineKeyboardMarkup([
             [
@@ -361,9 +442,10 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         logger.info(f"📩 [show_user_announcements] Отправка объявления ID: {ann_id} с кнопками: edit_{ann_id}, delete_{ann_id}")
 
         if photos:
-            await reply_message.reply_photo(photo=photos[0], caption=message, reply_markup=keyboard, parse_mode='Markdown')
+            sent_message = await reply_message.reply_photo(photo=photos[0], caption=message, reply_markup=keyboard, parse_mode='Markdown')
         else:
-            await reply_message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
+            sent_message = await reply_message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
+        context.user_data["announcement_message_ids"].append(sent_message.message_id)
 
     return CHOOSING
 

@@ -21,17 +21,32 @@ from logger import logger
 logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает команду /start, отправляет приветственное сообщение и удаляет команду пользователя."""
     user_id = update.message.from_user.id
+    start_message_id = update.message.message_id  # ✅ Запоминаем message_id команды /start
+
     if not await is_subscribed(user_id, context):
         text, keyboard = await check_subscription_message()
         await update.message.reply_text(text, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
+
+    if await has_user_ads(user_id):
+        welcome_message = await update.message.reply_text(WELCOME_NEW_USER, reply_markup=markup)
     else:
-        if await has_user_ads(user_id):
-            await update.message.reply_text(WELCOME_NEW_USER, reply_markup=markup)
-        else:
-            await update.message.reply_text(WELCOME_NEW_USER, reply_markup=add_advertisement_keyboard)
-        return CHOOSING
+        welcome_message = await update.message.reply_text(WELCOME_NEW_USER, reply_markup=add_advertisement_keyboard)
+
+    # ✅ Сохраняем message_id приветственного сообщения
+    context.user_data["welcome_message_id"] = welcome_message.message_id
+    logger.info(f"✅ [start] Сохранен message_id приветствия: {welcome_message.message_id}")
+
+    # ✅ Удаляем команду /start
+    try:
+        await context.bot.delete_message(chat_id=update.message.chat_id, message_id=start_message_id)
+        logger.info(f"🗑️ [start] Удалено сообщение пользователя: /start (message_id={start_message_id})")
+    except telegram.error.BadRequest:
+        logger.warning(f"⚠️ [start] Не удалось удалить сообщение /start (message_id={start_message_id})")
+
+    return CHOOSING
 
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -47,14 +62,39 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    choice = update.message.text
+    """Обрабатывает выбор пользователя: создание нового объявления или просмотр объявлений."""
+    user_message = update.message  # ✅ Запоминаем сообщение пользователя (NEW_AD_CHOICE)
+    user_message_id = user_message.message_id
+    chat_id = user_message.chat_id
+
+    choice = user_message.text
+    logger.info(f"📝 [handle_choice] Пользователь выбрал: {choice}")
+
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=user_message_id)
+        logger.info(f"🗑️ [handle_choice] Удалено сообщение пользователя: {choice} (message_id={user_message_id})")
+    except telegram.error.BadRequest:
+        logger.warning(f"⚠️ [handle_choice] Не удалось удалить сообщение пользователя {choice} (message_id={user_message_id})")
+
+    bot_message_id = context.user_data.get("welcome_message_id")
+
+    if bot_message_id:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=bot_message_id)
+            logger.info(f"🗑️ [handle_choice] Удалено сообщение бота: WELCOME_NEW_USER (message_id={bot_message_id})")
+            del context.user_data["welcome_message_id"]  # ✅ Удаляем из контекста после удаления
+        except telegram.error.BadRequest:
+            logger.warning(f"⚠️ [handle_choice] Не удалось удалить WELCOME_NEW_USER (message_id={bot_message_id})")
+
     if choice == NEW_AD_CHOICE:
         context.user_data.clear()
         await create_announcement(update, context)
         return EDIT_DESCRIPTION
+
     elif choice == MY_ADS_CHOICE:
         await show_user_announcements(update, context)
         return CHOOSING
+
     else:
         await update.message.reply_text(CHOOSE_ACTION, reply_markup=markup)
         return CHOOSING
@@ -122,13 +162,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return EDIT_PRICE
 
     elif action == 'editphotos':
-        logger.info(f"🖼️ Вызов функции: adding_photos(), ID объявления: {ann_id}")
-        context.user_data['photos'] = []
-        await query.message.reply_text(EDIT_PHOTOS_PROMPT, reply_markup=finish_photo_markup_with_cancel)
-        return ADDING_PHOTOS
+        logger.info(f"🖼️ Вызов функции: ask_photo_action(), ID объявления: {ann_id}")
+        return await ask_photo_action(update, context)
 
-    if action == "edit":
-        return await edit_announcement_handler(update, context)  # Вызываем новое меню
+    elif action == "edit":
+        return await edit_announcement_handler(update, context)
 
     elif action == 'cancel':
         logger.info(f"❌ Вызов функции: cancel(), ID объявления: {ann_id}")
@@ -144,7 +182,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         post_link = await publish_announcement(update, context, ann_id)
 
         if post_link:
-            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup, parse_mode='Markdown')
+            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup,
+                                           parse_mode='Markdown')
         else:
             await query.message.reply_text(POST_FAILURE_MESSAGE, reply_markup=markup)
 
