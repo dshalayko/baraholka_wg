@@ -48,8 +48,10 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query:
         await query.answer()
         user_id = query.from_user.id
+        message_to_delete = query.message  # Сообщение с кнопками, которое надо удалить
     else:
         user_id = message.from_user.id
+        message_to_delete = message  # Сообщение, которое отправил пользователь
 
     ann_id = context.user_data.get('ann_id')
 
@@ -63,14 +65,20 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Если обработчик вызван после нажатия кнопки
     if query and query.data:
-        action = query.data  # Данные нажатой кнопки
+        action = query.data
+        try:
+            await message_to_delete.delete()
+            logger.info(f"🗑️ [ask_photo_action] Удалено сообщение с выбором действия, ID объявления: {ann_id}")
+        except telegram.error.BadRequest:
+            logger.warning(f"⚠️ [ask_photo_action] Не удалось удалить сообщение (уже удалено?), ID объявления: {ann_id}")
+
         if action.startswith("addphotos"):
             logger.info(f"➕ [ask_photo_action] Пользователь {user_id} выбрал ДОБАВИТЬ фото в объявление {ann_id}")
             await query.message.reply_text("📸 Отправьте новые фото. Вы можете загрузить до 10 фото.", reply_markup=finish_photo_markup_with_cancel)
             return ADDING_PHOTOS
 
         elif action.startswith("replacephotos"):
-            logger.info(f"♻️ [ask_photo_action] Пользователь {user_id} выбрал ЗАМЕНИТЬ фото в объявлении {ann_id}")
+            logger.info(f"🔄 [ask_photo_action] Пользователь {user_id} выбрал ЗАМЕНИТЬ фото в объявлении {ann_id}")
 
             async with aiosqlite.connect('announcements.db') as db:
                 await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?', (json.dumps([]), ann_id))
@@ -79,7 +87,6 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("Все старые фото удалены. Отправьте новые фото.", reply_markup=finish_photo_markup_with_cancel)
             return ADDING_PHOTOS
 
-
         elif action.startswith("cancel_photo"):
             logger.info(f"🚫 [ask_photo_action] Пропускаем добавление фото, ID объявления: {ann_id}")
             async with aiosqlite.connect('announcements.db') as db:
@@ -87,6 +94,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 row = await cursor.fetchone()
                 message_ids = json.loads(row[0]) if row and row[0] else []
                 is_editing = bool(message_ids)
+
             await send_preview(update, context, editing=is_editing)
             return CHOOSING
 
@@ -100,10 +108,10 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if existing_photos:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ Добавить новые", callback_data=f'addphotos_{ann_id}')],
-            [InlineKeyboardButton("🔄 Заменить текущие", callback_data=f'replacephotos_{ann_id}')],
+            [InlineKeyboardButton("🔄 Обновить фото", callback_data=f'replacephotos_{ann_id}')],
             [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
         ])
-        message_text = "У вас уже есть загруженные фото. Хотите добавить новые или заменить текущие?"
+        message_text = "📸 У вас уже есть загруженные фото. Хотите добавить новые или заменить текущие?"
     else:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ Добавить фото", callback_data=f'addphotos_{ann_id}')],
@@ -111,10 +119,14 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
         message_text = ASK_FOR_PHOTOS
 
+    # Отправляем сообщение с кнопками
     if query:
-        await query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
+        sent_message = await query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
     else:
-        await message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
+        sent_message = await message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
+
+    # Сохраняем ID отправленного сообщения с кнопками в контексте
+    context.user_data['photo_action_message_id'] = sent_message.message_id
 
     return ASK_PHOTO_ACTION
 
@@ -139,7 +151,6 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             photos.append(photo.file_id)
             logger.info(f"🖼️ [adding_photos] Добавлено фото: {photo.file_id}, ID объявления: {ann_id}")
 
-            # ✅ Обновляем список фото в БД
             async with aiosqlite.connect('announcements.db') as db:
                 await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?', (json.dumps(photos), ann_id))
                 await db.commit()
@@ -239,7 +250,6 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editing=False):
     ann_id = context.user_data.get('ann_id')
 
-    # Если ann_id нет в контексте, получаем его из БД
     if not ann_id:
         logger.warning("⚠️ [send_preview] ann_id отсутствует в context.user_data, ищем в БД.")
         async with aiosqlite.connect('announcements.db') as db:
@@ -274,7 +284,6 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
     logger.info(f"📺 [send_preview] Генерация предпросмотра: ID {ann_id}, is_updated={is_updated}, timestamp={timestamp}")
 
-    # Формируем текст объявления
     message = await format_announcement_text(
         update,
         description, price, username, ann_id=ann_id,
