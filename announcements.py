@@ -248,6 +248,7 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await ask_photo_action(update, context)
 
 async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editing=False):
+    """Формирует и отправляет предпросмотр объявления, удаляя предыдущие сообщения."""
     ann_id = context.user_data.get('ann_id')
 
     if not ann_id:
@@ -279,7 +280,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         photos = json.loads(photo_file_ids) if photo_file_ids else []
         message_ids = json.loads(message_ids_json) if message_ids_json else None
 
-        is_updated = bool(message_ids)  # True, если сообщение уже публиковалось
+        is_updated = bool(message_ids)
         timestamp = timestamp if timestamp else ""
 
     logger.info(f"📺 [send_preview] Генерация предпросмотра: ID {ann_id}, is_updated={is_updated}, timestamp={timestamp}")
@@ -328,7 +329,6 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
         photos = json.loads(photo_file_ids) if photo_file_ids else []
         old_message_ids = json.loads(message_ids_json) if message_ids_json else []
 
-        # Определяем, редактируется ли объявление
         is_editing = bool(old_message_ids)
 
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -337,12 +337,10 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     disable_notification = is_editing
     logger.info(f"🔔 [publish_announcement] disable_notification={disable_notification}")
 
-    # Формируем текст объявления
     message = await format_announcement_text(update, description, price, username, ann_id=ann_id,
                                              is_updated=is_editing, message_ids=old_message_ids,
                                              timestamp=current_timestamp)
 
-    # Публикуем новое объявление
     if photos:
         media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
                  for idx, photo_id in enumerate(photos)]
@@ -356,13 +354,11 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
 
     logger.info(f"✅ [publish_announcement] Новое объявление опубликовано, ID: {ann_id}, сообщения: {new_message_ids}")
 
-    # Обновляем запись в базе, включая `timestamp`
     async with aiosqlite.connect('announcements.db') as db:
         await db.execute('UPDATE announcements SET message_ids = ?, timestamp = ? WHERE id = ?',
                          (json.dumps(new_message_ids), current_timestamp, ann_id))
         await db.commit()
 
-    # Перенос комментариев, если объявление обновляется
     if is_editing and old_message_ids:
         old_message_id = old_message_ids[0]
         new_message_id = new_message_ids[0]
@@ -373,7 +369,6 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
         if not transfer_success:
             logger.warning(f"⚠️ [publish_announcement] Не удалось перенести комментарии с {old_message_id} на {new_message_id}, продолжаем выполнение.")
 
-        # Удаление старых объявлений
         logger.info(f"🗑️ [publish_announcement] Удаление старых сообщений: {old_message_ids}")
         for message_id in old_message_ids:
             try:

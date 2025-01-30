@@ -62,12 +62,16 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает выбор пользователя: создание нового объявления или просмотр объявлений."""
-    user_message = update.message  # ✅ Запоминаем сообщение пользователя (NEW_AD_CHOICE)
-    user_message_id = user_message.message_id
-    chat_id = user_message.chat_id
 
-    choice = user_message.text
+    if update.message:
+        user_message = update.message
+        user_message_id = user_message.message_id
+        chat_id = user_message.chat_id
+        choice = user_message.text
+    else:
+        logger.warning("⚠️ [handle_choice] update.message отсутствует. Вероятно, вызван через callback_query.")
+        return CHOOSING
+
     logger.info(f"📝 [handle_choice] Пользователь выбрал: {choice}")
 
     try:
@@ -76,27 +80,24 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except telegram.error.BadRequest:
         logger.warning(f"⚠️ [handle_choice] Не удалось удалить сообщение пользователя {choice} (message_id={user_message_id})")
 
-    bot_message_id = context.user_data.get("welcome_message_id")
+    bot_message_id = context.user_data.pop("welcome_message_id", None)  # Удаляем сразу после использования
 
     if bot_message_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=bot_message_id)
             logger.info(f"🗑️ [handle_choice] Удалено сообщение бота: WELCOME_NEW_USER (message_id={bot_message_id})")
-            del context.user_data["welcome_message_id"]  # ✅ Удаляем из контекста после удаления
         except telegram.error.BadRequest:
             logger.warning(f"⚠️ [handle_choice] Не удалось удалить WELCOME_NEW_USER (message_id={bot_message_id})")
 
     if choice == NEW_AD_CHOICE:
         context.user_data.clear()
-        await create_announcement(update, context)
-        return EDIT_DESCRIPTION
+        return await create_announcement(update, context)
 
     elif choice == MY_ADS_CHOICE:
-        await show_user_announcements(update, context)
-        return CHOOSING
+        return await show_user_announcements(update, context)
 
     else:
-        await update.message.reply_text(CHOOSE_ACTION, reply_markup=markup)
+        await update.effective_chat.send_message(CHOOSE_ACTION, reply_markup=markup)
         return CHOOSING
 
 async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
@@ -132,7 +133,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Ошибка: не удалось определить ID объявления.")
         return CHOOSING
 
-    # Проверяем наличие ann_id в БД
     async with aiosqlite.connect('announcements.db') as db:
         cursor = await db.execute('SELECT id FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
@@ -141,8 +141,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("❌ Ошибка: объявление не найдено в базе.")
             return CHOOSING
 
-    context.user_data['ann_id'] = ann_id  # Устанавливаем в контексте
-    context.user_data['is_editing'] = True  # Устанавливаем флаг редактирования
+    context.user_data['ann_id'] = ann_id
+    context.user_data['is_editing'] = True
 
     logger.info(f"📋 [button_handler] is_editing=True, ID объявления: {ann_id}")
 

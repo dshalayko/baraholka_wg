@@ -10,7 +10,6 @@ from collections import defaultdict
 
 from utils import get_private_channel_post_link, notify_owner_about_comment
 
-thread_messages = defaultdict(list)
 CHAT_ID = -1002212626667  # Замените на ID вашей группы
 
 async def log_group_messages(update: Update, context: CallbackContext):
