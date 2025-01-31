@@ -109,7 +109,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Ошибка: не удалось определить ID объявления.")
         return CHOOSING
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('SELECT id FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         if not row:

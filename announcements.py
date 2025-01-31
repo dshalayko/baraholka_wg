@@ -24,7 +24,7 @@ async def create_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE
     if username == "None":
         logger.warning(f"⚠️ [create_announcement] У пользователя {user_id} нет username, записываем 'None'.")
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('''
             INSERT INTO announcements (user_id, username, description, price, photo_file_ids)
             VALUES (?, ?, ?, ?, ?)
@@ -61,7 +61,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHOOSING
 
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('SELECT photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         existing_photos = json.loads(row[0]) if row and row[0] else []
@@ -88,7 +88,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif action.startswith("replacephotos"):
             logger.info(f"🔄 [ask_photo_action] Пользователь {user_id} выбрал ЗАМЕНИТЬ фото в объявлении {ann_id}")
 
-            async with aiosqlite.connect('announcements.db') as db:
+            async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?', (json.dumps([]), ann_id))
                 await db.commit()
 
@@ -97,7 +97,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif action.startswith("cancel_photo"):
             logger.info(f"🚫 [ask_photo_action] Пропускаем добавление фото, ID объявления: {ann_id}")
-            async with aiosqlite.connect('announcements.db') as db:
+            async with aiosqlite.connect(DB_PATH) as db:
                 cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
                 row = await cursor.fetchone()
                 message_ids = json.loads(row[0]) if row and row[0] else []
@@ -132,7 +132,7 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHOOSING
 
     # Получаем текущие фото из базы
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('SELECT photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         photos = json.loads(row[0]) if row and row[0] else []
@@ -145,7 +145,7 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             photos.append(photo.file_id)
             logger.info(f"🖼️ [adding_photos] Добавлено фото: {photo.file_id}, ID объявления: {ann_id}")
 
-            async with aiosqlite.connect('announcements.db') as db:
+            async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?', (json.dumps(photos), ann_id))
                 await db.commit()
 
@@ -198,7 +198,7 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
 
     logger.info(f"✏️ [description_received] Введено новое описание: {description}, ID объявления: {ann_id}")
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('UPDATE announcements SET description = ? WHERE id = ?', (description, ann_id))
         await db.commit()
 
@@ -229,7 +229,7 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"💰 [price_received] Введена новая цена: {price}, ID объявления: {ann_id}")
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('UPDATE announcements SET price = ? WHERE id = ?', (price, ann_id))
         await db.commit()
 
@@ -249,7 +249,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
     if not ann_id:
         logger.warning("⚠️ [send_preview] ann_id отсутствует в context.user_data, ищем в БД.")
-        async with aiosqlite.connect('announcements.db') as db:
+        async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute('SELECT id FROM announcements ORDER BY id DESC LIMIT 1')
             row = await cursor.fetchone()
             if row:
@@ -261,7 +261,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
                 await update.message.reply_text("Ошибка: Не найдено ни одного объявления.")
                 return CHOOSING
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             'SELECT description, price, username, photo_file_ids, message_ids, timestamp FROM announcements WHERE id = ?',
             (ann_id,))
@@ -311,7 +311,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE, ann_id):
     logger.info(f"📢 [publish_announcement] Публикация объявления с ID {ann_id}")
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             'SELECT description, price, username, photo_file_ids, message_ids FROM announcements WHERE id = ?',
             (ann_id,))
@@ -350,7 +350,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
 
     logger.info(f"✅ [publish_announcement] Новое объявление опубликовано, ID: {ann_id}, сообщения: {new_message_ids}")
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('UPDATE announcements SET message_ids = ?, timestamp = ? WHERE id = ?',
                          (json.dumps(new_message_ids), current_timestamp, ann_id))
         await db.commit()
@@ -378,7 +378,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
 async def delete_announcement_by_id(ann_id, context, query, is_editing=False):
     logger.info(f"🗑️ [delete_announcement_by_id] Удаление объявления {ann_id}, is_editing={is_editing}")
 
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
 

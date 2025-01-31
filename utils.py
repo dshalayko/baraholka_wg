@@ -1,7 +1,7 @@
 import aiosqlite
 from telegram.ext import ContextTypes
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from config import PRIVATE_CHANNEL_ID, INVITE_LINK
+from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 
 from logger import logger
 from datetime import datetime
@@ -82,7 +82,7 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
     try:
         logger.info(f"🚀 [notify_owner_about_comment] Запуск с message_id={message_id}, user_id={user_id}")
 
-        async with aiosqlite.connect('announcements.db') as db:
+        async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute("SELECT id, user_id, message_ids FROM announcements")
             rows = await cursor.fetchall()
 

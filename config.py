@@ -10,6 +10,7 @@ API_ID =  os.getenv('API_ID')
 API_HASH =  os.getenv('API_HASH')
 CHAT_NAME =  os.getenv('CHAT_NAME')
 CHAT_ID =  os.getenv('CHAT_ID')
+DB_PATH =  os.getenv('DB_PATH')
 
 # Состояния для ConversationHandler
 CHECK_SUBSCRIPTION = range(999)

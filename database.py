@@ -2,11 +2,12 @@ import aiosqlite
 import json
 from telegram import InputMediaPhoto
 from logger import logger  # Импорт логгера
-from config import PRIVATE_CHANNEL_ID
+from config import PRIVATE_CHANNEL_ID, DB_PATH
+
 
 # Инициализация базы данных
 async def init_db():
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
                     CREATE TABLE IF NOT EXISTS announcements (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,14 +24,14 @@ async def init_db():
 
 # Проверка наличия объявлений у пользователя
 async def has_user_ads(user_id: int) -> bool:
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('SELECT COUNT(*) FROM announcements WHERE user_id = ?', (user_id,))
         count = await cursor.fetchone()
         return count[0] > 0
 
 # Сохранение нового объявления
 async def save_announcement(user_id, username, message_ids, description, price, photos):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
             INSERT INTO announcements (user_id, username, message_ids, description, price, photo_file_ids)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -46,7 +47,7 @@ async def save_announcement(user_id, username, message_ids, description, price, 
 
 # Получение объявлений пользователя
 async def get_user_announcements(user_id):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('''
             SELECT id, message_ids, description, price, photo_file_ids
             FROM announcements
@@ -57,7 +58,7 @@ async def get_user_announcements(user_id):
 
 # Удаление объявления по ID
 async def delete_announcement_by_id(ann_id, context):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         if row:
@@ -72,7 +73,7 @@ async def delete_announcement_by_id(ann_id, context):
 
 # Получение данных объявления для редактирования
 async def get_announcement_for_edit(ann_id):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute('SELECT description, price, photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         if row:
@@ -83,7 +84,7 @@ async def get_announcement_for_edit(ann_id):
 
 # Обновление описания объявления
 async def update_announcement_description(ann_id, new_description):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
             UPDATE announcements SET description = ? WHERE id = ?
         ''', (new_description, ann_id))
@@ -91,7 +92,7 @@ async def update_announcement_description(ann_id, new_description):
 
 # Обновление цены объявления
 async def update_announcement_price(ann_id, new_price):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
             UPDATE announcements SET price = ? WHERE id = ?
         ''', (new_price, ann_id))
@@ -99,7 +100,7 @@ async def update_announcement_price(ann_id, new_price):
 
 # Редактирование объявления (обновление всех данных)
 async def edit_announcement(ann_id, new_description, new_price, new_photos, context):
-    async with aiosqlite.connect('announcements.db') as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         # Удаление старых сообщений
         cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
