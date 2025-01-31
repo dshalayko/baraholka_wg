@@ -5,4 +5,4 @@ nest_asyncio
 pytz~=2024.2
 nest-asyncio~=1.6.0
 Pyrogram~=2.0.106
-TgCrypto
+TgCrypto~=1.2.5
