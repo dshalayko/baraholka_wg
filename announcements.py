@@ -56,11 +56,21 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not ann_id:
         logger.error("❌ [ask_photo_action] Ошибка: ID объявления не найден.")
-        if query:
-            await query.message.reply_text(NO_ANN_ID_MESSAGE_ERROR)
-        else:
-            await message.reply_text(NO_ANN_ID_MESSAGE_ERROR)
+        error_message = NO_ANN_ID_MESSAGE_ERROR
+        await (query.message.reply_text(error_message) if query else message.reply_text(error_message))
         return CHOOSING
+
+
+    async with aiosqlite.connect('announcements.db') as db:
+        cursor = await db.execute('SELECT photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
+        row = await cursor.fetchone()
+        existing_photos = json.loads(row[0]) if row and row[0] else []
+
+
+    if not existing_photos:
+        logger.info(f"📸 [ask_photo_action] В объявлении {ann_id} нет фото. Сразу переходим к загрузке.")
+        await (query.message.reply_text(ASK_FOR_PHOTOS, reply_markup=photo_markup_with_cancel, parse_mode='Markdown') if query else message.reply_text(ASK_FOR_PHOTOS, reply_markup=photo_markup_with_cancel, parse_mode='Markdown'))
+        return ADDING_PHOTOS
 
     if query and query.data:
         action = query.data
@@ -96,31 +106,16 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_preview(update, context, editing=is_editing)
             return CHOOSING
 
-    async with aiosqlite.connect('announcements.db') as db:
-        cursor = await db.execute('SELECT photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
-        row = await cursor.fetchone()
-        existing_photos = json.loads(row[0]) if row and row[0] else []
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ Добавить новые", callback_data=f'addphotos_{ann_id}')],
+        [InlineKeyboardButton("🔄 Обновить фото", callback_data=f'replacephotos_{ann_id}')],
+        [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
+    ])
 
-
-    if existing_photos:
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Добавить новые", callback_data=f'addphotos_{ann_id}')],
-            [InlineKeyboardButton("🔄 Обновить фото", callback_data=f'replacephotos_{ann_id}')],
-            [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
-        ])
-        message_text = HAS_PHOTOS
-    else:
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Добавить фото", callback_data=f'addphotos_{ann_id}')],
-            [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
-        ])
-        message_text = ASK_FOR_PHOTOS
+    message_text = HAS_PHOTOS
 
     # Отправляем сообщение с кнопками
-    if query:
-        sent_message = await query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
-    else:
-        sent_message = await message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown')
+    sent_message = await (query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown') if query else message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown'))
 
     # Сохраняем ID отправленного сообщения с кнопками в контексте
     context.user_data['photo_action_message_id'] = sent_message.message_id
@@ -128,7 +123,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_PHOTO_ACTION
 
 async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Добавляет фотографии к объявлению, проверяет лимит в 10 фото."""
+    """Добавляет фотографии к объявлению, проверяет лимит в 10 фото, отправляет сообщение об успешной загрузке только один раз."""
     ann_id = context.user_data.get('ann_id')
 
     if not ann_id:
@@ -142,6 +137,8 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row = await cursor.fetchone()
         photos = json.loads(row[0]) if row and row[0] else []
 
+    send_add_photo_text = len(photos) == 1
+
     if update.message.photo:
         photo = update.message.photo[-1]
         if len(photos) < 10:
@@ -154,7 +151,9 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             logger.info(f"📸 [adding_photos] Текущий список фото в БД для объявления {ann_id}: {photos}")
 
-            await update.message.reply_text(ADD_PHOTO_TEXT, reply_markup=finish_photo_markup_with_cancel)
+            if send_add_photo_text:
+                await update.message.reply_text(ADD_PHOTO_TEXT, reply_markup=finish_photo_markup_with_cancel)
+
         else:
             await update.message.reply_text(MAX_PHOTOS_REACHED)
 
