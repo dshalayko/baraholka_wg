@@ -1,25 +1,20 @@
 from telegram import Update
-from telegram.ext import CallbackContext, MessageHandler, filters, CommandHandler, ContextTypes
+from telegram.ext import CallbackContext, MessageHandler, filters
 
-from comments_manager import forward_thread_replies, get_message_id_by_thread_id
+from comments_manager import get_message_id_by_thread_id
 from logger import logger
+from config import CHAT_ID
 
-import sqlite3
-import re
-from collections import defaultdict
 
-from utils import get_private_channel_post_link, notify_owner_about_comment
+from utils import  notify_owner_about_comment
 
-CHAT_ID = -1002212626667  # Замените на ID вашей группы
+
 
 async def log_group_messages(update: Update, context: CallbackContext):
-    """Логирует ВСЕ сообщения в чате и отправляет уведомления владельцу объявления, если найден ann_id."""
     try:
         user = update.effective_user
         user_id = update.effective_user.id
         username = update.effective_user.username or "Нет username"
-        first_name = update.effective_user.first_name or "Нет имени"
-        last_name = update.effective_user.last_name or "Нет фамилии"
         text = update.message.text or "Нет текста"
         message_id = update.message.message_id
         thread_id = update.message.message_thread_id if update.message.message_thread_id else None
@@ -45,4 +40,4 @@ async def log_group_messages(update: Update, context: CallbackContext):
         logger.error(f"❌ [log_group_messages] Ошибка: {e}")
 
 def register_handlers(app):
-    app.add_handler(MessageHandler(filters.ALL & filters.Chat(CHAT_ID), log_group_messages))
+    app.add_handler(MessageHandler(filters.ALL & filters.Chat(int(CHAT_ID)), log_group_messages))

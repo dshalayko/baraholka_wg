@@ -95,7 +95,7 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
                 full_name = f"{first_name} {last_name}".strip()
                 original_text = message.text or "📷 Медиа"
 
-                formatted_text = f"{full_name}\n{original_text}"
+                formatted_text = f"**{full_name}**\n{original_text}"
                 comments.append((message.id, formatted_text))  # Сохраняем в список (ID сообщения и текст)
 
         logger.info(f"🔄 [forward_thread_replies] Отправляем {len(comments)} комментариев в обратном порядке.")

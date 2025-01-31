@@ -1,17 +1,16 @@
 import asyncio
 import json
-import logging
+
 import aiosqlite
 from datetime import datetime
 
 import telegram
-from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
 
 from comments_manager import forward_thread_replies
 from config import *
 from logger import logger
-from texts import *
 from keyboards import *
 from utils import get_serbia_time, get_private_channel_post_link
 from database import (get_user_announcements,
@@ -48,22 +47,21 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query:
         await query.answer()
         user_id = query.from_user.id
-        message_to_delete = query.message  # Сообщение с кнопками, которое надо удалить
+        message_to_delete = query.message
     else:
         user_id = message.from_user.id
-        message_to_delete = message  # Сообщение, которое отправил пользователь
+        message_to_delete = message
 
     ann_id = context.user_data.get('ann_id')
 
     if not ann_id:
         logger.error("❌ [ask_photo_action] Ошибка: ID объявления не найден.")
         if query:
-            await query.message.reply_text("Ошибка: ID объявления не найден.")
+            await query.message.reply_text(NO_ANN_ID_MESSAGE_ERROR)
         else:
-            await message.reply_text("Ошибка: ID объявления не найден.")
+            await message.reply_text(NO_ANN_ID_MESSAGE_ERROR)
         return CHOOSING
 
-    # Если обработчик вызван после нажатия кнопки
     if query and query.data:
         action = query.data
         try:
@@ -74,7 +72,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if action.startswith("addphotos"):
             logger.info(f"➕ [ask_photo_action] Пользователь {user_id} выбрал ДОБАВИТЬ фото в объявление {ann_id}")
-            await query.message.reply_text("📸 Отправьте новые фото. Вы можете загрузить до 10 фото.", reply_markup=finish_photo_markup_with_cancel)
+            await query.message.reply_text(ADD_NEW_PHOTOS, reply_markup=finish_photo_markup_with_cancel)
             return ADDING_PHOTOS
 
         elif action.startswith("replacephotos"):
@@ -84,7 +82,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await db.execute('UPDATE announcements SET photo_file_ids = ? WHERE id = ?', (json.dumps([]), ann_id))
                 await db.commit()
 
-            await query.message.reply_text("Все старые фото удалены. Отправьте новые фото.", reply_markup=finish_photo_markup_with_cancel)
+            await query.message.reply_text(OLD_PHOTOS_DELETED, reply_markup=finish_photo_markup_with_cancel)
             return ADDING_PHOTOS
 
         elif action.startswith("cancel_photo"):
@@ -98,20 +96,19 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_preview(update, context, editing=is_editing)
             return CHOOSING
 
-    # Проверяем, есть ли уже загруженные фото
     async with aiosqlite.connect('announcements.db') as db:
         cursor = await db.execute('SELECT photo_file_ids FROM announcements WHERE id = ?', (ann_id,))
         row = await cursor.fetchone()
         existing_photos = json.loads(row[0]) if row and row[0] else []
 
-    # Если в объявлении уже есть фото
+
     if existing_photos:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ Добавить новые", callback_data=f'addphotos_{ann_id}')],
             [InlineKeyboardButton("🔄 Обновить фото", callback_data=f'replacephotos_{ann_id}')],
             [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
         ])
-        message_text = "📸 У вас уже есть загруженные фото. Хотите добавить новые или заменить текущие?"
+        message_text = HAS_PHOTOS
     else:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ Добавить фото", callback_data=f'addphotos_{ann_id}')],
@@ -136,7 +133,7 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not ann_id:
         logger.error("❌ [adding_photos] Ошибка: ID объявления не найден.")
-        await update.message.reply_text("Ошибка: ID объявления не найден.")
+        await update.message.reply_text(NO_ANN_ID_MESSAGE_ERROR)
         return CHOOSING
 
     # Получаем текущие фото из базы
@@ -146,7 +143,7 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photos = json.loads(row[0]) if row and row[0] else []
 
     if update.message.photo:
-        photo = update.message.photo[-1]  # Берем последнее загруженное фото
+        photo = update.message.photo[-1]
         if len(photos) < 10:
             photos.append(photo.file_id)
             logger.info(f"🖼️ [adding_photos] Добавлено фото: {photo.file_id}, ID объявления: {ann_id}")
@@ -468,9 +465,9 @@ async def format_announcement_text(update: Update, description, price, username,
         first_name = user.first_name if user.first_name else "Аноним"
         last_name = user.last_name if user.last_name else ""
         username = f"{first_name} {last_name}".strip()  # Убираем лишний пробел, если фамилии нет
-        contact_info = f"{CONTACT_TEXT}\n{username.replace('_', '\_')}"
+        contact_info = f"{CONTACT_TEXT}\n@{username.replace('_', '\\_')}"
     else:
-        contact_info = f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
+        contact_info = f"{CONTACT_TEXT}\n@{username.replace('_', '\\_')}"
 
 
     message = f"{description}\n\n"

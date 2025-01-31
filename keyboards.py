@@ -37,12 +37,3 @@ finish_photo_markup_no_menu = ReplyKeyboardMarkup(
     one_time_keyboard=True,
     resize_keyboard=True
 )
-
-# Клавиатура для редактирования
-edit_keyboard = [
-    [InlineKeyboardButton('Текст объявления', callback_data='edit_description')],
-    [InlineKeyboardButton('Цену', callback_data='edit_price')],
-    [InlineKeyboardButton('Фотографии', callback_data='edit_photos')],
-    [InlineKeyboardButton('Ничего не меняем', callback_data='cancel_edit')],
-]
-edit_markup_with_cancel = InlineKeyboardMarkup(edit_keyboard)

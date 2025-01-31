@@ -1,21 +1,11 @@
-import telegram
 from utils import is_subscribed, show_menu, check_subscription_message
-from texts import *  # Импортируем все тексты
 from database import (
-    save_announcement,
-    delete_announcement_by_id as db_delete_announcement_by_id,
-    has_user_ads, edit_announcement, update_announcement_description, get_announcement_for_edit,
-    update_announcement_price
+    has_user_ads,
 )
-
 from announcements import *
-
-import json
 import logging
-from datetime import timedelta
 import aiosqlite
 
-from config import PRIVATE_CHANNEL_ID
 from logger import logger
 
 logger = logging.getLogger(__name__)
@@ -100,20 +90,6 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_chat.send_message(CHOOSE_ACTION, reply_markup=markup)
         return CHOOSING
 
-async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
-    user_data = context.job.data
-    user_id = user_data['user_id']
-    message_id = user_data['message_id']
-
-    # Отправляем пользователю сообщение с вопросом о продлении или удалении объявления
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(EXTEND_BUTTON, callback_data=f'extend_{message_id}'),
-         InlineKeyboardButton(REMOVE_BUTTON, callback_data=f'remove_{message_id}')]
-    ])
-    try:
-        await context.bot.send_message(chat_id=user_id, text=RELEVANCE_CHECK_MESSAGE, reply_markup=keyboard)
-    except Exception as e:
-        logger.error(SEND_MESSAGE_ERROR.format(e))
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -215,7 +191,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CHOOSING
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(ERROR_LOG, exc_info=context.error)
+    logger.error("Exception while handling an update:", exc_info=context.error)
 
 async def check_subscription_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
