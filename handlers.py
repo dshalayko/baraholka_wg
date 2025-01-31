@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает команду /start, отправляет приветственное сообщение и удаляет команду пользователя."""
     user_id = update.message.from_user.id
-    start_message_id = update.message.message_id  # ✅ Запоминаем message_id команды /start
+    start_message_id = update.message.message_id
 
     if not await is_subscribed(user_id, context):
         text, keyboard = await check_subscription_message()
@@ -25,11 +25,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         welcome_message = await update.message.reply_text(WELCOME_NEW_USER, reply_markup=add_advertisement_keyboard)
 
-    # ✅ Сохраняем message_id приветственного сообщения
     context.user_data["welcome_message_id"] = welcome_message.message_id
     logger.info(f"✅ [start] Сохранен message_id приветствия: {welcome_message.message_id}")
 
-    # ✅ Удаляем команду /start
     try:
         await context.bot.delete_message(chat_id=update.message.chat_id, message_id=start_message_id)
         logger.info(f"🗑️ [start] Удалено сообщение пользователя: /start (message_id={start_message_id})")
