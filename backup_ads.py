@@ -9,7 +9,8 @@ from pyrogram.enums import ChatType, MessageMediaType
 
 DB_PATH = "announcements.db"
 SESSION_NAME = "my_sessionwg"
-
+API_ID=29154182
+API_HASH="659379ef31841ad9bc44ed0d8b3214ae"
 
 import re
 
@@ -25,6 +26,14 @@ def extract_price_and_username(text):
     username = username_match.group(1).strip() if username_match else "None"
 
     return price, username
+
+
+def extract_description(text):
+    """Извлекает описание до блока с ценой."""
+    price_block_start = re.search(r'Цена', text)
+    if price_block_start:
+        return text[:price_block_start.start()].strip()
+    return text.strip()
 
 
 async def fetch_channel_announcements():
@@ -59,8 +68,9 @@ async def fetch_channel_announcements():
 
             async for message in app.get_chat_history(channel_id, limit=100):
                 if message.text or message.caption:
-                    description = message.text or message.caption
-                    price, extracted_username = extract_price_and_username(description)
+                    full_text = message.text or message.caption
+                    description = extract_description(full_text)
+                    price, extracted_username = extract_price_and_username(full_text)
 
                     # Получаем user_id и username
                     user_id = None
