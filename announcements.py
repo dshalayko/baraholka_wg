@@ -107,8 +107,8 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return CHOOSING
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Добавить новые", callback_data=f'addphotos_{ann_id}')],
-        [InlineKeyboardButton("🔄 Обновить фото", callback_data=f'replacephotos_{ann_id}')],
+        [InlineKeyboardButton("➕ Добавить к старым", callback_data=f'addphotos_{ann_id}')],
+        [InlineKeyboardButton("🔄 Заменить все", callback_data=f'replacephotos_{ann_id}')],
         [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
     ])
 
@@ -440,7 +440,6 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         photos = json.loads(photo_file_ids_json) if photo_file_ids_json else []
 
         status = "📝 _Черновик_\n" if not message_ids else f"[Опубликовано 📌]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n"
-
         message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n\n{status}"
 
         keyboard = InlineKeyboardMarkup([
@@ -452,10 +451,29 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
         logger.info(f"📩 [show_user_announcements] Отправка объявления ID: {ann_id} с кнопками: edit_{ann_id}, delete_{ann_id}")
 
-        if photos:
-            sent_message = await reply_message.reply_photo(photo=photos[0], caption=message, reply_markup=keyboard, parse_mode='Markdown')
-        else:
-            sent_message = await reply_message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
+        try:
+            if photos:
+                sent_message = await reply_message.reply_photo(
+                    photo=photos[0],
+                    caption=message,
+                    reply_markup=keyboard,
+                    parse_mode='Markdown'
+                )
+            else:
+                sent_message = await reply_message.reply_text(
+                    message,
+                    reply_markup=keyboard,
+                    parse_mode='Markdown'
+                )
+        except telegram.error.BadRequest as e:
+            logger.error(f"❌ [show_user_announcements] Ошибка при отправке фото для объявления ID {ann_id}: {e}")
+            # Отправляем только текстовое сообщение
+            sent_message = await reply_message.reply_text(
+                message,
+                reply_markup=keyboard,
+                parse_mode='Markdown'
+            )
+
         context.user_data["announcement_message_ids"].append(sent_message.message_id)
 
     return CHOOSING
