@@ -123,7 +123,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_PHOTO_ACTION
 
 async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Добавляет фотографии к объявлению, проверяет лимит в 10 фото, отправляет сообщение об успешной загрузке только один раз."""
+    """Добавляет фотографии к объявлению, проверяет лимит в 10 фото, учитывает альбомы."""
     ann_id = context.user_data.get('ann_id')
 
     if not ann_id:
@@ -137,7 +137,17 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row = await cursor.fetchone()
         photos = json.loads(row[0]) if row and row[0] else []
 
-    send_add_photo_text = len(photos) == 1
+    # Проверяем, есть ли media_group_id
+    media_group_id = update.message.media_group_id
+
+    # Если это новая группа медиа (альбом), сохраняем ID
+    if media_group_id and context.user_data.get('last_media_group_id') != media_group_id:
+        context.user_data['last_media_group_id'] = media_group_id
+        send_add_photo_text = True  # Отправляем сообщение только для нового альбома
+    elif not media_group_id:
+        send_add_photo_text = True  # Отправляем сообщение, если фото отправлено по одному
+    else:
+        send_add_photo_text = False  # Не отправляем повторно сообщение для того же альбома
 
     if update.message.photo:
         photo = update.message.photo[-1]
@@ -151,6 +161,7 @@ async def adding_photos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             logger.info(f"📸 [adding_photos] Текущий список фото в БД для объявления {ann_id}: {photos}")
 
+            # Отправляем сообщение только один раз для альбома или одиночного фото
             if send_add_photo_text:
                 await update.message.reply_text(ADD_PHOTO_TEXT, reply_markup=finish_photo_markup_with_cancel)
 
