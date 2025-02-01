@@ -52,14 +52,15 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
             logger.error("❌ [forward_thread_replies] Не удалось получить ID супергруппы.")
             await app.stop()
             return False
-        found_message_id = None
-        new_message_id = None
 
+        found_message_id = new_message_id = None
+
+        # Поиск старого сообщения
         for attempt in range(5):
             async for message in app.get_chat_history(chat_id):
-                if hasattr(message, "forward_from_message_id") and message.forward_from_message_id == old_thread_id:
+                if getattr(message, "forward_from_message_id", None) == old_thread_id:
                     found_message_id = message.id
-                    logger.info(f"✅ [forward_thread_replies] Найдено старое сообщение ID: {found_message_id}")
+                    logger.info(f"✅ Найдено старое сообщение ID: {found_message_id}")
                     break
             if found_message_id:
                 break
@@ -73,13 +74,12 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
 
         for attempt in range(5):
             async for message in app.get_chat_history(chat_id):
-                if hasattr(message, "forward_from_message_id") and message.forward_from_message_id == new_thread_id:
+                if getattr(message, "forward_from_message_id", None) == new_thread_id:
                     new_message_id = message.id
                     logger.info(f"✅ [forward_thread_replies] Найдено новое сообщение ID: {new_message_id}")
                     break
             if new_message_id:
                 break
-            logger.warning(f"⚠️ [forward_thread_replies] Не найдено новое сообщение (попытка {attempt+1}/5), ждем 2 сек...")
             await asyncio.sleep(2)
 
         if not new_message_id:
@@ -87,35 +87,45 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
             await app.stop()
             return False
 
+        # Перенос комментариев
         comments = []
         async for message in app.get_chat_history(chat_id):
-            if hasattr(message, "reply_to_message_id") and message.reply_to_message_id == found_message_id:
-                first_name = message.from_user.first_name if message.from_user and message.from_user.first_name else ""
-                last_name = message.from_user.last_name if message.from_user and message.from_user.last_name else ""
-                full_name = f"{first_name} {last_name}".strip()
-                original_text = message.text or "📷 Медиа"
+            if message.reply_to_message_id == found_message_id:
+                comments.append(message)
 
-                formatted_text = f"**{full_name}**\n{original_text}"
-                comments.append((message.id, formatted_text))  # Сохраняем в список (ID сообщения и текст)
-
-        logger.info(f"🔄 [forward_thread_replies] Отправляем {len(comments)} комментариев в обратном порядке.")
-        for message_id, formatted_text in reversed(comments):
+        logger.info(f"🔄 Отправляем {len(comments)} комментариев в обратном порядке.")
+        for comment in reversed(comments):
             try:
-                await app.send_message(
-                    chat_id=chat_id,
-                    text=formatted_text,
-                    reply_to_message_id=new_message_id
-                )
-                logger.info(f"📩 [forward_thread_replies] Отправлен комментарий ID {message_id} → {new_message_id}")
+                first_name = comment.from_user.first_name if comment.from_user else ""
+                last_name = comment.from_user.last_name if comment.from_user and comment.from_user.last_name else ""
+                full_name = f"{first_name} {last_name}".strip()
+
+                if comment.text:
+                    formatted_text = f"**{full_name}**\n{comment.text}"
+                    await app.send_message(chat_id=chat_id, text=formatted_text, reply_to_message_id=new_message_id)
+                    logger.info(f"📩 Отправлен текстовый комментарий ID {comment.id}")
+
+                elif comment.photo:
+                    caption = f"**{full_name}**\n{comment.caption or ''}".strip()
+                    await app.send_photo(chat_id=chat_id, photo=comment.photo.file_id, caption=caption, reply_to_message_id=new_message_id)
+                    logger.info(f"📸 Отправлена фотография ID {comment.id}")
+
+                elif comment.sticker:
+                    await app.send_sticker(chat_id=chat_id, sticker=comment.sticker.file_id, reply_to_message_id=new_message_id)
+                    logger.info(f"🎨 Отправлен стикер ID {comment.id}")
+
+                else:
+                    logger.warning(f"⚠️ Неизвестный тип медиа в сообщении ID {comment.id}")
+
             except Exception as e:
-                logger.error(f"❌ [forward_thread_replies] Ошибка при отправке комментария ID {message_id}: {e}")
+                logger.error(f"❌ [forward_thread_replies] Ошибка при отправке комментария ID {comment.id}: {e}")
 
         await app.stop()
         logger.info(f"✅ [forward_thread_replies] Перенос комментариев завершен успешно.")
         return True
 
     except Exception as e:
-        logger.error(f"❌ [forward_thread_replies] Ошибка при переносе комментариев: {e}")
+        logger.error(f"❌ Общая ошибка при переносе комментариев: {e}")
         await app.stop()
         return False
 
