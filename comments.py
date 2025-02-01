@@ -15,7 +15,7 @@ async def log_group_messages(update: Update, context: CallbackContext):
         user = update.effective_user
         user_id = update.effective_user.id
         username = update.effective_user.username or "Нет username"
-        text = update.message.text or "Нет текста"
+        text = update.message.text or ""
         message_id = update.message.message_id
         thread_id = update.message.message_thread_id if update.message.message_thread_id else None
         photo_id = update.message.photo[-1].file_id if update.message.photo else None

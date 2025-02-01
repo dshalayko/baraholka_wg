@@ -116,7 +116,7 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
         announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
 
         # 📩 Формируем сообщение
-        message_text = f"💬 Новый комментарий к вашему объявлению:\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
+        message_text = f"💬 Новый комментарий к вашему объявлению\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
 
         # ✉️ Отправляем уведомление владельцу
         logger.info(f"📨 [notify_owner_about_comment] Отправляем уведомление владельцу {owner_id}...")

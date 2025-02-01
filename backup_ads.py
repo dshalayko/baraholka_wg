@@ -5,12 +5,11 @@ from datetime import datetime
 import aiosqlite
 from pyrogram import Client
 from pyrogram.enums import ChatType, MessageMediaType
-#from config import API_ID, API_HASH
+from config import API_ID, API_HASH
 
 DB_PATH = "announcements.db"
 SESSION_NAME = "my_sessionwg"
-API_ID=29154182
-API_HASH="659379ef31841ad9bc44ed0d8b3214ae"
+
 
 import re
 
