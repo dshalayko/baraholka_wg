@@ -4,9 +4,11 @@ from datetime import datetime
 
 #docker cp container_name:/app/data/announcements.db .
 
+#/home/thunderboltstorm131/announcements.db
 
-OLD_DB_PATH = "old_announcements.db"  # Путь к старой базе (без timestamp)
-NEW_DB_PATH = "announcements.db"      # Путь к новой базе (с timestamp)
+
+OLD_DB_PATH = "announcements.db"  # Путь к старой базе (без timestamp)
+NEW_DB_PATH = "data/announcements.db"      # Путь к новой базе (с timestamp)
 
 async def migrate_database():
     """Перенос данных из старой БД в новую и добавление timestamp для новых записей."""
