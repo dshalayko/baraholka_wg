@@ -12,6 +12,7 @@ from utils import  notify_owner_about_comment
 
 async def log_group_messages(update: Update, context: CallbackContext):
     logger.info(f"✅ [log_group_messages] Вызов функции")
+    logger.info(f"📨 [log_group_messages] Пришло сообщение: {update.message}")
     try:
         user = update.effective_user
         user_id = update.effective_user.id
@@ -41,5 +42,7 @@ async def log_group_messages(update: Update, context: CallbackContext):
         logger.error(f"❌ [log_group_messages] Ошибка: {e}")
 
 def register_handlers(app):
+    logger.info(f"CHAT_ID: {CHAT_ID} (тип: {type(CHAT_ID)})")
     logger.info(f"✅ [register_handlers] Найден CHAT_ID={CHAT_ID}")
-    app.add_handler(MessageHandler(filters.ALL & filters.Chat(int(CHAT_ID)), log_group_messages))
+    app.add_handler(MessageHandler(filters.Chat(int(CHAT_ID)), log_group_messages))
+    #app.add_handler(MessageHandler(filters.ALL & filters.Chat(int(CHAT_ID)), log_group_messages))
