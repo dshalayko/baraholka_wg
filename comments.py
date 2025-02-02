@@ -40,4 +40,5 @@ async def log_group_messages(update: Update, context: CallbackContext):
         logger.error(f"❌ [log_group_messages] Ошибка: {e}")
 
 def register_handlers(app):
+    logger.info(f"✅ [register_handlers] Найден CHAT_ID={CHAT_ID}")
     app.add_handler(MessageHandler(filters.ALL & filters.Chat(int(CHAT_ID)), log_group_messages))
