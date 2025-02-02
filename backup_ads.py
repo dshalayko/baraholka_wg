@@ -8,7 +8,7 @@ from pyrogram.enums import ChatType, MessageMediaType
 from config import API_ID, API_HASH
 
 DB_PATH = "announcements.db"
-SESSION_NAME = "my_sessionwg"
+SESSION_NAME = "my_session"
 
 
 import re
