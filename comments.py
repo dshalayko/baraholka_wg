@@ -11,8 +11,6 @@ from utils import  notify_owner_about_comment
 
 
 async def log_group_messages(update: Update, context: CallbackContext):
-    logger.info(f"✅ [log_group_messages] Вызов функции")
-    logger.info(f"📨 [log_group_messages] Пришло сообщение: {update.message}")
     try:
         user = update.effective_user
         user_id = update.effective_user.id
