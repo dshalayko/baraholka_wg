@@ -3,42 +3,11 @@ from pyrogram import Client
 from pyrogram.enums import ChatType
 
 from logger import logger
-from config import API_ID, API_HASH, CHAT_NAME
+from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID
+
 
 async def get_supergroup_id(app, group_name=None):
-    """Получает ID супергруппы, в которой находится бот. Если бот в одной супергруппе — берём её сразу."""
-    logger.info("🔍 [get_supergroup_id] Получаем список чатов...")
-
-    found_supergroups = []  # Список всех найденных супергрупп
-
-    async for dialog in app.get_dialogs():
-        chat_type = dialog.chat.type  # Получаем тип чата
-        chat_id = dialog.chat.id
-        chat_title = dialog.chat.title or "Без названия"
-
-        # Если это супергруппа, добавляем в список
-        if chat_type == ChatType.SUPERGROUP:
-            found_supergroups.append((chat_id, chat_title))
-
-    # Если найдена хотя бы одна супергруппа
-    if found_supergroups:
-        if group_name:
-            # Ищем супергруппу по названию
-            for chat_id, title in found_supergroups:
-                if title == group_name:
-                    logger.info(f"✅ [get_supergroup_id] Найдена супергруппа '{group_name}' с ID: {chat_id}")
-                    return chat_id
-
-            logger.warning(f"⚠️ [get_supergroup_id] Супергруппа '{group_name}' не найдена среди {len(found_supergroups)} доступных.")
-        else:
-            # Если не передано `group_name`, но найдена одна супергруппа — используем её
-            if len(found_supergroups) == 1:
-                chat_id, title = found_supergroups[0]
-                logger.info(f"✅ [get_supergroup_id] Используем единственную найденную супергруппу: '{title}' (ID: {chat_id})")
-                return chat_id
-
-    logger.error("❌ [get_supergroup_id] Супергруппа не найдена.")
-    return None
+    return CHAT_ID
 
 async def forward_thread_replies(old_thread_id, new_thread_id):
     logger.info(f"🚀 [forward_thread_replies] Запуск функции с old_thread_id={old_thread_id}, new_thread_id={new_thread_id}")
