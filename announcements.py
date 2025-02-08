@@ -420,8 +420,12 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
             try:
                 await context.bot.delete_message(chat_id=reply_message.chat_id, message_id=msg_id)
                 logger.info(f"🗑️ [show_user_announcements] Удалено старое сообщение ID: {msg_id}")
-            except telegram.error.BadRequest:
-                logger.warning(f"⚠️ [show_user_announcements] Не удалось удалить сообщение ID: {msg_id}")
+            except telegram.error.BadRequest as e:
+                logger.warning(f"⚠️ [show_user_announcements] Не удалось удалить сообщение ID: {msg_id} - {e}")
+            except telegram.error.TelegramError as e:
+                logger.error(f"❌ [show_user_announcements] Ошибка Telegram при удалении сообщения ID: {msg_id} - {e}")
+            except Exception as e:
+                logger.error(f"❌ [show_user_announcements] Неизвестная ошибка при удалении сообщения ID: {msg_id} - {e}")
 
     context.user_data["announcement_message_ids"] = []  # ✅ Очищаем перед добавлением новых сообщений
 
@@ -473,6 +477,12 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
                 reply_markup=keyboard,
                 parse_mode='Markdown'
             )
+        except telegram.error.TelegramError as e:
+            logger.error(f"❌ [show_user_announcements] Ошибка Telegram при отправке объявления ID {ann_id}: {e}")
+            continue
+        except Exception as e:
+            logger.error(f"❌ [show_user_announcements] Неизвестная ошибка при отправке объявления ID {ann_id}: {e}")
+            continue
 
         context.user_data["announcement_message_ids"].append(sent_message.message_id)
 
