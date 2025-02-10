@@ -6,6 +6,7 @@ from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 from logger import logger
 from datetime import datetime
 import pytz
+import re
 
 from database import has_user_ads
 from keyboards import markup, add_advertisement_keyboard
@@ -130,3 +131,17 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
 
     except Exception as e:
         logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
+
+def escape_markdown_custom(text: str) -> str:
+    special_chars = r'[*\-~`_\[\]\(\)]'
+    text = re.sub(f'([{special_chars}])', r'\\\1', text)
+
+    def check_unclosed_tags(symbol: str, text: str) -> str:
+        if text.count(symbol) % 2 != 0:
+            return text + symbol  # Добавляем закрывающий тег
+        return text
+
+    for symbol in ['*', '_', '~', '`']:
+        text = check_unclosed_tags(symbol, text)
+
+    return text

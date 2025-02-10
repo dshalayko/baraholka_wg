@@ -7,12 +7,13 @@ from datetime import datetime
 import telegram
 from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
+from telegram.helpers import escape_markdown
 
 from comments_manager import forward_thread_replies
 from config import *
 from logger import logger
 from keyboards import *
-from utils import get_serbia_time, get_private_channel_post_link
+from utils import get_serbia_time, get_private_channel_post_link, escape_markdown_custom
 from database import (get_user_announcements,
                       )
 
@@ -202,9 +203,9 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
     description = update.message.text.strip()
 
     # 🔍 Проверяем длину описания
-    if len(description) > 1024:
+    if len(description) > 800:
         logger.warning(f"⚠️ [description_received] Введённое описание слишком длинное ({len(description)} символов), ID объявления: {ann_id}")
-        await update.message.reply_text(f"❗ Описание слишком длинное. Максимум 1024 символа. Сейчас: {len(description)} символов.\nПожалуйста, укоротите текст.")
+        await update.message.reply_text(f"❗ Описание слишком длинное. Максимум 800 символа. Сейчас: {len(description)} символов.\nПожалуйста, укоротите текст.")
         return EDIT_DESCRIPTION
 
     logger.info(f"✏️ [description_received] Введено новое описание: {description}, ID объявления: {ann_id}")
@@ -233,9 +234,9 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     price = update.message.text.strip()
 
-    if len(price) > 1024:
+    if len(price) > 130:
         logger.warning(f"⚠️ [price_received] Введённая цена слишком длинная ({len(price)} символов), ID объявления: {ann_id}")
-        await update.message.reply_text(f"❗ Цена слишком длинная. Максимум 1024 символа. Сейчас: {len(price)} символов.\nПожалуйста, укоротите текст.")
+        await update.message.reply_text(f"❗ Цена слишком длинная. Максимум 130 символа. Сейчас: {len(price)} символов.\nПожалуйста, укоротите текст.")
         return EDIT_PRICE
 
     logger.info(f"💰 [price_received] Введена новая цена: {price}, ID объявления: {ann_id}")
@@ -444,6 +445,8 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         photos = json.loads(photo_file_ids_json) if photo_file_ids_json else []
 
         status = "📝 _Черновик_\n" if not message_ids else f"[Опубликовано 📌]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n"
+        description = escape_markdown_custom(description)
+        price = escape_markdown_custom(price)
         message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n\n{status}"
 
         keyboard = InlineKeyboardMarkup([
@@ -470,13 +473,8 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
                     parse_mode='Markdown'
                 )
         except telegram.error.BadRequest as e:
-            logger.error(f"❌ [show_user_announcements] Ошибка при отправке фото для объявления ID {ann_id}: {e}")
-            # Отправляем только текстовое сообщение
-            sent_message = await reply_message.reply_text(
-                message,
-                reply_markup=keyboard,
-                parse_mode='Markdown'
-            )
+            logger.error(f"❌ [show_user_announcements] Ошибка при отправке объявления ID {ann_id}: {e}")
+            continue  # Пропускаем проблемное объявление
         except telegram.error.TelegramError as e:
             logger.error(f"❌ [show_user_announcements] Ошибка Telegram при отправке объявления ID {ann_id}: {e}")
             continue
@@ -490,6 +488,8 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 
 async def format_announcement_text(update: Update, description, price, username, ann_id, is_updated=False, message_ids=None, timestamp=None):
     current_time = get_serbia_time()
+    description = escape_markdown_custom(description)
+    price = escape_markdown_custom(price)
 
     # Если username = "None", используем first_name + last_name
     if username == "None":
@@ -503,7 +503,7 @@ async def format_announcement_text(update: Update, description, price, username,
         first_name = user.first_name if user.first_name else "Аноним"
         last_name = user.last_name if user.last_name else ""
         username = f"{first_name} {last_name}".strip()  # Убираем лишний пробел, если фамилии нет
-        contact_info = f"{CONTACT_TEXT}\n@{username.replace('_', '\\_')}"
+        contact_info = f"{CONTACT_TEXT}\n{username.replace('_', '\\_')}"
     else:
         contact_info = f"{CONTACT_TEXT}\n@{username.replace('_', '\\_')}"
 
