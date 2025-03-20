@@ -88,7 +88,6 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_chat.send_message(CHOOSE_ACTION, reply_markup=markup)
         return CHOOSING
 
-
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

@@ -21,7 +21,6 @@ async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Ошибка при проверке подписки: {e}")
         return False
 
-
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
@@ -55,7 +54,6 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_subscription_message():
     text = 'Пожалуйста, подпишитесь на наш канал, чтобы продолжить.'
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton('Подписаться на канал', url=INVITE_LINK)],
         [InlineKeyboardButton('Я подписался', callback_data='check_subscription')]
     ])
     return text, keyboard

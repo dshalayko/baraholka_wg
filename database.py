@@ -1,7 +1,7 @@
 import aiosqlite
 import json
 from telegram import InputMediaPhoto
-from logger import logger  # Импорт логгера
+from logger import logger
 from config import PRIVATE_CHANNEL_ID, DB_PATH
 
 
@@ -56,20 +56,6 @@ async def get_user_announcements(user_id):
         rows = await cursor.fetchall()
         return rows  # Возвращает (id, message_ids, description, price, photo_file_ids)
 
-# Удаление объявления по ID
-async def delete_announcement_by_id(ann_id, context):
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute('SELECT message_ids FROM announcements WHERE id = ?', (ann_id,))
-        row = await cursor.fetchone()
-        if row:
-            message_ids = json.loads(row[0])
-            for message_id in message_ids:
-                try:
-                    await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
-                except Exception as e:
-                    logger.error(f"Ошибка при удалении сообщения {message_id}: {e}")
-            await db.execute('DELETE FROM announcements WHERE id = ?', (ann_id,))
-            await db.commit()
 
 # Получение данных объявления для редактирования
 async def get_announcement_for_edit(ann_id):
