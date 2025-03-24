@@ -394,14 +394,6 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
                         "Пожалуйста, удалите вручную."
                     )
                 )
-                await context.bot.send_message(
-                    chat_id=DSHALAYKO_ID,
-                    text=(
-                        "Не удалось удалить сообщение боту:\n"
-                        f"Ссылка: {msg_link}\n"
-                        "Пожалуйста, удалите вручную."
-                    )
-                )
 
     return get_private_channel_post_link(PRIVATE_CHANNEL_ID, new_message_ids[0])
 
@@ -424,14 +416,6 @@ async def delete_announcement_by_id(ann_id, context, query, is_editing=False):
                     # Отправляем сообщение админам, чтобы они удалили вручную
                     await context.bot.send_message(
                         chat_id=SLONSKI_ID,
-                        text=(
-                            "Не удалось удалить сообщение боту:\n"
-                            f"Ссылка: {msg_link}\n"
-                            "Пожалуйста, удалите вручную."
-                        )
-                    )
-                    await context.bot.send_message(
-                        chat_id=DSHALAYKO_ID,
                         text=(
                             "Не удалось удалить сообщение боту:\n"
                             f"Ссылка: {msg_link}\n"
