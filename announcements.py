@@ -38,7 +38,7 @@ async def create_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data['photos'] = []
     context.user_data['username'] = username
 
-    await update.message.reply_text(START_NEW_AD)
+    await update.message.reply_text(START_NEW_AD, reply_markup=ReplyKeyboardRemove())
     return EDIT_DESCRIPTION
 
 async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
