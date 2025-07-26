@@ -570,7 +570,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
     return CHOOSING
 
 async def format_announcement_text(update: Update, description, price, username, ann_id, is_updated=False, message_ids=None, timestamp=None):
-    current_time = get_serbia_time()
+    current_time = escape_markdown(get_serbia_time(), version=2)
     description = escape_markdown(description, version=2)
     price = escape_markdown(price, version=2)
 
