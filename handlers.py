@@ -63,7 +63,8 @@ async def format_announcement_text(description, price, username, is_updated=Fals
     # Формируем текст объявления
     message = f"{description}\n\n"
     message += f"{PRICE_TEXT}\n{price}\n\n"
-    message += f"{CONTACT_TEXT}\n@{username.replace('_', '\_')}"
+    escaped_username = username.replace('_', '\\_')
+    message += f"{CONTACT_TEXT}\n@{escaped_username}"
 
     # Если это обновленное объявление, добавляем отметку об обновлении
     if is_updated:
@@ -594,16 +595,26 @@ async def check_relevance(context: ContextTypes.DEFAULT_TYPE):
         logger.error(SEND_MESSAGE_ERROR.format(e))
 
 async def delete_announcement_by_message_id(message_id, context: ContextTypes.DEFAULT_TYPE):
+    """Delete announcement from channel and database using first message id."""
     # Удаляем сообщение из канала
     try:
         await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
     except Exception as e:
         logger.error(DELETE_MESSAGE_ERROR.format(e))
 
-    # Удаляем запись из базы данных
+    # Удаляем запись из базы данных по message_id внутри JSON-колонки
     async with aiosqlite.connect('announcements.db') as db:
-        await db.execute('DELETE FROM announcements WHERE message_id = ?', (message_id,))
-        await db.commit()
+        cursor = await db.execute('SELECT id, message_ids FROM announcements')
+        rows = await cursor.fetchall()
+        for ann_id, message_ids_json in rows:
+            try:
+                ids = json.loads(message_ids_json)
+            except Exception:
+                ids = []
+            if message_id in ids:
+                await db.execute('DELETE FROM announcements WHERE id = ?', (ann_id,))
+                await db.commit()
+                break
 
 async def relevance_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
