@@ -1,12 +1,13 @@
 import aiosqlite
 from telegram.ext import ContextTypes
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram.helpers import escape_markdown
+from telegram.constants import ParseMode
 from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 
 from logger import logger
 from datetime import datetime
 import pytz
-import re
 
 from database import has_user_ads
 from keyboards import markup, add_advertisement_keyboard
@@ -114,32 +115,24 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
 
         announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
 
+        escaped_text = escape_markdown(text, version=2)
+
         # 📩 Формируем сообщение
-        message_text = f"💬 Новый комментарий к вашему объявлению\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
+        message_text = (
+            "💬 Новый комментарий к вашему объявлению\n\n"
+            f"_{escaped_text}_\n\n"
+            f"🔗 [Посмотреть объявление]({announcement_link})"
+        )
 
         # ✉️ Отправляем уведомление владельцу
         logger.info(f"📨 [notify_owner_about_comment] Отправляем уведомление владельцу {owner_id}...")
         await context.bot.send_message(
             chat_id=owner_id,
             text=message_text,
-            parse_mode="Markdown",
+            parse_mode=ParseMode.MARKDOWN_V2,
             disable_web_page_preview=True
         )
         logger.info(f"✅ [notify_owner_about_comment] Уведомление успешно отправлено владельцу {owner_id}.")
 
     except Exception as e:
         logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
-
-def escape_markdown_custom(text: str) -> str:
-    special_chars = r'[*\-~`_\[\]\(\)]'
-    text = re.sub(f'([{special_chars}])', r'\\\1', text)
-
-    def check_unclosed_tags(symbol: str, text: str) -> str:
-        if text.count(symbol) % 2 != 0:
-            return text + symbol  # Добавляем закрывающий тег
-        return text
-
-    for symbol in ['*', '_', '~', '`']:
-        text = check_unclosed_tags(symbol, text)
-
-    return text

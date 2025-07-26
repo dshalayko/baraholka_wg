@@ -5,6 +5,7 @@ from database import (
 from announcements import *
 import logging
 import aiosqlite
+from telegram.constants import ParseMode
 
 from logger import logger
 
@@ -155,8 +156,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         post_link = await publish_announcement(update, context, ann_id)
 
         if post_link:
-            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup,
-                                           parse_mode='Markdown')
+            await query.message.reply_text(
+                POST_SUCCESS_MESSAGE.format(post_link),
+                reply_markup=markup,
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
         else:
             await query.message.reply_text(POST_FAILURE_MESSAGE, reply_markup=markup)
 
