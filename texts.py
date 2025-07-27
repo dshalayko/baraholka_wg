@@ -4,7 +4,7 @@ TRANSLATIONS = {
         "en": "Hello! I'm the WG Black Market bot. I'll post ads on your behalf, and if you later want to change or remove them, come to me."
     },
     "START_NEW_AD": {
-        "ru": "Пришлите текст объявления\\\\. Дальше я попрошу указать цену и добавить фотографии. Но в первую очередь — расскажите, что вы хотите продать или купить.",
+        "ru": "Пришлите текст объявления\\. Дальше я попрошу указать цену и добавить фотографии. Но в первую очередь — расскажите, что вы хотите продать или купить.",
         "en": "Send the ad text\\. Next I'll ask for a price and photos. But first, tell me what you want to sell or buy."
     },
     "CHOOSE_ACTION": {
@@ -76,8 +76,8 @@ TRANSLATIONS = {
         "en": "Done with photos, let's move on"
     },
     "POST_SUCCESS_MESSAGE": {
-        "ru": "💥*Успех\\\\!\\n Вот ссылка на ваше объявление:*\\n[Открыть объявление]({})",
-        "en": "💥*Success!\\n Here is the link to your ad:*\\n[Open ad]({})"
+        "ru": "💥*Успех\n Вот ссылка на ваше объявление:*\n[Открыть объявление]({})",
+        "en": "💥*Success\n Here is the link to your ad:*\n[Open ad]({})"
     },
     "POST_FAILURE_MESSAGE": {
         "ru": "Произошла ошибка при размещении объявления",
@@ -100,12 +100,12 @@ TRANSLATIONS = {
         "en": "{description}\\n\\n*Price*\\n{price}"
     },
     "CANCEL_MESSAGE": {
-        "ru": "Ок, отменили\\\\.",
+        "ru": "Ок, отменили\\.",
         "en": "Ok, cancelled\\."
     },
     "ASK_FOR_PHOTOS": {
-        "ru": "Можно загрузить сразу несколько фото\\\\.\\n\\n_Хайрезы я не принимаю, поэтому не убирайте галочку с настройки «Сжимать фотографии»_\\n",
-        "en": "You can upload several photos at once\\n\\n_I don't accept hi-res, so leave the \"Compress photos\" option on_\\n"
+        "ru": "Можно загрузить сразу несколько фото\\.\n\n_Хайрезы я не принимаю, поэтому не убирайте галочку с настройки «Сжимать фотографии»_\n",
+        "en": "You can upload several photos at once\\.\n\n_I don't accept hi-res, so leave the \"Compress photos\" option on_\n"
     },
     "ADD_NEW_PHOTOS": {
         "ru": "📸 Отправьте новые фото. Вы можете загрузить до 10 фото.",
@@ -116,20 +116,20 @@ TRANSLATIONS = {
         "en": "All old photos deleted. Send new photos."
     },
     "HAS_PHOTOS": {
-        "ru": "📸 У вас уже есть загруженные фото\\n Хотите добавить новые или заменить текущие?",
-        "en": "📸 You already have uploaded photos\\nDo you want to add new ones or replace current?"
+        "ru": "📸 У вас уже есть загруженные фото\nХотите добавить новые или заменить текущие?",
+        "en": "📸 You already have uploaded photos\nDo you want to add new ones or replace current?"
     },
     "NO_ANN_ID_MESSAGE_ERROR": {
         "ru": "Ошибка: ID объявления не найден.",
         "en": "Error: announcement ID not found."
     },
     "DESCRIPTION_TOO_LONG": {
-        "ru": "❗ Описание слишком длинное. Максимум 800 символа. Сейчас: {length} символов.\\nПожалуйста, укоротите текст.",
-        "en": "❗ The description is too long. Maximum 800 characters. Now: {length} characters.\\nPlease shorten the text."
+        "ru": "❗ Описание слишком длинное. Максимум 800 символа. Сейчас: {length} символов\\nПожалуйста, укоротите текст\\.",
+        "en": "❗ The description is too long. Maximum 800 characters. Now: {length} characters\\nPlease shorten the text\\."
     },
     "PRICE_TOO_LONG": {
-        "ru": "❗ Цена слишком длинная. Максимум 130 символа. Сейчас: {length} символов.\\nПожалуйста, укоротите текст.",
-        "en": "❗ The price is too long. Maximum 130 characters. Now: {length} characters.\\nPlease shorten the text."
+        "ru": "❗ Цена слишком длинная. Максимум 130 символа. Сейчас: {length} символов\\nПожалуйста, укоротите текст\\.",
+        "en": "❗ The price is too long. Maximum 130 characters. Now: {length} characters\\nPlease shorten the text\\."
     },
     "PRICE_REQUEST_TEXT": {
         "ru": "Принято! Теперь укажите цену.",
@@ -144,8 +144,8 @@ TRANSLATIONS = {
         "en": "❌ Error: announcement not found in database."
     },
     "DELETE_MANUALLY_MESSAGE": {
-        "ru": "Не удалось удалить сообщение боту:\\nСсылка: {link}\\nПожалуйста, удалите вручную.",
-        "en": "Could not delete the bot's message:\\nLink: {link}\\nPlease delete it manually."
+        "ru": "Не удалось удалить сообщение боту:\nСсылка: {link}\nПожалуйста, удалите вручную.",
+        "en": "Could not delete the bot's message:\nLink: {link}\nPlease delete it manually."
     },
     "ERROR_CANNOT_DETERMINE_ID": {
         "ru": "❌ Ошибка: не удалось определить ID объявления.",
@@ -168,8 +168,8 @@ TRANSLATIONS = {
         "en": "I've subscribed"
     },
     "COMMENT_NOTIFICATION": {
-        "ru": "💬 Новый комментарий к вашему объявлению\\n\\n_{text}_\\n\\n🔗 [Посмотреть объявление]({link})",
-        "en": "💬 New comment to your ad\\n\\n_{text}_\\n\\n🔗 [View the ad]({link})"
+        "ru": "💬 Новый комментарий к вашему объявлению\n\n_{text}_\n\n🔗 [Посмотреть объявление]({link})",
+        "en": "💬 New comment to your ad\n\n_{text}_\n\n🔗 [View the ad]({link})"
     },
     "MAIN_MENU_BUTTON": {
         "ru": "В главное меню",
@@ -216,16 +216,16 @@ TRANSLATIONS = {
         "en": "🚫 Change nothing"
     },
     "EDIT_MESSAGE_TEXT_TEMPLATE": {
-        "ru": "Описание: {description}\\nЦена: {price}\\n\\nОбновлено",
-        "en": "Description: {description}\\nPrice: {price}\\n\\nUpdated"
+        "ru": "Описание: {description}\nЦена: {price}\n\nОбновлено",
+        "en": "Description: {description}\nPrice: {price}\n\nUpdated"
     },
     "DRAFT_STATUS": {
-        "ru": "📝 _Черновик_\\n",
-        "en": "📝 _Draft_\\n"
+        "ru": "📝 _Черновик_\n",
+        "en": "📝 _Draft_\n"
     },
     "PUBLISHED_STATUS": {
-        "ru": "[Опубликовано 📌]({})\\n",
-        "en": "[Published 📌]({})\\n"
+        "ru": "[Опубликовано 📌]({})\n",
+        "en": "[Published 📌]({})\n"
     },
     "ERROR_CANNOT_GET_USER_DATA": {
         "ru": "❌ Ошибка: не удалось получить данные пользователя.",
