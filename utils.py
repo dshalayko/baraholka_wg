@@ -10,9 +10,13 @@ from datetime import datetime
 import pytz
 
 from database import has_user_ads
-from keyboards import markup, add_advertisement_keyboard
+from keyboards import (
+    get_markup,
+    get_add_advertisement_keyboard,
+)
 from texts import (
-    CHOOSE_ACTION_NEW,
+    t,
+    get_lang,
     SUBSCRIPTION_PROMPT,
     I_SUBSCRIBED_BUTTON,
     COMMENT_NOTIFICATION,
@@ -29,6 +33,7 @@ async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    lang = get_lang(update)
 
     has_ads = await has_user_ads(user_id)
 
@@ -36,31 +41,32 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Responding to a regular message
         if has_ads:
             await update.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=markup  # Two buttons
+                t("CHOOSE_ACTION_NEW", lang),
+                reply_markup=get_markup(lang)  # Two buttons
             )
         else:
             await update.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=add_advertisement_keyboard  # Single button
+                t("CHOOSE_ACTION_NEW", lang),
+                reply_markup=get_add_advertisement_keyboard(lang)  # Single button
             )
     elif update.callback_query:
         # Responding to a callback query
         if has_ads:
             await update.callback_query.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=markup  # Two buttons
+                t("CHOOSE_ACTION_NEW", lang),
+                reply_markup=get_markup(lang)  # Two buttons
             )
         else:
             await update.callback_query.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=add_advertisement_keyboard  # Single button
+                t("CHOOSE_ACTION_NEW", lang),
+                reply_markup=get_add_advertisement_keyboard(lang)  # Single button
             )
 
-async def check_subscription_message():
-    text = SUBSCRIPTION_PROMPT
+async def check_subscription_message(update: Update):
+    lang = get_lang(update)
+    text = t("SUBSCRIPTION_PROMPT", lang)
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(I_SUBSCRIBED_BUTTON, callback_data='check_subscription')]
+        [InlineKeyboardButton(t("I_SUBSCRIBED_BUTTON", lang), callback_data='check_subscription')]
     ])
     return text, keyboard
 
@@ -122,8 +128,15 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
 
         escaped_text = escape_markdown(text, version=2)
 
+        lang = 'en'
+        try:
+            user = await context.bot.get_chat(owner_id)
+            lang = get_lang(user)
+        except Exception:
+            pass
+
         # 📩 Формируем сообщение
-        message_text = COMMENT_NOTIFICATION.format(
+        message_text = t("COMMENT_NOTIFICATION", lang).format(
             text=escaped_text,
             link=announcement_link,
         )
