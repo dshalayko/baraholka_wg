@@ -11,7 +11,12 @@ import pytz
 
 from database import has_user_ads
 from keyboards import markup, add_advertisement_keyboard
-from texts import CHOOSE_ACTION_NEW
+from texts import (
+    CHOOSE_ACTION_NEW,
+    SUBSCRIPTION_PROMPT,
+    I_SUBSCRIBED_BUTTON,
+    COMMENT_NOTIFICATION,
+)
 
 
 async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
@@ -53,9 +58,9 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
 async def check_subscription_message():
-    text = 'Пожалуйста, подпишитесь на наш канал, чтобы продолжить.'
+    text = SUBSCRIPTION_PROMPT
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton('Я подписался', callback_data='check_subscription')]
+        [InlineKeyboardButton(I_SUBSCRIBED_BUTTON, callback_data='check_subscription')]
     ])
     return text, keyboard
 
@@ -118,10 +123,9 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
         escaped_text = escape_markdown(text, version=2)
 
         # 📩 Формируем сообщение
-        message_text = (
-            "💬 Новый комментарий к вашему объявлению\n\n"
-            f"_{escaped_text}_\n\n"
-            f"🔗 [Посмотреть объявление]({announcement_link})"
+        message_text = COMMENT_NOTIFICATION.format(
+            text=escaped_text,
+            link=announcement_link,
         )
 
         # ✉️ Отправляем уведомление владельцу
