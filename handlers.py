@@ -110,6 +110,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    lang = get_lang(update)
+
     data = query.data
     logger.info(f"🔍 [button_handler] Получен callback_data: {data}")
 
