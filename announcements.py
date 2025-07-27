@@ -21,15 +21,6 @@ from keyboards import (
 from texts import (
     t,
     get_lang,
-    DESCRIPTION_TOO_LONG,
-    PRICE_TOO_LONG,
-    PRICE_REQUEST_TEXT,
-    ERROR_NO_ADS,
-    ERROR_ANNOUNCEMENT_NOT_FOUND_DB,
-    DELETE_MANUALLY_MESSAGE,
-    ERROR_CANNOT_GET_USER_DATA,
-    DRAFT_STATUS,
-    PUBLISHED_STATUS,
 )
 from utils import get_serbia_time, get_private_channel_post_link
 from database import (get_user_announcements,

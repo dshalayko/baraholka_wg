@@ -17,9 +17,6 @@ from keyboards import (
 from texts import (
     t,
     get_lang,
-    SUBSCRIPTION_PROMPT,
-    I_SUBSCRIBED_BUTTON,
-    COMMENT_NOTIFICATION,
 )
 
 

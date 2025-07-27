@@ -233,6 +233,9 @@ TRANSLATIONS = {
     }
 }
 
+# Backwards compatibility constant used by database module
+EDIT_MESSAGE_TEXT_TEMPLATE = TRANSLATIONS["EDIT_MESSAGE_TEXT_TEMPLATE"]["ru"]
+
 def get_lang(obj):
     if obj is None:
         return "en"

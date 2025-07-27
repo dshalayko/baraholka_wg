@@ -7,9 +7,6 @@ from announcements import *
 from texts import (
     t,
     get_lang,
-    ERROR_CANNOT_DETERMINE_ID,
-    ERROR_ANNOUNCEMENT_NOT_FOUND_DB,
-    NOT_SUBSCRIBED_MESSAGE_SHORT,
 )
 import logging
 import aiosqlite
@@ -117,7 +114,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not ann_id:
         logger.error("❌ Ошибка: не удалось определить ID объявления из callback_data.")
-        await query.message.reply_text(ERROR_CANNOT_DETERMINE_ID)
+        await query.message.reply_text(t("ERROR_CANNOT_DETERMINE_ID", lang))
         return CHOOSING
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -125,7 +122,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row = await cursor.fetchone()
         if not row:
             logger.error(f"❌ Ошибка: объявление {ann_id} не найдено в БД.")
-            await query.message.reply_text(ERROR_ANNOUNCEMENT_NOT_FOUND_DB)
+            await query.message.reply_text(t("ERROR_ANNOUNCEMENT_NOT_FOUND_DB", lang))
             return CHOOSING
 
     context.user_data['ann_id'] = ann_id
