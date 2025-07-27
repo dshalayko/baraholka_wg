@@ -3,6 +3,7 @@ import json
 from telegram import InputMediaPhoto
 from logger import logger
 from config import PRIVATE_CHANNEL_ID, DB_PATH
+from texts import EDIT_MESSAGE_TEXT_TEMPLATE
 
 
 # Инициализация базы данных
@@ -99,7 +100,10 @@ async def edit_announcement(ann_id, new_description, new_price, new_photos, cont
                     logger.error(f"Ошибка при удалении сообщения {message_id}: {e}")
 
         # Отправка нового объявления
-        message_text = f"Описание: {new_description}\nЦена: {new_price}\n\nОбновлено"
+        message_text = EDIT_MESSAGE_TEXT_TEMPLATE.format(
+            description=new_description,
+            price=new_price,
+        )
         if new_photos:
             media = [InputMediaPhoto(media=photo_id, caption=message_text if idx == 0 else None) for idx, photo_id in enumerate(new_photos)]
             sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media)

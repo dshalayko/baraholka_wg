@@ -4,25 +4,25 @@ from texts import *
 
 # Основная клавиатура с двумя кнопками: «Добавить объявление» и «Мои объявления»
 reply_keyboard = [
-    ['Новое хрустящее объявление', 'Мои объявления'],
+    [NEW_AD_CHOICE, MY_ADS_CHOICE],
 ]
 markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
 # Клавиатура с одной кнопкой «Добавить объявление»
 add_advertisement_keyboard = ReplyKeyboardMarkup(
-    [['Новое хрустящее объявление']],
+    [[NEW_AD_CHOICE]],
     resize_keyboard=True
 )
 
 # Клавиатура с кнопкой «Вернуться в меню»
 cancel_keyboard = [
-    [KeyboardButton('В главное меню')]
+    [KeyboardButton(MAIN_MENU_BUTTON)]
 ]
 cancel_markup = ReplyKeyboardMarkup(cancel_keyboard, resize_keyboard=True)
 
 # Клавиатура для добавления фотографий
 photo_keyboard = [
-    [KeyboardButton('Объявление без фотографий')],
+    [KeyboardButton(NO_PHOTO_AD)],
 ]
 photo_markup_with_cancel = ReplyKeyboardMarkup(photo_keyboard, resize_keyboard=True)
 

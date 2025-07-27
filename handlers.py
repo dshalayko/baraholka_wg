@@ -3,6 +3,16 @@ from database import (
     has_user_ads,
 )
 from announcements import *
+from texts import (
+    ERROR_CANNOT_DETERMINE_ID,
+    ERROR_ANNOUNCEMENT_NOT_FOUND_DB,
+    EDIT_TEXT_BUTTON,
+    EDIT_PRICE_BUTTON,
+    EDIT_PHOTOS_BUTTON,
+    CANCEL_NOTHING_BUTTON,
+    EDIT_CHOICE_TEXT,
+    NOT_SUBSCRIBED_MESSAGE_SHORT,
+)
 import logging
 import aiosqlite
 from telegram.constants import ParseMode
@@ -104,7 +114,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not ann_id:
         logger.error("❌ Ошибка: не удалось определить ID объявления из callback_data.")
-        await query.message.reply_text("❌ Ошибка: не удалось определить ID объявления.")
+        await query.message.reply_text(ERROR_CANNOT_DETERMINE_ID)
         return CHOOSING
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -112,7 +122,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row = await cursor.fetchone()
         if not row:
             logger.error(f"❌ Ошибка: объявление {ann_id} не найдено в БД.")
-            await query.message.reply_text("❌ Ошибка: объявление не найдено в базе.")
+            await query.message.reply_text(ERROR_ANNOUNCEMENT_NOT_FOUND_DB)
             return CHOOSING
 
     context.user_data['ann_id'] = ann_id
@@ -176,13 +186,13 @@ async def edit_announcement_handler(update: Update, context: ContextTypes.DEFAUL
     logger.info(f"✏️ [edit_announcement_handler] Открыто меню редактирования для объявления ID: {ann_id}")
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📝 Текст обьявления", callback_data=f'editdescription_{ann_id}')],
-        [InlineKeyboardButton("💰 Цену", callback_data=f'editprice_{ann_id}')],
-        [InlineKeyboardButton("🖼️ Фотографии", callback_data=f'editphotos_{ann_id}')],
-        [InlineKeyboardButton("🚫 Ничего не меняем", callback_data=f'cancel_{ann_id}')]
+        [InlineKeyboardButton(EDIT_TEXT_BUTTON, callback_data=f'editdescription_{ann_id}')],
+        [InlineKeyboardButton(EDIT_PRICE_BUTTON, callback_data=f'editprice_{ann_id}')],
+        [InlineKeyboardButton(EDIT_PHOTOS_BUTTON, callback_data=f'editphotos_{ann_id}')],
+        [InlineKeyboardButton(CANCEL_NOTHING_BUTTON, callback_data=f'cancel_{ann_id}')]
     ])
 
-    await query.message.reply_text(f"Что меняем?", reply_markup=keyboard)
+    await query.message.reply_text(EDIT_CHOICE_TEXT, reply_markup=keyboard)
 
     return CHOOSING
 
@@ -205,5 +215,5 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
         return CHOOSING
     else:
         text, keyboard = await check_subscription_message()
-        await query.message.reply_text("Вы еще не подписаны на канал.", reply_markup=keyboard)
+        await query.message.reply_text(NOT_SUBSCRIBED_MESSAGE_SHORT, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION

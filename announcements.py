@@ -14,6 +14,23 @@ from comments_manager import forward_thread_replies
 from config import *
 from logger import logger
 from keyboards import *
+from texts import (
+    DESCRIPTION_TOO_LONG,
+    PRICE_TOO_LONG,
+    PRICE_REQUEST_TEXT,
+    ERROR_NO_ADS,
+    ERROR_ANNOUNCEMENT_NOT_FOUND_DB,
+    DELETE_MANUALLY_MESSAGE,
+    ERROR_CANNOT_GET_USER_DATA,
+    ADD_TO_OLD_PHOTOS,
+    REPLACE_ALL_PHOTOS,
+    SKIP_ADD_PHOTOS,
+    EDIT_BUTTON,
+    PUBLISH_BUTTON,
+    DELETE_BUTTON,
+    DRAFT_STATUS,
+    PUBLISHED_STATUS,
+)
 from utils import get_serbia_time, get_private_channel_post_link
 from database import (get_user_announcements,
                       )
@@ -121,9 +138,9 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return CHOOSING
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Добавить к старым", callback_data=f'addphotos_{ann_id}')],
-        [InlineKeyboardButton("🔄 Заменить все", callback_data=f'replacephotos_{ann_id}')],
-        [InlineKeyboardButton("🚫 Пропустить", callback_data=f'cancel_photo_{ann_id}')]
+        [InlineKeyboardButton(ADD_TO_OLD_PHOTOS, callback_data=f'addphotos_{ann_id}')],
+        [InlineKeyboardButton(REPLACE_ALL_PHOTOS, callback_data=f'replacephotos_{ann_id}')],
+        [InlineKeyboardButton(SKIP_ADD_PHOTOS, callback_data=f'cancel_photo_{ann_id}')]
     ])
 
     message_text = HAS_PHOTOS
@@ -222,7 +239,7 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not ann_id:
         logger.error("❌ [description_received] Ошибка: ID объявления не найден.")
-        await update.message.reply_text("Ошибка: ID объявления не найден.")
+        await update.message.reply_text(NO_ANN_ID_MESSAGE_ERROR)
         return CHOOSING
 
     description = update.message.text.strip()
@@ -230,7 +247,9 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
     # 🔍 Проверяем длину описания
     if len(description) > 800:
         logger.warning(f"⚠️ [description_received] Введённое описание слишком длинное ({len(description)} символов), ID объявления: {ann_id}")
-        await update.message.reply_text(f"❗ Описание слишком длинное. Максимум 800 символа. Сейчас: {len(description)} символов.\nПожалуйста, укоротите текст.")
+        await update.message.reply_text(
+            DESCRIPTION_TOO_LONG.format(length=len(description))
+        )
         return EDIT_DESCRIPTION
 
     logger.info(f"✏️ [description_received] Введено новое описание: {description}, ID объявления: {ann_id}")
@@ -244,7 +263,7 @@ async def description_received(update: Update, context: ContextTypes.DEFAULT_TYP
         await send_preview(update, context, editing=True)
         return CHOOSING
 
-    await update.message.reply_text('Принято! Теперь укажите цену.')
+    await update.message.reply_text(PRICE_REQUEST_TEXT)
     return EDIT_PRICE
 
 async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -254,14 +273,16 @@ async def price_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not ann_id:
         logger.error("❌ [price_received] Ошибка: ID объявления не найден.")
-        await update.message.reply_text("Ошибка: ID объявления не найден.")
+        await update.message.reply_text(NO_ANN_ID_MESSAGE_ERROR)
         return CHOOSING
 
     price = update.message.text.strip()
 
     if len(price) > 130:
         logger.warning(f"⚠️ [price_received] Введённая цена слишком длинная ({len(price)} символов), ID объявления: {ann_id}")
-        await update.message.reply_text(f"❗ Цена слишком длинная. Максимум 130 символа. Сейчас: {len(price)} символов.\nПожалуйста, укоротите текст.")
+        await update.message.reply_text(
+            PRICE_TOO_LONG.format(length=len(price))
+        )
         return EDIT_PRICE
 
     logger.info(f"💰 [price_received] Введена новая цена: {price}, ID объявления: {ann_id}")
@@ -295,7 +316,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
                 logger.info(f"✅ [send_preview] Найден последний ann_id в БД: {ann_id}")
             else:
                 logger.error("❌ [send_preview] Ошибка: не найдено ни одного объявления в БД.")
-                await update.message.reply_text("Ошибка: Не найдено ни одного объявления.")
+                await update.message.reply_text(ERROR_NO_ADS)
                 return CHOOSING
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -306,7 +327,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
         if not row:
             logger.error(f"❌ [send_preview] Ошибка: объявление {ann_id} не найдено в базе.")
-            await update.message.reply_text("❌ Ошибка: объявление не найдено в базе.")
+            await update.message.reply_text(ERROR_ANNOUNCEMENT_NOT_FOUND_DB)
             return CHOOSING
 
         description, price, username, photo_file_ids, message_ids_json, timestamp = row
@@ -325,8 +346,8 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
     )
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✏️ Редактировать", callback_data=f'edit_{ann_id}')],
-        [InlineKeyboardButton("📢 Опубликовать", callback_data=f'post_{ann_id}')]
+        [InlineKeyboardButton(EDIT_BUTTON, callback_data=f'edit_{ann_id}')],
+        [InlineKeyboardButton(PUBLISH_BUTTON, callback_data=f'post_{ann_id}')]
     ])
 
     logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: edit_{ann_id}, post_{ann_id}")
@@ -448,11 +469,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
                 # Отправляем сообщение админам, чтобы они удалили вручную
                 await context.bot.send_message(
                     chat_id=SLONSKI_ID,
-                    text=(
-                        "Не удалось удалить сообщение боту:\n"
-                        f"Ссылка: {msg_link}\n"
-                        "Пожалуйста, удалите вручную."
-                    )
+                    text=DELETE_MANUALLY_MESSAGE.format(link=msg_link),
                 )
 
     return get_private_channel_post_link(PRIVATE_CHANNEL_ID, new_message_ids[0])
@@ -476,11 +493,7 @@ async def delete_announcement_by_id(ann_id, context, query, is_editing=False):
                     # Отправляем сообщение админам, чтобы они удалили вручную
                     await context.bot.send_message(
                         chat_id=SLONSKI_ID,
-                        text=(
-                            "Не удалось удалить сообщение боту:\n"
-                            f"Ссылка: {msg_link}\n"
-                            "Пожалуйста, удалите вручную."
-                        )
+                        text=DELETE_MANUALLY_MESSAGE.format(link=msg_link),
                     )
 
         if not is_editing:
@@ -527,15 +540,19 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         message_ids = json.loads(message_ids_json) if message_ids_json else []
         photos = json.loads(photo_file_ids_json) if photo_file_ids_json else []
 
-        status = "📝 _Черновик_\n" if not message_ids else f"[Опубликовано 📌]({get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])})\n"
+        status = (
+            DRAFT_STATUS if not message_ids else PUBLISHED_STATUS.format(
+                get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
+            )
+        )
         description = escape_markdown(description, version=2)
         price = escape_markdown(price, version=2)
         message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n\n{status}"
 
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("✏️ Редактировать", callback_data=f'edit_{ann_id}'),
-                InlineKeyboardButton("❌ Удалить", callback_data=f'delete_{ann_id}')
+                InlineKeyboardButton(EDIT_BUTTON, callback_data=f'edit_{ann_id}'),
+                InlineKeyboardButton(DELETE_BUTTON, callback_data=f'delete_{ann_id}')
             ]
         ])
 
@@ -581,7 +598,7 @@ async def format_announcement_text(update: Update, description, price, username,
 
         if not user:
             logger.error("❌ [format_announcement_text] Ошибка: не удалось получить данные пользователя.")
-            return "❌ Ошибка: не удалось получить данные пользователя."
+            return ERROR_CANNOT_GET_USER_DATA
 
         first_name = user.first_name if user.first_name else "Аноним"
         last_name = user.last_name if user.last_name else ""
