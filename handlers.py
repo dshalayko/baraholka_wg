@@ -11,6 +11,13 @@ from texts import (
 import logging
 import aiosqlite
 from telegram.constants import ParseMode
+from telegram import (
+    Update,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    ReplyKeyboardRemove,
+)
+from telegram.ext import ContextTypes
 
 from logger import logger
 

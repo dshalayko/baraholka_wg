@@ -5,7 +5,13 @@ import aiosqlite
 from datetime import datetime
 
 import telegram
-from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove
+from telegram import (
+    Update,
+    InputMediaPhoto,
+    ReplyKeyboardRemove,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 from telegram.ext import ContextTypes
 from telegram.helpers import escape_markdown
 from telegram.constants import ParseMode
