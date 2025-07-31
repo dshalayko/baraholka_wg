@@ -1,6 +1,6 @@
 import aiosqlite
 from telegram.ext import ContextTypes
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram import Update
 from telegram.helpers import escape_markdown
 from telegram.constants import ParseMode
 from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
@@ -10,7 +10,11 @@ from datetime import datetime
 import pytz
 
 from database import has_user_ads
-from keyboards import markup, add_advertisement_keyboard
+from keyboards import (
+    markup,
+    add_advertisement_keyboard,
+    get_subscription_keyboard,
+)
 from texts import (
     CHOOSE_ACTION_NEW,
     SUBSCRIPTION_PROMPT,
@@ -59,9 +63,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def check_subscription_message():
     text = SUBSCRIPTION_PROMPT
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(I_SUBSCRIBED_BUTTON, callback_data='check_subscription')]
-    ])
+    keyboard = get_subscription_keyboard()
     return text, keyboard
 
 def get_serbia_time():

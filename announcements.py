@@ -137,11 +137,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_preview(update, context, editing=is_editing)
             return CHOOSING
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(ADD_TO_OLD_PHOTOS, callback_data=f'addphotos_{ann_id}')],
-        [InlineKeyboardButton(REPLACE_ALL_PHOTOS, callback_data=f'replacephotos_{ann_id}')],
-        [InlineKeyboardButton(SKIP_ADD_PHOTOS, callback_data=f'cancel_photo_{ann_id}')]
-    ])
+    keyboard = get_photo_action_keyboard(ann_id)
 
     message_text = HAS_PHOTOS
 
@@ -345,10 +341,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         is_updated=is_updated, message_ids=message_ids, timestamp=timestamp
     )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(EDIT_BUTTON, callback_data=f'edit_{ann_id}')],
-        [InlineKeyboardButton(PUBLISH_BUTTON, callback_data=f'post_{ann_id}')]
-    ])
+    keyboard = get_preview_keyboard(ann_id)
 
     logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: edit_{ann_id}, post_{ann_id}")
     if photos:
@@ -549,12 +542,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         price = escape_markdown(price, version=2)
         message = f"{ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n\n{status}"
 
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(EDIT_BUTTON, callback_data=f'edit_{ann_id}'),
-                InlineKeyboardButton(DELETE_BUTTON, callback_data=f'delete_{ann_id}')
-            ]
-        ])
+        keyboard = get_edit_delete_keyboard(ann_id)
 
         logger.info(f"📩 [show_user_announcements] Отправка объявления ID: {ann_id} с кнопками: edit_{ann_id}, delete_{ann_id}")
 
