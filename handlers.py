@@ -3,6 +3,7 @@ from database import (
     has_user_ads,
 )
 from announcements import *
+from keyboards import get_edit_menu_keyboard
 from texts import (
     ERROR_CANNOT_DETERMINE_ID,
     ERROR_ANNOUNCEMENT_NOT_FOUND_DB,
@@ -185,12 +186,7 @@ async def edit_announcement_handler(update: Update, context: ContextTypes.DEFAUL
 
     logger.info(f"✏️ [edit_announcement_handler] Открыто меню редактирования для объявления ID: {ann_id}")
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(EDIT_TEXT_BUTTON, callback_data=f'editdescription_{ann_id}')],
-        [InlineKeyboardButton(EDIT_PRICE_BUTTON, callback_data=f'editprice_{ann_id}')],
-        [InlineKeyboardButton(EDIT_PHOTOS_BUTTON, callback_data=f'editphotos_{ann_id}')],
-        [InlineKeyboardButton(CANCEL_NOTHING_BUTTON, callback_data=f'cancel_{ann_id}')]
-    ])
+    keyboard = get_edit_menu_keyboard(ann_id)
 
     await query.message.reply_text(EDIT_CHOICE_TEXT, reply_markup=keyboard)
 
