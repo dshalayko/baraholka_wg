@@ -71,20 +71,129 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
 
                 if comment.text:
                     formatted_text = f"**{full_name}**\n{comment.text}"
-                    await app.send_message(chat_id=chat_id, text=formatted_text, reply_to_message_id=new_message_id)
+                    await app.send_message(
+                        chat_id=chat_id,
+                        text=formatted_text,
+                        reply_to_message_id=new_message_id,
+                    )
                     logger.info(f"📩 Отправлен текстовый комментарий ID {comment.id}")
 
                 elif comment.photo:
                     caption = f"**{full_name}**\n{comment.caption or ''}".strip()
-                    await app.send_photo(chat_id=chat_id, photo=comment.photo.file_id, caption=caption, reply_to_message_id=new_message_id)
+                    await app.send_photo(
+                        chat_id=chat_id,
+                        photo=comment.photo.file_id,
+                        caption=caption,
+                        reply_to_message_id=new_message_id,
+                    )
                     logger.info(f"📸 Отправлена фотография ID {comment.id}")
 
                 elif comment.sticker:
-                    await app.send_sticker(chat_id=chat_id, sticker=comment.sticker.file_id, reply_to_message_id=new_message_id)
+                    await app.send_sticker(
+                        chat_id=chat_id,
+                        sticker=comment.sticker.file_id,
+                        reply_to_message_id=new_message_id,
+                    )
                     logger.info(f"🎨 Отправлен стикер ID {comment.id}")
 
+                elif comment.animation:
+                    caption = f"**{full_name}**\n{comment.caption or ''}".strip()
+                    await app.send_animation(
+                        chat_id=chat_id,
+                        animation=comment.animation.file_id,
+                        caption=caption,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"🎞️ Отправлена анимация ID {comment.id}")
+
+                elif comment.video:
+                    caption = f"**{full_name}**\n{comment.caption or ''}".strip()
+                    await app.send_video(
+                        chat_id=chat_id,
+                        video=comment.video.file_id,
+                        caption=caption,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"🎬 Отправлено видео ID {comment.id}")
+
+                elif comment.document:
+                    caption = f"**{full_name}**\n{comment.caption or ''}".strip()
+                    await app.send_document(
+                        chat_id=chat_id,
+                        document=comment.document.file_id,
+                        caption=caption,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"📄 Отправлен документ ID {comment.id}")
+
+                elif comment.audio:
+                    caption = f"**{full_name}**\n{comment.caption or ''}".strip()
+                    await app.send_audio(
+                        chat_id=chat_id,
+                        audio=comment.audio.file_id,
+                        caption=caption,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"🎵 Отправлен аудиофайл ID {comment.id}")
+
+                elif comment.voice:
+                    caption = f"**{full_name}**\n{comment.caption or ''}".strip()
+                    voice_caption = caption if caption != f"**{full_name}**" else None
+                    await app.send_voice(
+                        chat_id=chat_id,
+                        voice=comment.voice.file_id,
+                        caption=voice_caption,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"🎤 Отправлено голосовое сообщение ID {comment.id}")
+
+                elif comment.video_note:
+                    await app.send_video_note(
+                        chat_id=chat_id,
+                        video_note=comment.video_note.file_id,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"📹 Отправлено видео сообщение ID {comment.id}")
+
+                elif comment.location:
+                    await app.send_location(
+                        chat_id=chat_id,
+                        latitude=comment.location.latitude,
+                        longitude=comment.location.longitude,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"📍 Отправлена локация ID {comment.id}")
+
+                elif comment.venue:
+                    await app.send_venue(
+                        chat_id=chat_id,
+                        latitude=comment.venue.location.latitude,
+                        longitude=comment.venue.location.longitude,
+                        title=comment.venue.title,
+                        address=comment.venue.address,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"🏢 Отправлена информация о месте ID {comment.id}")
+
+                elif comment.contact:
+                    await app.send_contact(
+                        chat_id=chat_id,
+                        phone_number=comment.contact.phone_number,
+                        first_name=comment.contact.first_name,
+                        last_name=comment.contact.last_name or '',
+                        vcard=comment.contact.vcard or None,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"👤 Отправлен контакт ID {comment.id}")
+
                 else:
-                    logger.warning(f"⚠️ Неизвестный тип медиа в сообщении ID {comment.id}")
+                    await app.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=chat_id,
+                        message_id=comment.id,
+                        reply_to_message_id=new_message_id,
+                    )
+                    logger.info(f"🔄 Скопировано сообщение ID {comment.id}")
 
             except Exception as e:
                 logger.error(f"❌ [forward_thread_replies] Ошибка при отправке комментария ID {comment.id}: {e}")
