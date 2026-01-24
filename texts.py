@@ -35,3 +35,39 @@ HAS_PHOTOS = "📸 У вас уже есть загруженные фото. Х
 
 NO_ANN_ID_MESSAGE_ERROR = "Ошибка: ID объявления не найден."
 
+SUBSCRIBE_PROMPT = "Пожалуйста, подпишитесь на наш канал, чтобы продолжить."
+SUBSCRIBE_BUTTON = "Я подписался"
+MAIN_MENU_BUTTON = "В главное меню"
+
+LANG_MESSAGE = "Язык клиента: {language_code}"
+LANG_UNKNOWN = "Не удалось определить язык клиента."
+
+ERROR_ANN_ID_NOT_FOUND = "❌ Ошибка: ID объявления не найден."
+ERROR_ANNOUNCEMENT_NOT_FOUND = "❌ Ошибка: объявление не найдено в базе."
+ERROR_NO_ANNOUNCEMENTS = "Ошибка: Не найдено ни одного объявления."
+ERROR_USER_DATA_NOT_FOUND = "❌ Ошибка: не удалось получить данные пользователя."
+
+EDIT_MENU_TITLE = "Что меняем?"
+EDIT_DESCRIPTION_BUTTON = "📝 Текст объявления"
+EDIT_PRICE_BUTTON = "💰 Цену"
+EDIT_PHOTOS_BUTTON = "🖼️ Фотографии"
+EDIT_CANCEL_BUTTON = "🚫 Ничего не меняем"
+
+ASK_PHOTO_ACTION_ADD = "➕ Добавить к старым"
+ASK_PHOTO_ACTION_REPLACE = "🔄 Заменить все"
+ASK_PHOTO_ACTION_SKIP = "🚫 Пропустить"
+
+PREVIEW_EDIT_BUTTON = "✏️ Редактировать"
+PREVIEW_PUBLISH_BUTTON = "📢 Опубликовать"
+DELETE_BUTTON = "❌ Удалить"
+
+DRAFT_STATUS = "📝 _Черновик_\n"
+PUBLISHED_STATUS = "[Опубликовано 📌]({link})\n"
+
+DESCRIPTION_TOO_LONG = "❗ Описание слишком длинное. Максимум 800 символа. Сейчас: {length} символов.\nПожалуйста, укоротите текст."
+PRICE_TOO_LONG = "❗ Цена слишком длинная. Максимум 130 символа. Сейчас: {length} символов.\nПожалуйста, укоротите текст."
+ACCEPTED_PRICE_PROMPT = "Принято! Теперь укажите цену."
+
+NOT_SUBSCRIBED_SHORT = "Вы еще не подписаны на канал."
+
+ANONYMOUS_NAME = "Аноним"

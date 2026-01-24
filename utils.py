@@ -3,14 +3,15 @@ from telegram.ext import ContextTypes
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 
+import texts as texts_ru
+import texts_en
 from logger import logger
 from datetime import datetime
 import pytz
 import re
 
 from database import has_user_ads
-from keyboards import markup, add_advertisement_keyboard
-from texts import CHOOSE_ACTION_NEW
+from keyboards import get_main_markup, get_add_advertisement_keyboard
 
 
 async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
@@ -21,40 +22,58 @@ async def is_subscribed(user_id, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Ошибка при проверке подписки: {e}")
         return False
 
+def get_texts_by_language_code(language_code: str | None):
+    if language_code and not language_code.lower().startswith("ru"):
+        return texts_en
+    return texts_ru
+
+def get_texts(update: Update):
+    language_code = get_user_language_code(update)
+    return get_texts_by_language_code(language_code)
+
+def get_user_language_code(update: Update) -> str | None:
+    user = update.effective_user
+    if user and user.language_code:
+        return user.language_code
+    return None
+
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     has_ads = await has_user_ads(user_id)
+    texts = get_texts(update)
+    language_code = get_user_language_code(update)
 
     if update.message:
         # Responding to a regular message
         if has_ads:
             await update.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=markup  # Two buttons
+                texts.CHOOSE_ACTION_NEW,
+                reply_markup=get_main_markup(language_code)  # Two buttons
             )
         else:
             await update.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=add_advertisement_keyboard  # Single button
+                texts.CHOOSE_ACTION_NEW,
+                reply_markup=get_add_advertisement_keyboard(language_code)  # Single button
             )
     elif update.callback_query:
         # Responding to a callback query
         if has_ads:
             await update.callback_query.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=markup  # Two buttons
+                texts.CHOOSE_ACTION_NEW,
+                reply_markup=get_main_markup(language_code)  # Two buttons
             )
         else:
             await update.callback_query.message.reply_text(
-                CHOOSE_ACTION_NEW,
-                reply_markup=add_advertisement_keyboard  # Single button
+                texts.CHOOSE_ACTION_NEW,
+                reply_markup=get_add_advertisement_keyboard(language_code)  # Single button
             )
 
-async def check_subscription_message():
-    text = 'Пожалуйста, подпишитесь на наш канал, чтобы продолжить.'
+async def check_subscription_message(update: Update):
+    texts = get_texts(update)
+    text = texts.SUBSCRIBE_PROMPT
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton('Я подписался', callback_data='check_subscription')]
+        [InlineKeyboardButton(texts.SUBSCRIBE_BUTTON, callback_data='check_subscription')]
     ])
     return text, keyboard
 
@@ -132,7 +151,8 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
 
 def escape_markdown_custom(text: str) -> str:
     special_chars = r'[*\-~`_\[\]\(\)]'
-    text = re.sub(f'([{special_chars}])', r'\\\1', text)
+    pattern = r'([*\-~`_\[\]\(\)])'
+    text = re.sub(pattern, r'\\\1', text)
 
     def check_unclosed_tags(symbol: str, text: str) -> str:
         if text.count(symbol) % 2 != 0:

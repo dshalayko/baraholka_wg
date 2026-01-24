@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 from handlers import (
     start, handle_choice, button_handler,
-    cancel, error_handler,
+    cancel, error_handler, lang,
     check_subscription_callback, edit_announcement_handler, ask_photo_action
 )
 from announcements import (
@@ -68,6 +68,7 @@ async def main():
     register_comment_handlers(app)
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("lang", lang))
     app.add_handler(CommandHandler('my_ads', show_user_announcements))
 
     # Добавляем ConversationHandler
