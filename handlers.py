@@ -1,4 +1,8 @@
-from utils import is_subscribed, show_menu, check_subscription_message
+import texts as texts_ru
+import texts_en
+
+from keyboards import get_main_markup, get_add_advertisement_keyboard
+from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts
 from database import (
     has_user_ads,
 )
@@ -14,16 +18,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает команду /start, отправляет приветственное сообщение и удаляет команду пользователя."""
     user_id = update.message.from_user.id
     start_message_id = update.message.message_id
+    texts = get_texts(update)
+    language_code = get_user_language_code(update)
 
     if not await is_subscribed(user_id, context):
-        text, keyboard = await check_subscription_message()
+        text, keyboard = await check_subscription_message(update)
         await update.message.reply_text(text, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
 
     if await has_user_ads(user_id):
-        welcome_message = await update.message.reply_text(WELCOME_NEW_USER, reply_markup=markup)
+        welcome_message = await update.message.reply_text(
+            texts.WELCOME_NEW_USER,
+            reply_markup=get_main_markup(language_code)
+        )
     else:
-        welcome_message = await update.message.reply_text(WELCOME_NEW_USER, reply_markup=add_advertisement_keyboard)
+        welcome_message = await update.message.reply_text(
+            texts.WELCOME_NEW_USER,
+            reply_markup=get_add_advertisement_keyboard(language_code)
+        )
 
     context.user_data["welcome_message_id"] = welcome_message.message_id
     logger.info(f"✅ [start] Сохранен message_id приветствия: {welcome_message.message_id}")
@@ -36,17 +48,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return CHOOSING
 
+async def lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    language_code = get_user_language_code(update)
+    texts = get_texts(update)
+    if language_code:
+        await update.message.reply_text(texts.LANG_MESSAGE.format(language_code=language_code))
+    else:
+        await update.message.reply_text(texts.LANG_UNKNOWN)
+
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
+    texts = get_texts(update)
     if await is_subscribed(user_id, context):
-        await query.message.reply_text(SUBSCRIPTION_SUCCESS)
-        await show_menu(query, context)
+        await query.message.reply_text(texts.SUBSCRIPTION_SUCCESS)
+        await show_menu(update, context)
         return CHOOSING
     else:
-        text, keyboard = await check_subscription_message()
-        await query.message.reply_text(NOT_SUBSCRIBED_YET, reply_markup=keyboard)
+        text, keyboard = await check_subscription_message(update)
+        await query.message.reply_text(texts.NOT_SUBSCRIBED_YET, reply_markup=keyboard)
         return
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,20 +98,26 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except telegram.error.BadRequest:
             logger.warning(f"⚠️ [handle_choice] Не удалось удалить WELCOME_NEW_USER (message_id={bot_message_id})")
 
-    if choice == NEW_AD_CHOICE:
+    if choice in (texts_ru.NEW_AD_CHOICE, texts_en.NEW_AD_CHOICE):
         context.user_data.clear()
         return await create_announcement(update, context)
 
-    elif choice == MY_ADS_CHOICE:
+    elif choice in (texts_ru.MY_ADS_CHOICE, texts_en.MY_ADS_CHOICE):
         return await show_user_announcements(update, context)
 
     else:
-        await update.effective_chat.send_message(CHOOSE_ACTION, reply_markup=markup)
+        texts = get_texts(update)
+        language_code = get_user_language_code(update)
+        await update.effective_chat.send_message(
+            texts.CHOOSE_ACTION,
+            reply_markup=get_main_markup(language_code)
+        )
         return CHOOSING
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    texts = get_texts(update)
 
     data = query.data
     logger.info(f"🔍 [button_handler] Получен callback_data: {data}")
@@ -103,7 +130,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not ann_id:
         logger.error("❌ Ошибка: не удалось определить ID объявления из callback_data.")
-        await query.message.reply_text("❌ Ошибка: не удалось определить ID объявления.")
+        await query.message.reply_text(texts.ERROR_ANN_ID_NOT_FOUND)
         return CHOOSING
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -111,7 +138,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row = await cursor.fetchone()
         if not row:
             logger.error(f"❌ Ошибка: объявление {ann_id} не найдено в БД.")
-            await query.message.reply_text("❌ Ошибка: объявление не найдено в базе.")
+            await query.message.reply_text(texts.ERROR_ANNOUNCEMENT_NOT_FOUND)
             return CHOOSING
 
     context.user_data['ann_id'] = ann_id
@@ -126,12 +153,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == 'editdescription':
         logger.info(f"✏️ Вызов функции: description_received(), ID объявления: {ann_id}")
-        await query.message.reply_text(EDIT_DESCRIPTION_PROMPT, reply_markup=ReplyKeyboardRemove())
+        await query.message.reply_text(texts.EDIT_DESCRIPTION_PROMPT, reply_markup=ReplyKeyboardRemove())
         return EDIT_DESCRIPTION
 
     elif action == 'editprice':
         logger.info(f"💰 Вызов функции: price_received(), ID объявления: {ann_id}")
-        await query.message.reply_text(EDIT_PRICE_PROMPT, reply_markup=ReplyKeyboardRemove())
+        await query.message.reply_text(texts.EDIT_PRICE_PROMPT, reply_markup=ReplyKeyboardRemove())
         return EDIT_PRICE
 
     elif action == 'editphotos':
@@ -155,16 +182,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         post_link = await publish_announcement(update, context, ann_id)
 
         if post_link:
-            await query.message.reply_text(POST_SUCCESS_MESSAGE.format(post_link), reply_markup=markup,
+            await query.message.reply_text(
+                texts.POST_SUCCESS_MESSAGE.format(post_link),
+                reply_markup=get_main_markup(get_user_language_code(update)),
                                            parse_mode='Markdown')
         else:
-            await query.message.reply_text(POST_FAILURE_MESSAGE, reply_markup=markup)
+            await query.message.reply_text(
+                texts.POST_FAILURE_MESSAGE,
+                reply_markup=get_main_markup(get_user_language_code(update))
+            )
 
         return CHOOSING
 
 async def edit_announcement_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    texts = get_texts(update)
 
     ann_id = int(query.data.split("_")[1])
     context.user_data["ann_id"] = ann_id
@@ -172,19 +205,23 @@ async def edit_announcement_handler(update: Update, context: ContextTypes.DEFAUL
     logger.info(f"✏️ [edit_announcement_handler] Открыто меню редактирования для объявления ID: {ann_id}")
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📝 Текст обьявления", callback_data=f'editdescription_{ann_id}')],
-        [InlineKeyboardButton("💰 Цену", callback_data=f'editprice_{ann_id}')],
-        [InlineKeyboardButton("🖼️ Фотографии", callback_data=f'editphotos_{ann_id}')],
-        [InlineKeyboardButton("🚫 Ничего не меняем", callback_data=f'cancel_{ann_id}')]
+        [InlineKeyboardButton(texts.EDIT_DESCRIPTION_BUTTON, callback_data=f'editdescription_{ann_id}')],
+        [InlineKeyboardButton(texts.EDIT_PRICE_BUTTON, callback_data=f'editprice_{ann_id}')],
+        [InlineKeyboardButton(texts.EDIT_PHOTOS_BUTTON, callback_data=f'editphotos_{ann_id}')],
+        [InlineKeyboardButton(texts.EDIT_CANCEL_BUTTON, callback_data=f'cancel_{ann_id}')]
     ])
 
-    await query.message.reply_text(f"Что меняем?", reply_markup=keyboard)
+    await query.message.reply_text(texts.EDIT_MENU_TITLE, reply_markup=keyboard)
 
     return CHOOSING
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text(CANCEL_MESSAGE, reply_markup=markup)
+    texts = get_texts(update)
+    await update.message.reply_text(
+        texts.CANCEL_MESSAGE,
+        reply_markup=get_main_markup(get_user_language_code(update))
+    )
     return CHOOSING
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -194,12 +231,13 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+    texts = get_texts(update)
 
     if await is_subscribed(user_id, context):
-        await query.message.reply_text(SUBSCRIPTION_SUCCESS)
+        await query.message.reply_text(texts.SUBSCRIPTION_SUCCESS)
         await show_menu(update, context)
         return CHOOSING
     else:
-        text, keyboard = await check_subscription_message()
-        await query.message.reply_text("Вы еще не подписаны на канал.", reply_markup=keyboard)
+        text, keyboard = await check_subscription_message(update)
+        await query.message.reply_text(texts.NOT_SUBSCRIBED_SHORT, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
