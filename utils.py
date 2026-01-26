@@ -132,16 +132,18 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
             return
 
         announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
+        safe_text = escape_markdown_v2(text)
+        safe_link = escape_markdown_v2_url(announcement_link)
 
         # 📩 Формируем сообщение
-        message_text = f"💬 Новый комментарий к вашему объявлению\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
+        message_text = f"💬 Новый комментарий к вашему объявлению\n\n_{safe_text}_\n\n🔗 [Посмотреть объявление]({safe_link})"
 
         # ✉️ Отправляем уведомление владельцу
         logger.info(f"📨 [notify_owner_about_comment] Отправляем уведомление владельцу {owner_id}...")
         await context.bot.send_message(
             chat_id=owner_id,
             text=message_text,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             disable_web_page_preview=True
         )
         logger.info(f"✅ [notify_owner_about_comment] Уведомление успешно отправлено владельцу {owner_id}.")
@@ -163,3 +165,15 @@ def escape_markdown_custom(text: str) -> str:
         text = check_unclosed_tags(symbol, text)
 
     return text
+
+def escape_markdown_v2(text: str) -> str:
+    if text is None:
+        return ""
+    text = text.replace("\\", "\\\\")
+    return re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+
+def escape_markdown_v2_url(text: str) -> str:
+    if text is None:
+        return ""
+    text = text.replace("\\", "\\\\")
+    return re.sub(r'([()])', r'\\\1', text)

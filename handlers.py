@@ -6,7 +6,7 @@ import texts_en
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from keyboards import get_main_markup, get_add_advertisement_keyboard
-from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts
+from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts, escape_markdown_v2_url
 from database import (
     has_user_ads,
 )
@@ -199,13 +199,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if post_link:
             await query.message.reply_text(
-                texts.POST_SUCCESS_MESSAGE.format(post_link),
+                texts.POST_SUCCESS_MESSAGE.format(link=escape_markdown_v2_url(post_link)),
                 reply_markup=get_main_markup(get_user_language_code(update)),
-                                           parse_mode='Markdown')
+                                           parse_mode='MarkdownV2')
         else:
             await query.message.reply_text(
                 texts.POST_FAILURE_MESSAGE,
-                reply_markup=get_main_markup(get_user_language_code(update))
+                reply_markup=get_main_markup(get_user_language_code(update)),
+                parse_mode='MarkdownV2'
             )
 
         return CHOOSING

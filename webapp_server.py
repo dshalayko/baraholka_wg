@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import io
@@ -15,11 +16,13 @@ import mimetypes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from telegram import Bot, InputFile, InputMediaPhoto
+from telegram.error import NetworkError, RetryAfter, TimedOut
+from telegram.request import HTTPXRequest
 
 import texts as texts_ru
 from comments_manager import forward_thread_replies
 from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
-from utils import escape_markdown_custom, get_private_channel_post_link, get_serbia_time
+from utils import escape_markdown_v2, escape_markdown_v2_url, get_private_channel_post_link, get_serbia_time
 
 
 load_dotenv()
@@ -28,6 +31,12 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=LOG_LEVEL, format="%(levelname)s: %(message)s")
 
 WEBAPP_DIR = os.path.join(os.path.dirname(__file__), "webapp")
+FAVICON_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>"
+    "<rect width='64' height='64' rx='14' fill='#1a1f2b'/>"
+    "<circle cx='32' cy='32' r='18' fill='#3f8cff'/>"
+    "</svg>"
+)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MEDIA_STORAGE_CHAT_ID = os.getenv("MEDIA_STORAGE_CHAT_ID")
 
@@ -36,7 +45,8 @@ logger = logging.getLogger("webapp")
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set")
 
-bot = Bot(BOT_TOKEN)
+request = HTTPXRequest(connect_timeout=20.0, read_timeout=60.0, write_timeout=60.0, pool_timeout=20.0)
+bot = Bot(BOT_TOKEN, request=request)
 
 
 class AnnouncementIn(BaseModel):
@@ -108,21 +118,21 @@ def _format_announcement_text(
     user_display: Optional[str],
     is_updated: bool,
 ) -> str:
-    description = escape_markdown_custom(description)
-    price = escape_markdown_custom(price)
+    description = escape_markdown_v2(description)
+    price = escape_markdown_v2(price)
 
     if username != "None":
-        contact_info = f"{texts_ru.CONTACT_TEXT}\n@{username.replace('_', '\\_')}"
+        contact_info = f"{texts_ru.CONTACT_TEXT}\n@{escape_markdown_v2(username)}"
     else:
         display = user_display or texts_ru.ANONYMOUS_NAME
-        contact_info = f"{texts_ru.CONTACT_TEXT}\n{display.replace('_', '\\_')}"
+        contact_info = f"{texts_ru.CONTACT_TEXT}\n{escape_markdown_v2(display)}"
     message = f"{description}\n\n"
     message += f"{texts_ru.PRICE_TEXT}\n{price}\n\n"
     message += contact_info
 
     if is_updated:
         current_time = get_serbia_time()
-        message += f"\n\n{texts_ru.UPDATED_TEXT.format(current_time=current_time)}"
+        message += f"\n\n{texts_ru.UPDATED_TEXT.format(current_time=escape_markdown_v2(current_time))}"
 
     return message
 
@@ -148,6 +158,11 @@ async def _startup() -> None:
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(os.path.join(WEBAPP_DIR, "index.html"))
+
+
+@app.get("/favicon.ico")
+async def favicon() -> Response:
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
 async def _ensure_db() -> None:
@@ -340,7 +355,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(_get_
 
     if photos:
         media = [
-            InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="Markdown")
+            InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="MarkdownV2")
             for idx, photo_id in enumerate(photos)
         ]
         sent_messages = await bot.send_media_group(
@@ -351,7 +366,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(_get_
         sent_message = await bot.send_message(
             chat_id=private_channel_id,
             text=message,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             disable_notification=is_editing,
         )
         new_message_ids = [sent_message.message_id]
@@ -410,10 +425,24 @@ async def upload_files(
     for upload in files:
         data = await upload.read()
         filename = upload.filename or "photo.jpg"
-        message = await bot.send_photo(
-            chat_id=storage_chat_id,
-            photo=InputFile(io.BytesIO(data), filename=filename),
-        )
+        message = None
+        last_error: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                message = await bot.send_photo(
+                    chat_id=storage_chat_id,
+                    photo=InputFile(io.BytesIO(data), filename=filename),
+                )
+                last_error = None
+                break
+            except RetryAfter as exc:
+                last_error = exc
+                await asyncio.sleep(min(exc.retry_after + 1, 10))
+            except (TimedOut, NetworkError) as exc:
+                last_error = exc
+                await asyncio.sleep(1 + attempt)
+        if last_error is not None:
+            raise HTTPException(status_code=504, detail=f"Upload timeout: {last_error}")
         if not message.photo:
             raise HTTPException(status_code=400, detail="Failed to upload photo")
         file_id = message.photo[-1].file_id

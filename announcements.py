@@ -7,7 +7,6 @@ from datetime import datetime
 import telegram
 from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from telegram.helpers import escape_markdown
 
 import texts as texts_ru
 import texts_en
@@ -22,7 +21,8 @@ from keyboards import (
 from utils import (
     get_serbia_time,
     get_private_channel_post_link,
-    escape_markdown_custom,
+    escape_markdown_v2,
+    escape_markdown_v2_url,
     get_texts,
     get_user_language_code,
 )
@@ -89,12 +89,12 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             query.message.reply_text(
                 texts.ASK_FOR_PHOTOS,
                 reply_markup=get_photo_markup_with_cancel(language_code),
-                parse_mode='Markdown'
+                parse_mode='MarkdownV2'
             )
             if query else message.reply_text(
                 texts.ASK_FOR_PHOTOS,
                 reply_markup=get_photo_markup_with_cancel(language_code),
-                parse_mode='Markdown'
+                parse_mode='MarkdownV2'
             )
         )
         return ADDING_PHOTOS
@@ -148,7 +148,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = texts.HAS_PHOTOS
 
     # Отправляем сообщение с кнопками
-    sent_message = await (query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown') if query else message.reply_text(message_text, reply_markup=keyboard, parse_mode='Markdown'))
+    sent_message = await (query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='MarkdownV2') if query else message.reply_text(message_text, reply_markup=keyboard, parse_mode='MarkdownV2'))
 
     # Сохраняем ID отправленного сообщения с кнопками в контексте
     context.user_data['photo_action_message_id'] = sent_message.message_id
@@ -358,19 +358,19 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
 
     logger.info(f"📩 [send_preview] Кнопки сформированы, callback_data: edit_{ann_id}, post_{ann_id}")
     if photos:
-        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
+        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='MarkdownV2')
                  for idx, photo_id in enumerate(photos)]
         if update.message:
             await update.message.reply_media_group(media=media)
-            await update.message.reply_text(texts.PREVIEW_TEXT, reply_markup=keyboard, parse_mode='Markdown')
+            await update.message.reply_text(texts.PREVIEW_TEXT, reply_markup=keyboard, parse_mode='MarkdownV2')
         else:
             await update.callback_query.message.reply_media_group(media=media)
-            await update.callback_query.message.reply_text(texts.PREVIEW_TEXT, reply_markup=keyboard, parse_mode='Markdown')
+            await update.callback_query.message.reply_text(texts.PREVIEW_TEXT, reply_markup=keyboard, parse_mode='MarkdownV2')
     else:
         if update.message:
-            await update.message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
+            await update.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
         else:
-            await update.callback_query.message.reply_text(message, reply_markup=keyboard, parse_mode='Markdown')
+            await update.callback_query.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
 
 async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE, ann_id):
     logger.info(f"📢 [publish_announcement] Публикация объявления с ID {ann_id}")
@@ -402,14 +402,14 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
                                              timestamp=current_timestamp)
 
     if photos:
-        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='Markdown')
+        media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='MarkdownV2')
                  for idx, photo_id in enumerate(photos)]
         sent_messages = await context.bot.send_media_group(chat_id=PRIVATE_CHANNEL_ID, media=media,
                                                            disable_notification=disable_notification)
         new_message_ids = [msg.message_id for msg in sent_messages]
     else:
         sent_message = await context.bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=message,
-                                                      parse_mode='Markdown', disable_notification=disable_notification)
+                                                      parse_mode='MarkdownV2', disable_notification=disable_notification)
         new_message_ids = [sent_message.message_id]
 
     logger.info(f"✅ [publish_announcement] Новое объявление опубликовано, ID: {ann_id}, сообщения: {new_message_ids}")
@@ -505,7 +505,7 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["announcement_message_ids"] = []  # ✅ Очищаем перед добавлением новых сообщений
 
     if rows:
-        header_message = await reply_message.reply_text(texts.USER_ADS_MESSAGE, parse_mode="Markdown")
+        header_message = await reply_message.reply_text(texts.USER_ADS_MESSAGE, parse_mode="MarkdownV2")
         context.user_data["announcement_message_ids"].append(header_message.message_id)
 
     if not rows:
@@ -524,11 +524,13 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         status = (
             texts.DRAFT_STATUS
             if not message_ids else texts.PUBLISHED_STATUS.format(
-                link=get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
+                link=escape_markdown_v2_url(
+                    get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
+                )
             )
         )
-        description = escape_markdown_custom(description)
-        price = escape_markdown_custom(price)
+        description = escape_markdown_v2(description)
+        price = escape_markdown_v2(price)
         message = f"{texts.ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n\n{status}"
 
         keyboard = InlineKeyboardMarkup([
@@ -546,13 +548,13 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
                     photo=photos[0],
                     caption=message,
                     reply_markup=keyboard,
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
             else:
                 sent_message = await reply_message.reply_text(
                     message,
                     reply_markup=keyboard,
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
         except telegram.error.BadRequest as e:
             logger.error(f"❌ [show_user_announcements] Ошибка при отправке объявления ID {ann_id}: {e}")
@@ -571,8 +573,8 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 async def format_announcement_text(update: Update, description, price, username, ann_id, is_updated=False, message_ids=None, timestamp=None):
     texts = get_texts(update)
     current_time = get_serbia_time()
-    description = escape_markdown_custom(description)
-    price = escape_markdown_custom(price)
+    description = escape_markdown_v2(description)
+    price = escape_markdown_v2(price)
 
     # Если username = "None", используем first_name + last_name
     if username == "None":
@@ -586,9 +588,9 @@ async def format_announcement_text(update: Update, description, price, username,
         first_name = user.first_name if user.first_name else texts.ANONYMOUS_NAME
         last_name = user.last_name if user.last_name else ""
         username = f"{first_name} {last_name}".strip()  # Убираем лишний пробел, если фамилии нет
-        contact_info = f"{texts.CONTACT_TEXT}\n{username.replace('_', '\\_')}"
+        contact_info = f"{texts.CONTACT_TEXT}\n{escape_markdown_v2(username)}"
     else:
-        contact_info = f"{texts.CONTACT_TEXT}\n@{username.replace('_', '\\_')}"
+        contact_info = f"{texts.CONTACT_TEXT}\n@{escape_markdown_v2(username)}"
 
 
     message = f"{description}\n\n"
@@ -596,6 +598,6 @@ async def format_announcement_text(update: Update, description, price, username,
     message += contact_info
 
     if is_updated and message_ids:
-        message += f"\n\n{texts.UPDATED_TEXT.format(current_time=current_time)}"
+        message += f"\n\n{texts.UPDATED_TEXT.format(current_time=escape_markdown_v2(current_time))}"
     #message += f"#{ann_id}\n\n"
     return message
