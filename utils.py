@@ -1,5 +1,6 @@
 import aiosqlite
 from telegram.ext import ContextTypes
+from telegram.helpers import escape_markdown
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 
@@ -7,8 +8,8 @@ import texts as texts_ru
 import texts_en
 from logger import logger
 from datetime import datetime
-import pytz
 import re
+import pytz
 
 from database import has_user_ads
 from keyboards import get_main_markup, get_add_advertisement_keyboard
@@ -132,16 +133,22 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
             return
 
         announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
+        escaped_text = escape_markdown_custom(text)
+        escaped_link = escape_markdown_custom(announcement_link, entity_type="url")
 
         # 📩 Формируем сообщение
-        message_text = f"💬 Новый комментарий к вашему объявлению\n\n_{text}_\n\n🔗 [Посмотреть объявление]({announcement_link})"
+        message_text = (
+            "💬 Новый комментарий к вашему объявлению\n\n"
+            f"_{escaped_text}_\n\n"
+            f"🔗 [Посмотреть объявление]({escaped_link})"
+        )
 
         # ✉️ Отправляем уведомление владельцу
         logger.info(f"📨 [notify_owner_about_comment] Отправляем уведомление владельцу {owner_id}...")
         await context.bot.send_message(
             chat_id=owner_id,
             text=message_text,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             disable_web_page_preview=True
         )
         logger.info(f"✅ [notify_owner_about_comment] Уведомление успешно отправлено владельцу {owner_id}.")
@@ -149,17 +156,7 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
     except Exception as e:
         logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
 
-def escape_markdown_custom(text: str) -> str:
-    special_chars = r'[*\-~`_\[\]\(\)]'
-    pattern = r'([*\-~`_\[\]\(\)])'
-    text = re.sub(pattern, r'\\\1', text)
-
-    def check_unclosed_tags(symbol: str, text: str) -> str:
-        if text.count(symbol) % 2 != 0:
-            return text + symbol  # Добавляем закрывающий тег
-        return text
-
-    for symbol in ['*', '_', '~', '`']:
-        text = check_unclosed_tags(symbol, text)
-
-    return text
+def escape_markdown_custom(text: str, entity_type: str | None = None) -> str:
+    # Normalize user-provided MarkdownV2 escapes to avoid double backslashes in output.
+    text = re.sub(r'\\([_*\[\]()~`>#+\-=|{}.!])', r'\1', text)
+    return escape_markdown(text, version=2, entity_type=entity_type)

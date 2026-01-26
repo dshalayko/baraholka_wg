@@ -2,7 +2,7 @@ import texts as texts_ru
 import texts_en
 
 from keyboards import get_main_markup, get_add_advertisement_keyboard
-from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts
+from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts, escape_markdown_custom
 from database import (
     has_user_ads,
 )
@@ -182,10 +182,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         post_link = await publish_announcement(update, context, ann_id)
 
         if post_link:
+            escaped_link = escape_markdown_custom(post_link, entity_type="url")
             await query.message.reply_text(
-                texts.POST_SUCCESS_MESSAGE.format(post_link),
+                texts.POST_SUCCESS_MESSAGE.format(link=escaped_link),
                 reply_markup=get_main_markup(get_user_language_code(update)),
-                                           parse_mode='Markdown')
+                                           parse_mode='MarkdownV2')
         else:
             await query.message.reply_text(
                 texts.POST_FAILURE_MESSAGE,
