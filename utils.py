@@ -1,5 +1,6 @@
 import aiosqlite
 from telegram.ext import ContextTypes
+from telegram.helpers import escape_markdown
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 
@@ -7,8 +8,8 @@ import texts as texts_ru
 import texts_en
 from logger import logger
 from datetime import datetime
-import pytz
 import re
+import pytz
 
 from database import has_user_ads
 from keyboards import get_main_markup, get_add_advertisement_keyboard

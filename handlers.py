@@ -198,6 +198,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         post_link = await publish_announcement(update, context, ann_id)
 
         if post_link:
+            escaped_link = escape_markdown_custom(post_link, entity_type="url")
             await query.message.reply_text(
                 texts.POST_SUCCESS_MESSAGE.format(link=escape_markdown_v2_url(post_link)),
                 reply_markup=get_main_markup(get_user_language_code(update)),
