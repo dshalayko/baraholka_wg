@@ -133,15 +133,11 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
             return
 
         announcement_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
-        escaped_text = escape_markdown_custom(text)
-        escaped_link = escape_markdown_custom(announcement_link, entity_type="url")
+        safe_text = escape_markdown_v2(text)
+        safe_link = escape_markdown_v2_url(announcement_link)
 
         # 📩 Формируем сообщение
-        message_text = (
-            "💬 Новый комментарий к вашему объявлению\n\n"
-            f"_{escaped_text}_\n\n"
-            f"🔗 [Посмотреть объявление]({escaped_link})"
-        )
+        message_text = f"💬 Новый комментарий к вашему объявлению\n\n_{safe_text}_\n\n🔗 [Посмотреть объявление]({safe_link})"
 
         # ✉️ Отправляем уведомление владельцу
         logger.info(f"📨 [notify_owner_about_comment] Отправляем уведомление владельцу {owner_id}...")
@@ -156,7 +152,29 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
     except Exception as e:
         logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
 
-def escape_markdown_custom(text: str, entity_type: str | None = None) -> str:
-    # Normalize user-provided MarkdownV2 escapes to avoid double backslashes in output.
-    text = re.sub(r'\\([_*\[\]()~`>#+\-=|{}.!])', r'\1', text)
-    return escape_markdown(text, version=2, entity_type=entity_type)
+def escape_markdown_custom(text: str) -> str:
+    special_chars = r'[*\-~`_\[\]\(\)]'
+    pattern = r'([*\-~`_\[\]\(\)])'
+    text = re.sub(pattern, r'\\\1', text)
+
+    def check_unclosed_tags(symbol: str, text: str) -> str:
+        if text.count(symbol) % 2 != 0:
+            return text + symbol  # Добавляем закрывающий тег
+        return text
+
+    for symbol in ['*', '_', '~', '`']:
+        text = check_unclosed_tags(symbol, text)
+
+    return text
+
+def escape_markdown_v2(text: str) -> str:
+    if text is None:
+        return ""
+    text = text.replace("\\", "\\\\")
+    return re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+
+def escape_markdown_v2_url(text: str) -> str:
+    if text is None:
+        return ""
+    text = text.replace("\\", "\\\\")
+    return re.sub(r'([()])', r'\\\1', text)

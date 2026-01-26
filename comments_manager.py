@@ -1,9 +1,14 @@
 import asyncio
+import os
+
 from pyrogram import Client
 from pyrogram.enums import ChatType
 
 from logger import logger
 from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID
+
+BASE_DIR = os.path.dirname(__file__)
+SESSION_PATH = os.path.join(BASE_DIR, "my_session")
 
 
 async def get_supergroup_id(app, group_name=None):
@@ -11,7 +16,7 @@ async def get_supergroup_id(app, group_name=None):
 
 async def forward_thread_replies(old_thread_id, new_thread_id):
     logger.info(f"🚀 [forward_thread_replies] Запуск функции с old_thread_id={old_thread_id}, new_thread_id={new_thread_id}")
-    app = Client("my_session", api_id=API_ID, api_hash=API_HASH)
+    app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH)
 
     try:
         await app.start()
@@ -102,7 +107,7 @@ async def get_message_id_by_thread_id(thread_id):
     """Ищет сообщение, у которого message_id == thread_id, и возвращает его. Логирует ВСЕ сообщения в группе."""
     logger.info(f"🔍 [get_message_id_by_thread_id] Поиск сообщения с message_id={thread_id}")
 
-    async with Client("my_session", api_id=API_ID, api_hash=API_HASH) as app:
+    async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH) as app:
         try:
             chat_id = await get_supergroup_id(app, CHAT_NAME)
             if not chat_id:
@@ -136,5 +141,4 @@ async def get_message_id_by_thread_id(thread_id):
         except Exception as e:
             logger.error(f"❌ [get_message_id_by_thread_id] Ошибка при поиске message_id: {e}")
             return None
-
 

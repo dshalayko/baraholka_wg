@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WG Black Market Mini App</title>
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <div class="app-title">WG Black Market app <span class="app-badge">beta</span></div>
+      </header>
+      <nav class="tabs">
+        <button class="tab active" id="tabMyAds">My ads</button>
+        <button class="tab" id="tabCreate">Create ad</button>
+        <button class="tab tab-icon" id="themeToggle" aria-label="Toggle theme">◐</button>
+      </nav>
+
+      <section class="panel panel-list" id="listPanel">
+        <div class="list-shell" id="adsList">
+          <div class="empty" id="emptyState">No ads yet</div>
+        </div>
+      </section>
+
+      <section class="panel" id="formPanel" hidden>
+        <div class="panel-body">
+          <label class="field">
+            <span id="descLabel">Description</span>
+            <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
+          </label>
+          <label class="field">
+            <span id="priceLabel">Price</span>
+            <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
+          </label>
+          <label class="field">
+            <span id="photosLabel">Photos (max 10)</span>
+            <div class="photo-actions" id="photoActions">
+              <button class="ghost" id="addMorePhotosBtn">Add photos</button>
+            </div>
+            <input id="photos" type="file" accept="image/*" multiple hidden />
+            <div class="upload-row">
+              <div class="chips" id="photoChips"></div>
+              <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
+            </div>
+            <div class="photo-grid" id="photoGrid"></div>
+          </label>
+          <div class="form-actions">
+            <button class="ghost" id="cancelFormBtn">Cancel</button>
+            <button class="ghost" id="saveAdBtn">Save draft</button>
+          </div>
+          <button class="primary publish-wide" id="publishBtn">Publish</button>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

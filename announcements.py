@@ -7,6 +7,7 @@ from datetime import datetime
 import telegram
 from telegram import Update, InputMediaPhoto, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
+
 import texts as texts_ru
 import texts_en
 from comments_manager import forward_thread_replies
@@ -20,7 +21,8 @@ from keyboards import (
 from utils import (
     get_serbia_time,
     get_private_channel_post_link,
-    escape_markdown_custom,
+    escape_markdown_v2,
+    escape_markdown_v2_url,
     get_texts,
     get_user_language_code,
 )
@@ -519,13 +521,16 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
         message_ids = json.loads(message_ids_json) if message_ids_json else []
         photos = json.loads(photo_file_ids_json) if photo_file_ids_json else []
 
-        status = texts.DRAFT_STATUS
-        if message_ids:
-            link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
-            escaped_link = escape_markdown_custom(link, entity_type="url")
-            status = texts.PUBLISHED_STATUS.format(link=escaped_link)
-        description = escape_markdown_custom(description)
-        price = escape_markdown_custom(price)
+        status = (
+            texts.DRAFT_STATUS
+            if not message_ids else texts.PUBLISHED_STATUS.format(
+                link=escape_markdown_v2_url(
+                    get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_ids[0])
+                )
+            )
+        )
+        description = escape_markdown_v2(description)
+        price = escape_markdown_v2(price)
         message = f"{texts.ANNOUNCEMENT_LIST_MESSAGE.format(description=description, price=price)}\n\n{status}"
 
         keyboard = InlineKeyboardMarkup([
@@ -568,9 +573,8 @@ async def show_user_announcements(update: Update, context: ContextTypes.DEFAULT_
 async def format_announcement_text(update: Update, description, price, username, ann_id, is_updated=False, message_ids=None, timestamp=None):
     texts = get_texts(update)
     current_time = get_serbia_time()
-    description = escape_markdown_custom(description)
-    price = escape_markdown_custom(price)
-    escaped_time = escape_markdown_custom(current_time)
+    description = escape_markdown_v2(description)
+    price = escape_markdown_v2(price)
 
     # Если username = "None", используем first_name + last_name
     if username == "None":
@@ -584,11 +588,9 @@ async def format_announcement_text(update: Update, description, price, username,
         first_name = user.first_name if user.first_name else texts.ANONYMOUS_NAME
         last_name = user.last_name if user.last_name else ""
         username = f"{first_name} {last_name}".strip()  # Убираем лишний пробел, если фамилии нет
-        escaped_username = escape_markdown_custom(username)
-        contact_info = f"{texts.CONTACT_TEXT}\n{escaped_username}"
+        contact_info = f"{texts.CONTACT_TEXT}\n{escape_markdown_v2(username)}"
     else:
-        escaped_username = escape_markdown_custom(username)
-        contact_info = f"{texts.CONTACT_TEXT}\n@{escaped_username}"
+        contact_info = f"{texts.CONTACT_TEXT}\n@{escape_markdown_v2(username)}"
 
 
     message = f"{description}\n\n"
@@ -596,6 +598,6 @@ async def format_announcement_text(update: Update, description, price, username,
     message += contact_info
 
     if is_updated and message_ids:
-        message += f"\n\n{texts.UPDATED_TEXT.format(current_time=escaped_time)}"
+        message += f"\n\n{texts.UPDATED_TEXT.format(current_time=escape_markdown_v2(current_time))}"
     #message += f"#{ann_id}\n\n"
     return message
