@@ -152,21 +152,6 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
     except Exception as e:
         logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
 
-def escape_markdown_custom(text: str) -> str:
-    special_chars = r'[*\-~`_\[\]\(\)]'
-    pattern = r'([*\-~`_\[\]\(\)])'
-    text = re.sub(pattern, r'\\\1', text)
-
-    def check_unclosed_tags(symbol: str, text: str) -> str:
-        if text.count(symbol) % 2 != 0:
-            return text + symbol  # Добавляем закрывающий тег
-        return text
-
-    for symbol in ['*', '_', '~', '`']:
-        text = check_unclosed_tags(symbol, text)
-
-    return text
-
 def escape_markdown_v2(text: str) -> str:
     if text is None:
         return ""
