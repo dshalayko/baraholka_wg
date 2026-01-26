@@ -1,5 +1,9 @@
+import os
+
 import texts as texts_ru
 import texts_en
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from keyboards import get_main_markup, get_add_advertisement_keyboard
 from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts
@@ -55,6 +59,18 @@ async def lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(texts.LANG_MESSAGE.format(language_code=language_code))
     else:
         await update.message.reply_text(texts.LANG_UNKNOWN)
+
+async def open_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    texts = get_texts(update)
+    webapp_url = os.getenv("WEBAPP_URL")
+    if not webapp_url:
+        await update.message.reply_text("WEBAPP_URL не задан.")
+        return
+
+    keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))]]
+    )
+    await update.message.reply_text(texts.OPEN_WEBAPP_BUTTON, reply_markup=keyboard)
 
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

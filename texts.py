@@ -38,6 +38,7 @@ NO_ANN_ID_MESSAGE_ERROR = "Ошибка: ID объявления не найде
 SUBSCRIBE_PROMPT = "Пожалуйста, подпишитесь на наш канал, чтобы продолжить."
 SUBSCRIBE_BUTTON = "Я подписался"
 MAIN_MENU_BUTTON = "В главное меню"
+OPEN_WEBAPP_BUTTON = "Открыть мини‑приложение"
 
 LANG_MESSAGE = "Язык клиента: {language_code}"
 LANG_UNKNOWN = "Не удалось определить язык клиента."

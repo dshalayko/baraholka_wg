@@ -38,6 +38,7 @@ NO_ANN_ID_MESSAGE_ERROR = "Error: ad ID not found."
 SUBSCRIBE_PROMPT = "Please subscribe to our channel to continue."
 SUBSCRIBE_BUTTON = "I have subscribed"
 MAIN_MENU_BUTTON = "Main menu"
+OPEN_WEBAPP_BUTTON = "Open Mini App"
 
 LANG_MESSAGE = "Client language: {language_code}"
 LANG_UNKNOWN = "Couldn't determine client language."

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WG Black Market Mini App</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <nav class="tabs">
+        <button class="tab active" id="tabMyAds">My ads</button>
+        <button class="tab" id="tabCreate">Create ad</button>
+        <button class="tab tab-icon" id="themeToggle" aria-label="Toggle theme">◐</button>
+      </nav>
+
+      <section class="panel" id="listPanel">
+        <div class="panel-header">
+          <h2 id="listTitle">Your ads</h2>
+          <div class="panel-actions">
+            <button class="ghost" id="refreshBtn">Refresh</button>
+          </div>
+        </div>
+        <div class="panel-body" id="adsList">
+          <div class="empty" id="emptyState">No ads yet</div>
+        </div>
+      </section>
+
+      <section class="panel" id="previewPage" hidden>
+        <div class="panel-header">
+          <h2 id="previewPageTitle">Preview</h2>
+          <div class="panel-actions">
+            <button class="ghost" id="closePreviewBtn">Back</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="preview-card">
+            <div class="preview-text" id="previewPageText"></div>
+            <div class="preview-photos" id="previewPagePhotos"></div>
+          </div>
+          <div class="form-actions">
+            <button class="primary" id="publishFromPreviewBtn">Publish</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="formPanel" hidden>
+        <div class="panel-header">
+          <h2 id="formTitle">New ad</h2>
+        </div>
+        <div class="panel-body">
+          <label class="field">
+            <span id="descLabel">Description</span>
+            <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
+          </label>
+          <label class="field">
+            <span id="priceLabel">Price</span>
+            <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
+          </label>
+          <label class="field">
+            <span id="photosLabel">Photos (max 10)</span>
+            <input id="photos" type="file" accept="image/*" multiple />
+            <div class="upload-row">
+              <div class="chips" id="photoChips"></div>
+              <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
+            </div>
+          </label>
+          <div class="preview-panel" id="previewPanel" hidden>
+            <h3 id="previewTitle">Preview</h3>
+            <div class="preview-card">
+              <div class="preview-text" id="previewText"></div>
+              <div class="preview-photos" id="previewPhotos"></div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="ghost" id="cancelFormBtn">Cancel</button>
+            <button class="ghost" id="previewBtn">Preview</button>
+            <button class="primary" id="saveAdBtn">Save draft</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
