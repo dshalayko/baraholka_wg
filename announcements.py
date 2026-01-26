@@ -145,7 +145,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton(texts.ASK_PHOTO_ACTION_SKIP, callback_data=f'cancel_photo_{ann_id}')]
     ])
 
-    message_text = texts.HAS_PHOTOS
+    message_text = escape_markdown_custom(texts.HAS_PHOTOS)
 
     # Отправляем сообщение с кнопками
     sent_message = await (query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='MarkdownV2') if query else message.reply_text(message_text, reply_markup=keyboard, parse_mode='MarkdownV2'))
