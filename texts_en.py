@@ -28,7 +28,7 @@ NO_ANNOUNCEMENTS_MESSAGE = "You don't have any ads yet."
 ANNOUNCEMENT_LIST_MESSAGE = "{description}\n\n*Price*\n{price}"
 CANCEL_MESSAGE = "Ok, canceled."
 
-ASK_FOR_PHOTOS = "And now — photos\\! You can send several at once\\.\n\n_I don't accept hi-res, so don't uncheck the “Compress photos” setting\\._"
+ASK_FOR_PHOTOS = "And now — photos\\! You can send several at once\\.\n\n_I don't accept hi\\-res, so don't uncheck the “Compress photos” setting\\._"
 ADD_NEW_PHOTOS = "📸 Send new photos. You can upload up to 10 photos."
 OLD_PHOTOS_DELETED = "All old photos have been deleted. Send new photos."
 HAS_PHOTOS = "📸 You already have uploaded photos. Do you want to add new ones or replace the current ones?"
