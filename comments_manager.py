@@ -9,12 +9,13 @@ from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID
 
 BASE_DIR = os.path.dirname(__file__)
 SESSION_PATH = os.path.join(BASE_DIR, "my_session")
+_forward_lock = asyncio.Lock()
 
 
 async def get_supergroup_id(app, group_name=None):
     return CHAT_ID
 
-async def forward_thread_replies(old_thread_id, new_thread_id):
+async def _forward_thread_replies_once(old_thread_id, new_thread_id):
     logger.info(f"🚀 [forward_thread_replies] Запуск функции с old_thread_id={old_thread_id}, new_thread_id={new_thread_id}")
     app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH)
 
@@ -101,7 +102,20 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
     except Exception as e:
         logger.error(f"❌ Общая ошибка при переносе комментариев: {e}")
         await app.stop()
-        return False
+        raise
+
+
+async def forward_thread_replies(old_thread_id, new_thread_id):
+    async with _forward_lock:
+        for attempt in range(3):
+            try:
+                return await _forward_thread_replies_once(old_thread_id, new_thread_id)
+            except Exception as e:
+                err_text = str(e).lower()
+                if "database is locked" in err_text and attempt < 2:
+                    await asyncio.sleep(2 + attempt * 2)
+                    continue
+                return False
 
 async def get_message_id_by_thread_id(thread_id):
     """Ищет сообщение, у которого message_id == thread_id, и возвращает его. Логирует ВСЕ сообщения в группе."""
@@ -141,4 +155,3 @@ async def get_message_id_by_thread_id(thread_id):
         except Exception as e:
             logger.error(f"❌ [get_message_id_by_thread_id] Ошибка при поиске message_id: {e}")
             return None
-

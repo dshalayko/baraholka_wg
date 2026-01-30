@@ -16,7 +16,7 @@ import mimetypes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from telegram import Bot, InputFile, InputMediaPhoto
-from telegram.error import NetworkError, RetryAfter, TimedOut
+from telegram.error import BadRequest, NetworkError, RetryAfter, TelegramError, TimedOut
 from telegram.request import HTTPXRequest
 
 import texts as texts_ru
@@ -295,7 +295,15 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(_get_u
             for message_id in message_ids:
                 try:
                     await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
-                except Exception as exc:
+                except BadRequest as exc:
+                    exc_text = str(exc).lower()
+                    if "message to delete not found" in exc_text or "message not found" in exc_text:
+                        logger.warning(
+                            "ann:delete message not found chat_id=%s message_id=%s",
+                            private_channel_id,
+                            message_id,
+                        )
+                        continue
                     if admin_id is not None:
                         link = get_private_channel_post_link(private_channel_id, message_id)
                         await bot.send_message(
@@ -303,6 +311,20 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(_get_u
                             text=(
                                 "Не удалось удалить сообщение боту:\n"
                                 f"Ссылка: {link}\n"
+                                f"Ошибка: {exc}\n"
+                                "Пожалуйста, удалите вручную."
+                            ),
+                        )
+                    raise HTTPException(status_code=500, detail=str(exc))
+                except TelegramError as exc:
+                    if admin_id is not None:
+                        link = get_private_channel_post_link(private_channel_id, message_id)
+                        await bot.send_message(
+                            chat_id=admin_id,
+                            text=(
+                                "Не удалось удалить сообщение боту:\n"
+                                f"Ссылка: {link}\n"
+                                f"Ошибка: {exc}\n"
                                 "Пожалуйста, удалите вручную."
                             ),
                         )
@@ -478,7 +500,20 @@ async def get_announcement_photo(
     if file_id not in photo_ids:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    tg_file = await bot.get_file(file_id)
-    data = await tg_file.download_as_bytearray()
+    try:
+        tg_file = await bot.get_file(file_id)
+        data = await tg_file.download_as_bytearray()
+    except BadRequest as exc:
+        exc_text = str(exc).lower()
+        if "temporarily unavailable" in exc_text:
+            raise HTTPException(status_code=503, detail="Photo temporarily unavailable")
+        if "wrong file_id" in exc_text or "file_id" in exc_text:
+            raise HTTPException(status_code=404, detail="Photo not found")
+        raise HTTPException(status_code=502, detail=str(exc))
+    except (TimedOut, NetworkError) as exc:
+        raise HTTPException(status_code=503, detail=f"Telegram timeout: {exc}")
+    except TelegramError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
     content_type, _ = mimetypes.guess_type(tg_file.file_path or "")
     return Response(content=bytes(data), media_type=content_type or "image/jpeg")
