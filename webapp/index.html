@@ -5,10 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>WG Black Market Mini App</title>
     <link rel="icon" href="/favicon.ico" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/layout.css" />
+    <link rel="stylesheet" href="/static/css/forms.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+    <link rel="stylesheet" href="/static/css/media.css" />
   </head>
   <body>
     <div id="app">
+      <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+      <div class="busy-overlay" id="busyOverlay" hidden>
+        <div class="busy-card">
+          <div class="busy-spinner"></div>
+          <div class="busy-text" id="busyText">Загрузка...</div>
+        </div>
+      </div>
       <header class="app-header">
         <div class="app-title">WG Black Market app <span class="app-badge">beta</span></div>
       </header>
@@ -55,7 +66,57 @@
       </section>
     </div>
 
+    <div class="modal-backdrop" id="editModal" hidden>
+      <div class="modal modal-wide">
+        <div class="modal-title" id="editModalTitle">Редактирование</div>
+        <div class="modal-body">
+          <label class="field">
+            <span id="editDescLabel">Описание</span>
+            <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
+          </label>
+          <label class="field">
+            <span id="editPriceLabel">Цена</span>
+            <input id="editPrice" type="text" maxlength="130" placeholder="Например: 50 RSD" />
+          </label>
+          <label class="field">
+            <span id="editPhotosLabel">Фотографии (максимум 10)</span>
+            <div class="photo-actions">
+              <button class="ghost" id="editAddMorePhotosBtn">Добавить фото</button>
+            </div>
+            <input id="editPhotos" type="file" accept="image/*" multiple hidden />
+            <div class="upload-row">
+              <div class="spinner" id="editUploadSpinner" aria-hidden="true"></div>
+            </div>
+            <div class="photo-grid" id="editPhotoGrid"></div>
+          </label>
+        </div>
+        <div class="modal-actions modal-actions-wide">
+          <button class="ghost" id="editCancelBtn">Отмена</button>
+          <button class="primary" id="editPublishBtn">Опубликовать</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="confirmModal" hidden>
+      <div class="modal">
+        <div class="modal-title" id="confirmTitle">Подтверждение</div>
+        <div class="modal-text" id="confirmText">Вы уверены, что хотите удалить объявление?</div>
+        <div class="modal-actions">
+          <button class="ghost" id="confirmNoBtn">Отмена</button>
+          <button class="danger" id="confirmYesBtn">Да, удалить</button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/static/app.js"></script>
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/dom.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/photos.js"></script>
+    <script src="/static/js/modals.js"></script>
+    <script src="/static/js/ads.js"></script>
+    <script src="/static/js/main.js"></script>
   </body>
 </html>
