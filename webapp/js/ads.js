@@ -39,14 +39,51 @@ function renderAds() {
     const card = document.createElement("div");
     card.className = "ad-card";
 
-    if (ad.photo_file_ids && ad.photo_file_ids.length && tg?.initData) {
-      const img = document.createElement("img");
-      img.className = "ad-photo";
-      const fileId = ad.photo_file_ids[0];
+    const photos = Array.isArray(ad.photo_file_ids) ? ad.photo_file_ids : [];
+    if (photos.length && tg?.initData) {
+      const gallery = document.createElement("div");
       const initData = encodeURIComponent(tg.initData);
-      img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
-      img.alt = ad.description || "photo";
-      card.appendChild(img);
+      const total = photos.length;
+
+      if (total === 1) {
+        const img = document.createElement("img");
+        img.className = "ad-photo";
+        const fileId = photos[0];
+        img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+        img.alt = ad.description || "photo";
+        card.appendChild(img);
+      } else if (total === 2) {
+        gallery.className = "ad-gallery ad-gallery-two";
+        photos.slice(0, 2).forEach((fileId) => {
+          const img = document.createElement("img");
+          img.className = "ad-gallery-img";
+          img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+          img.alt = ad.description || "photo";
+          gallery.appendChild(img);
+        });
+        card.appendChild(gallery);
+      } else {
+        gallery.className = "ad-gallery ad-gallery-three";
+        const top = document.createElement("img");
+        top.className = "ad-gallery-img ad-gallery-top";
+        top.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(photos[0])}&initData=${initData}`;
+        top.alt = ad.description || "photo";
+
+        const bottom = document.createElement("div");
+        bottom.className = "ad-gallery-bottom";
+
+        photos.slice(1, 3).forEach((fileId) => {
+          const img = document.createElement("img");
+          img.className = "ad-gallery-img";
+          img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+          img.alt = ad.description || "photo";
+          bottom.appendChild(img);
+        });
+
+        gallery.appendChild(top);
+        gallery.appendChild(bottom);
+        card.appendChild(gallery);
+      }
     }
 
     const title = document.createElement("h3");
@@ -54,8 +91,17 @@ function renderAds() {
     title.textContent = ad.description || "(no description)";
 
     const meta = document.createElement("div");
-    meta.className = "ad-meta";
-    meta.textContent = `${t("price")}: ${ad.price || ""}`;
+    meta.className = "ad-meta ad-price";
+
+    const priceLabel = document.createElement("span");
+    priceLabel.className = "ad-price-label";
+    priceLabel.textContent = t("price");
+
+    const priceValue = document.createElement("span");
+    priceValue.className = "ad-price-value";
+    priceValue.textContent = ad.price || "";
+
+    meta.append(priceLabel, priceValue);
 
     const status = document.createElement("div");
     status.className = "ad-meta";
