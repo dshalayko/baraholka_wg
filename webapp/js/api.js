@@ -8,7 +8,18 @@ async function apiFetch(path, options = {}) {
   const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `HTTP ${response.status}`);
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (err) {
+      data = null;
+    }
+    const detail = data?.detail ?? data;
+    const message = (detail && typeof detail === "object" ? detail.message : detail) || text || `HTTP ${response.status}`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.data = detail;
+    throw error;
   }
   return response.json();
 }
@@ -63,9 +74,46 @@ async function saveAd() {
 async function deleteAd(id) {
   setBusy(true, t("busyDeleting"));
   try {
-    await apiFetch(`/api/announcements/${id}`, { method: "DELETE" });
+    const result = await apiFetch(`/api/announcements/${id}`, { method: "DELETE" });
     await refreshAds();
-    showToast(t("deletedToast"), "danger");
+    if (result?.warning) {
+      const ids = Array.isArray(result.not_deleted_message_ids) ? result.not_deleted_message_ids : [];
+      const detail = ids.length ? `message_ids: ${ids.join(", ")}` : "";
+      const postLink = result.post_link || null;
+      state.lastError = {
+        action: "delete_ad_warning",
+        ad_id: id,
+        status: 200,
+        message: result.warning,
+        error_id: null,
+        error_detail: detail,
+        post_link: postLink,
+        client_time: new Date().toISOString(),
+        language: state.languageCode,
+        user_agent: navigator.userAgent,
+      };
+      const modalDetail = [detail, postLink ? `post_link: ${postLink}` : ""].filter(Boolean).join("\n");
+      openErrorModal(t("deletedWithWarning"), modalDetail);
+    } else {
+      showToast(t("deletedToast"), "danger");
+    }
+  } catch (err) {
+    console.error(err);
+    const errorId = err?.data?.error_id;
+    const detail = err?.data?.error_detail;
+    const message = errorId ? `${t("deleteFailed")} #${errorId}` : t("deleteFailed");
+    state.lastError = {
+      action: "delete_ad",
+      ad_id: id,
+      status: err?.status,
+      message: err?.message || t("deleteFailed"),
+      error_id: errorId,
+      error_detail: detail,
+      client_time: new Date().toISOString(),
+      language: state.languageCode,
+      user_agent: navigator.userAgent,
+    };
+    openErrorModal(message, detail || err?.message);
   } finally {
     setBusy(false);
   }
@@ -79,4 +127,11 @@ async function publishAd(id) {
   } finally {
     setBusy(false);
   }
+}
+
+async function reportBug(payload) {
+  return apiFetch("/api/bug-report", {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
 }

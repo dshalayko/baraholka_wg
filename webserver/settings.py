@@ -12,6 +12,7 @@ logger = logging.getLogger("webapp")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MEDIA_STORAGE_CHAT_ID = os.getenv("MEDIA_STORAGE_CHAT_ID")
+BUG_CHAT_ID = os.getenv("BUG_CHAT_IT")
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 WEBAPP_DIR = os.path.join(BASE_DIR, "webapp")

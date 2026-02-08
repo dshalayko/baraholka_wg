@@ -10,6 +10,25 @@ function closeDeleteConfirm() {
   elements.confirmModal.style.display = "none";
 }
 
+function openErrorModal(message, details) {
+  elements.errorTitle.textContent = t("errorTitle");
+  elements.errorText.textContent = message || t("deleteFailed");
+  if (details) {
+    elements.errorDetails.hidden = false;
+    elements.errorDetails.textContent = `${t("errorDetails")} ${details}`;
+  } else {
+    elements.errorDetails.hidden = true;
+    elements.errorDetails.textContent = "";
+  }
+  elements.errorModal.hidden = false;
+  elements.errorModal.style.display = "flex";
+}
+
+function closeErrorModal() {
+  elements.errorModal.hidden = true;
+  elements.errorModal.style.display = "none";
+}
+
 function resetEditModal() {
   state.editModal.id = null;
   state.editModal.photoFileIds = [];

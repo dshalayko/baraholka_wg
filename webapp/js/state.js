@@ -16,4 +16,5 @@ const state = {
     photoPreviews: [],
   },
   busyCount: 0,
+  lastError: null,
 };

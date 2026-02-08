@@ -40,4 +40,10 @@ const elements = {
   confirmText: document.getElementById("confirmText"),
   confirmYesBtn: document.getElementById("confirmYesBtn"),
   confirmNoBtn: document.getElementById("confirmNoBtn"),
+  errorModal: document.getElementById("errorModal"),
+  errorTitle: document.getElementById("errorTitle"),
+  errorText: document.getElementById("errorText"),
+  errorDetails: document.getElementById("errorDetails"),
+  errorReportBtn: document.getElementById("errorReportBtn"),
+  errorCloseBtn: document.getElementById("errorCloseBtn"),
 };

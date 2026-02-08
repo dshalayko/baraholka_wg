@@ -108,6 +108,18 @@
       </div>
     </div>
 
+    <div class="modal-backdrop" id="errorModal" hidden>
+      <div class="modal">
+        <div class="modal-title" id="errorTitle">Произошла ошибка</div>
+        <div class="modal-text" id="errorText"></div>
+        <div class="modal-text modal-text-muted" id="errorDetails" hidden></div>
+        <div class="modal-actions">
+          <button class="ghost" id="errorCloseBtn">Закрыть</button>
+          <button class="primary" id="errorReportBtn">Сообщить об ошибке</button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/static/js/state.js"></script>
     <script src="/static/js/i18n.js"></script>

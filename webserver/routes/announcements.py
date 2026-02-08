@@ -1,5 +1,6 @@
 import json
 import mimetypes
+import uuid
 from typing import Any, Dict, Optional
 
 import aiosqlite
@@ -130,6 +131,12 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_us
             raise HTTPException(status_code=404, detail="Announcement not found")
 
         message_ids = json.loads(row[0]) if row and row[0] else []
+        post_link = (
+            get_private_channel_post_link(private_channel_id, message_ids[0])
+            if message_ids and private_channel_id is not None
+            else None
+        )
+        not_deleted_ids = []
 
         if message_ids and private_channel_id is not None:
             for message_id in message_ids:
@@ -144,6 +151,34 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_us
                             message_id,
                         )
                         continue
+                    if "message can't be deleted" in exc_text or "message cannot be deleted" in exc_text:
+                        logger.warning(
+                            "ann:delete not allowed chat_id=%s message_id=%s",
+                            private_channel_id,
+                            message_id,
+                        )
+                        not_deleted_ids.append(message_id)
+                        if admin_id is not None:
+                            link = get_private_channel_post_link(private_channel_id, message_id)
+                            await bot.send_message(
+                                chat_id=admin_id,
+                                text=(
+                                    "Сообщение не удалось удалить (ограничение Telegram):\n"
+                                    f"Ссылка: {link}\n"
+                                    f"Ошибка: {exc}\n"
+                                    "Пожалуйста, удалите вручную."
+                                ),
+                            )
+                        continue
+                    error_id = uuid.uuid4().hex[:8]
+                    logger.exception(
+                        "ann:delete failed error_id=%s user_id=%s ann_id=%s chat_id=%s message_id=%s",
+                        error_id,
+                        user_id,
+                        ann_id,
+                        private_channel_id,
+                        message_id,
+                    )
                     if admin_id is not None:
                         link = get_private_channel_post_link(private_channel_id, message_id)
                         await bot.send_message(
@@ -152,11 +187,29 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_us
                                 "Не удалось удалить сообщение боту:\n"
                                 f"Ссылка: {link}\n"
                                 f"Ошибка: {exc}\n"
+                                f"Код ошибки: {error_id}\n"
                                 "Пожалуйста, удалите вручную."
                             ),
                         )
-                    raise HTTPException(status_code=500, detail=str(exc))
+                    raise HTTPException(
+                        status_code=500,
+                        detail={
+                            "message": "Failed to delete announcement.",
+                            "error_id": error_id,
+                            "error_detail": str(exc),
+                            "ann_id": ann_id,
+                        },
+                    )
                 except TelegramError as exc:
+                    error_id = uuid.uuid4().hex[:8]
+                    logger.exception(
+                        "ann:delete failed error_id=%s user_id=%s ann_id=%s chat_id=%s message_id=%s",
+                        error_id,
+                        user_id,
+                        ann_id,
+                        private_channel_id,
+                        message_id,
+                    )
                     if admin_id is not None:
                         link = get_private_channel_post_link(private_channel_id, message_id)
                         await bot.send_message(
@@ -165,15 +218,30 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_us
                                 "Не удалось удалить сообщение боту:\n"
                                 f"Ссылка: {link}\n"
                                 f"Ошибка: {exc}\n"
+                                f"Код ошибки: {error_id}\n"
                                 "Пожалуйста, удалите вручную."
                             ),
                         )
-                    raise HTTPException(status_code=500, detail=str(exc))
+                    raise HTTPException(
+                        status_code=500,
+                        detail={
+                            "message": "Failed to delete announcement.",
+                            "error_id": error_id,
+                            "error_detail": str(exc),
+                            "ann_id": ann_id,
+                        },
+                    )
 
         await db.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
         await db.commit()
 
-    return {"status": "deleted"}
+    response = {"status": "deleted"}
+    if not_deleted_ids:
+        response["warning"] = "Post in channel could not be deleted."
+        response["not_deleted_message_ids"] = not_deleted_ids
+        if post_link:
+            response["post_link"] = post_link
+    return response
 
 
 @router.post("/api/announcements/{ann_id}/publish")

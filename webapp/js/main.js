@@ -26,6 +26,9 @@ function applyTranslations() {
   elements.confirmText.textContent = t("deleteConfirm");
   elements.confirmYesBtn.textContent = t("confirmYes");
   elements.confirmNoBtn.textContent = t("confirmNo");
+  elements.errorTitle.textContent = t("errorTitle");
+  elements.errorCloseBtn.textContent = t("errorClose");
+  elements.errorReportBtn.textContent = t("reportError");
 }
 
 function bindEvents() {
@@ -161,6 +164,30 @@ function bindEvents() {
       closeDeleteConfirm();
     }
   });
+  elements.errorCloseBtn.addEventListener("click", closeErrorModal);
+  elements.errorModal.addEventListener("click", (event) => {
+    if (event.target === elements.errorModal) {
+      closeErrorModal();
+    }
+  });
+  elements.errorReportBtn.addEventListener("click", async () => {
+    if (!state.lastError) {
+      closeErrorModal();
+      return;
+    }
+    setBusy(true, t("busySaving"));
+    try {
+      await reportBug(state.lastError);
+      showToast(t("reportSent"), "success");
+      state.lastError = null;
+      closeErrorModal();
+    } catch (err) {
+      console.error(err);
+      showToast(t("reportFailed"), "danger");
+    } finally {
+      setBusy(false);
+    }
+  });
   elements.confirmYesBtn.addEventListener("click", async () => {
     if (!state.pendingDeleteId) {
       closeDeleteConfirm();
@@ -180,3 +207,4 @@ refreshAds();
 initTheme();
 closeDeleteConfirm();
 closeEditModal();
+closeErrorModal();

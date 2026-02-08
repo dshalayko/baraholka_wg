@@ -395,6 +395,12 @@
   margin-bottom: 16px;
 }
 
+.modal-text-muted {
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;
