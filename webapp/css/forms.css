@@ -11,6 +11,23 @@
   color: var(--ink);
 }
 
+.field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: -4px;
+}
+
+.field-checkbox span {
+  margin-bottom: 0;
+}
+
+.field-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--button);
+}
+
 textarea,
 input[type="text"] {
   width: 100%;
@@ -47,6 +64,11 @@ textarea:focus,
 input[type="text"]:focus {
   outline: 2px solid rgba(36, 129, 204, 0.2);
   border-color: rgba(36, 129, 204, 0.4);
+}
+
+.field-invalid {
+  border-color: rgba(212, 60, 60, 0.7);
+  outline: 2px solid rgba(212, 60, 60, 0.25);
 }
 
 .upload-row {

@@ -28,7 +28,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            SELECT id, description, price, photo_file_ids, message_ids, timestamp, last_published_is_edit
+            SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, last_published_is_edit
             FROM announcements WHERE user_id = ?
             """,
             (user_id,),
@@ -36,7 +36,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
         rows = await cursor.fetchall()
 
     for row in rows:
-        ann_id, description, price, photo_file_ids, message_ids, timestamp, last_published_is_edit = row
+        ann_id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, last_published_is_edit = row
         photo_list = json.loads(photo_file_ids) if photo_file_ids else []
         message_list = json.loads(message_ids) if message_ids else []
         is_published = bool(message_list)
@@ -52,6 +52,8 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
                 id=ann_id,
                 description=description,
                 price=price,
+                price_in_description=bool(price_in_description),
+                contact_info=contact_info,
                 photo_file_ids=photo_list,
                 is_published=is_published,
                 post_link=post_link,
@@ -69,16 +71,39 @@ async def create_announcement(
 ) -> Dict[str, Any]:
     user_id = user.get("id")
     username = user.get("username") or "None"
-    logger.info("ann:create user_id=%s username=%s desc_len=%s price_len=%s photos=%s",
-                user_id, username, len(payload.description), len(payload.price), len(payload.photo_file_ids))
+    price = payload.price or ""
+    price_in_description = bool(payload.price_in_description)
+    contact_info = (payload.contact_info or "").strip()
+    if username == "None" and not contact_info:
+        raise HTTPException(status_code=422, detail="Contact info is required when username is missing")
+    if not price_in_description and not price.strip():
+        raise HTTPException(status_code=422, detail="Price is required unless price_in_description is true")
+    logger.info(
+        "ann:create user_id=%s username=%s desc_len=%s price_len=%s price_in_desc=%s contact_len=%s photos=%s",
+        user_id,
+        username,
+        len(payload.description),
+        len(price),
+        price_in_description,
+        len(contact_info),
+        len(payload.photo_file_ids),
+    )
 
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            INSERT INTO announcements (user_id, username, description, price, photo_file_ids)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, username, payload.description, payload.price, json.dumps(payload.photo_file_ids)),
+            (
+                user_id,
+                username,
+                payload.description,
+                price,
+                1 if price_in_description else 0,
+                contact_info,
+                json.dumps(payload.photo_file_ids),
+            ),
         )
         await db.commit()
         ann_id = cursor.lastrowid
@@ -91,8 +116,24 @@ async def update_announcement(
     ann_id: int, payload: AnnouncementIn, user: Dict[str, Any] = Depends(get_user_from_request)
 ) -> Dict[str, Any]:
     user_id = user.get("id")
-    logger.info("ann:update user_id=%s ann_id=%s desc_len=%s price_len=%s photos=%s",
-                user_id, ann_id, len(payload.description), len(payload.price), len(payload.photo_file_ids))
+    price = payload.price or ""
+    price_in_description = bool(payload.price_in_description)
+    contact_info = (payload.contact_info or "").strip()
+    username = user.get("username") or "None"
+    if username == "None" and not contact_info:
+        raise HTTPException(status_code=422, detail="Contact info is required when username is missing")
+    if not price_in_description and not price.strip():
+        raise HTTPException(status_code=422, detail="Price is required unless price_in_description is true")
+    logger.info(
+        "ann:update user_id=%s ann_id=%s desc_len=%s price_len=%s price_in_desc=%s contact_len=%s photos=%s",
+        user_id,
+        ann_id,
+        len(payload.description),
+        len(price),
+        price_in_description,
+        len(contact_info),
+        len(payload.photo_file_ids),
+    )
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             "SELECT id FROM announcements WHERE id = ? AND user_id = ?",
@@ -104,10 +145,17 @@ async def update_announcement(
 
         await db.execute(
             """
-            UPDATE announcements SET description = ?, price = ?, photo_file_ids = ?
+            UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?
             WHERE id = ?
             """,
-            (payload.description, payload.price, json.dumps(payload.photo_file_ids), ann_id),
+            (
+                payload.description,
+                price,
+                1 if price_in_description else 0,
+                contact_info,
+                json.dumps(payload.photo_file_ids),
+                ann_id,
+            ),
         )
         await db.commit()
 
@@ -257,7 +305,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            SELECT description, price, username, photo_file_ids, message_ids
+            SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids
             FROM announcements WHERE id = ? AND user_id = ?
             """,
             (ann_id, user_id),
@@ -267,7 +315,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         if not row:
             raise HTTPException(status_code=404, detail="Announcement not found")
 
-        description, price, username, photo_file_ids, message_ids_json = row
+        description, price, price_in_description, username, contact_info, photo_file_ids, message_ids_json = row
         photos = json.loads(photo_file_ids) if photo_file_ids else []
         old_message_ids = json.loads(message_ids_json) if message_ids_json else []
 
@@ -278,7 +326,9 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
     message = format_announcement_text(
         description,
         price,
+        bool(price_in_description),
         username,
+        contact_info,
         display_name,
         is_updated=is_editing,
     )

@@ -41,7 +41,20 @@
             <span id="descLabel">Description</span>
             <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
           </label>
-          <label class="field">
+          <label class="field" id="contactField">
+            <span id="contactLabel">Как связаться</span>
+            <input
+              id="contactInfo"
+              type="text"
+              maxlength="200"
+              placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
+            />
+          </label>
+          <label class="field field-checkbox">
+            <input id="priceInDescription" type="checkbox" />
+            <span id="priceInDescriptionLabel">Цена в описании</span>
+          </label>
+          <label class="field" id="priceField">
             <span id="priceLabel">Price</span>
             <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
           </label>
@@ -74,7 +87,20 @@
             <span id="editDescLabel">Описание</span>
             <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
           </label>
-          <label class="field">
+          <label class="field" id="editContactField">
+            <span id="editContactLabel">Как связаться</span>
+            <input
+              id="editContactInfo"
+              type="text"
+              maxlength="200"
+              placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
+            />
+          </label>
+          <label class="field field-checkbox">
+            <input id="editPriceInDescription" type="checkbox" />
+            <span id="editPriceInDescriptionLabel">Цена в описании</span>
+          </label>
+          <label class="field" id="editPriceField">
             <span id="editPriceLabel">Цена</span>
             <input id="editPrice" type="text" maxlength="130" placeholder="Например: 50 RSD" />
           </label>

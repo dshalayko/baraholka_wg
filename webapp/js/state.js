@@ -8,6 +8,7 @@ const state = {
   editingId: null,
   photoFileIds: [],
   photoPreviews: [],
+  hasUsername: !!tg?.initDataUnsafe?.user?.username,
   languageCode: tg?.initDataUnsafe?.user?.language_code || "ru",
   pendingDeleteId: null,
   editModal: {

@@ -4,7 +4,9 @@ function applyTranslations() {
   elements.tabCreate.textContent = t("create");
   elements.cancelFormBtn.textContent = t("cancel");
   elements.descLabel.textContent = t("description");
+  elements.contactLabel.textContent = t("contactLabel");
   elements.priceLabel.textContent = t("price");
+  elements.priceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
   elements.photosLabel.textContent = t("photos");
   elements.emptyState.textContent = t("noAds");
   elements.description.placeholder = t("descPlaceholder");
@@ -15,10 +17,14 @@ function applyTranslations() {
   elements.addMorePhotosBtn.textContent = t("addMore");
   elements.editModalTitle.textContent = t("editTitle");
   elements.editDescLabel.textContent = t("description");
+  elements.editContactLabel.textContent = t("contactLabel");
   elements.editPriceLabel.textContent = t("price");
+  elements.editPriceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
   elements.editPhotosLabel.textContent = t("photos");
   elements.editDescription.placeholder = t("descPlaceholder");
   elements.editPrice.placeholder = t("pricePlaceholder");
+  elements.contactInfo.placeholder = t("contactPlaceholder");
+  elements.editContactInfo.placeholder = t("contactPlaceholder");
   elements.editAddMorePhotosBtn.textContent = t("addMore");
   elements.editCancelBtn.textContent = t("editCancel");
   elements.editPublishBtn.textContent = t("editPublish");
@@ -49,8 +55,20 @@ function bindEvents() {
   elements.saveAdBtn.addEventListener("click", saveAd);
   elements.publishBtn.addEventListener("click", async () => {
     const description = elements.description.value.trim();
-    const price = elements.price.value.trim();
-    if (!description || !price) {
+    const priceInDescription = elements.priceInDescription.checked;
+    const price = priceInDescription ? "" : elements.price.value.trim();
+    const contactInfo = elements.contactInfo.value.trim();
+    const isValid = validateAdForm({
+      description,
+      price,
+      priceInDescription,
+      contactInfo,
+      requireContact: !state.hasUsername,
+      descriptionInput: elements.description,
+      priceInput: elements.price,
+      contactInput: elements.contactInfo,
+    });
+    if (!isValid) {
       tg?.showAlert?.(t("required"));
       return;
     }
@@ -62,6 +80,8 @@ function bindEvents() {
           body: JSON.stringify({
             description,
             price,
+            price_in_description: priceInDescription,
+            contact_info: contactInfo,
             photo_file_ids: state.photoFileIds,
           }),
         });
@@ -70,6 +90,16 @@ function bindEvents() {
           showToast(t("publishedToast"), "success");
         }
       } else {
+        await apiFetch(`/api/announcements/${state.editingId}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            description,
+            price,
+            price_in_description: priceInDescription,
+            contact_info: contactInfo,
+            photo_file_ids: state.photoFileIds,
+          }),
+        });
         await publishAd(state.editingId);
         showToast(t("publishedToast"), "success");
       }
@@ -82,8 +112,19 @@ function bindEvents() {
   elements.description.addEventListener("input", () => {
     updateCounts();
     autoResizeDescription();
+    setFieldInvalid(elements.description, false);
   });
-  elements.price.addEventListener("input", updateCounts);
+  elements.contactInfo.addEventListener("input", () => {
+    setFieldInvalid(elements.contactInfo, false);
+  });
+  elements.price.addEventListener("input", () => {
+    updateCounts();
+    setFieldInvalid(elements.price, false);
+  });
+  elements.priceInDescription.addEventListener("change", () => {
+    applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
+    updateCounts();
+  });
   elements.addMorePhotosBtn.addEventListener("click", (event) => {
     event.preventDefault();
     elements.photos.click();
@@ -96,6 +137,16 @@ function bindEvents() {
   });
   elements.editDescription.addEventListener("input", () => {
     autoResizeTextarea(elements.editDescription);
+    setFieldInvalid(elements.editDescription, false);
+  });
+  elements.editContactInfo.addEventListener("input", () => {
+    setFieldInvalid(elements.editContactInfo, false);
+  });
+  elements.editPrice.addEventListener("input", () => {
+    setFieldInvalid(elements.editPrice, false);
+  });
+  elements.editPriceInDescription.addEventListener("change", () => {
+    applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
   });
   elements.editPhotos.addEventListener("change", () => {
     const files = Array.from(elements.editPhotos.files || []);
@@ -132,8 +183,20 @@ function bindEvents() {
   });
   elements.editPublishBtn.addEventListener("click", async () => {
     const description = elements.editDescription.value.trim();
-    const price = elements.editPrice.value.trim();
-    if (!description || !price) {
+    const priceInDescription = elements.editPriceInDescription.checked;
+    const price = priceInDescription ? "" : elements.editPrice.value.trim();
+    const contactInfo = elements.editContactInfo.value.trim();
+    const isValid = validateAdForm({
+      description,
+      price,
+      priceInDescription,
+      contactInfo,
+      requireContact: !state.hasUsername,
+      descriptionInput: elements.editDescription,
+      priceInput: elements.editPrice,
+      contactInput: elements.editContactInfo,
+    });
+    if (!isValid) {
       tg?.showAlert?.(t("required"));
       return;
     }
@@ -148,6 +211,8 @@ function bindEvents() {
         body: JSON.stringify({
           description,
           price,
+          price_in_description: priceInDescription,
+          contact_info: contactInfo,
           photo_file_ids: state.editModal.photoFileIds,
         }),
       });
@@ -200,6 +265,7 @@ function bindEvents() {
 }
 
 applyTranslations();
+applyContactFieldVisibility();
 bindEvents();
 updateCounts();
 showTab("list");

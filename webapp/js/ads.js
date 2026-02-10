@@ -16,7 +16,10 @@ function resetForm() {
   });
   state.photoPreviews = [];
   elements.description.value = "";
+  elements.contactInfo.value = "";
   elements.price.value = "";
+  elements.priceInDescription.checked = false;
+  applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
   elements.photos.value = "";
   elements.photoChips.innerHTML = "";
   elements.photoGrid.innerHTML = "";
@@ -99,7 +102,7 @@ function renderAds() {
 
     const priceValue = document.createElement("span");
     priceValue.className = "ad-price-value";
-    priceValue.textContent = ad.price || "";
+    priceValue.textContent = ad.price_in_description ? t("priceInDescriptionValue") : (ad.price || "");
 
     meta.append(priceLabel, priceValue);
 
@@ -174,7 +177,10 @@ function startEdit(ad) {
     };
   });
   elements.description.value = ad.description || "";
+  elements.contactInfo.value = ad.contact_info || "";
   elements.price.value = ad.price || "";
+  elements.priceInDescription.checked = !!ad.price_in_description;
+  applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
   elements.saveAdBtn.hidden = !!ad.is_published;
   autoResizeDescription();
   renderPhotoPreviews();

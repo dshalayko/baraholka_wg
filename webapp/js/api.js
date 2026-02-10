@@ -37,8 +37,20 @@ async function refreshAds() {
 
 async function saveAd() {
   const description = elements.description.value.trim();
-  const price = elements.price.value.trim();
-  if (!description || !price) {
+  const priceInDescription = elements.priceInDescription.checked;
+  const price = priceInDescription ? "" : elements.price.value.trim();
+  const contactInfo = elements.contactInfo.value.trim();
+  const isValid = validateAdForm({
+    description,
+    price,
+    priceInDescription,
+    contactInfo,
+    requireContact: !state.hasUsername,
+    descriptionInput: elements.description,
+    priceInput: elements.price,
+    contactInput: elements.contactInfo,
+  });
+  if (!isValid) {
     tg?.showAlert?.(t("required"));
     return;
   }
@@ -46,6 +58,8 @@ async function saveAd() {
   const payload = {
     description,
     price,
+    price_in_description: priceInDescription,
+    contact_info: contactInfo,
     photo_file_ids: state.photoFileIds,
   };
 

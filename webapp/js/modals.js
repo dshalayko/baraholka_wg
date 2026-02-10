@@ -39,7 +39,10 @@ function resetEditModal() {
   });
   state.editModal.photoPreviews = [];
   elements.editDescription.value = "";
+  elements.editContactInfo.value = "";
   elements.editPrice.value = "";
+  elements.editPriceInDescription.checked = false;
+  applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
   elements.editPhotos.value = "";
   elements.editPhotoGrid.innerHTML = "";
   renderEditPhotoPreviews();
@@ -57,7 +60,10 @@ function openEditModal(ad) {
     };
   });
   elements.editDescription.value = ad.description || "";
+  elements.editContactInfo.value = ad.contact_info || "";
   elements.editPrice.value = ad.price || "";
+  elements.editPriceInDescription.checked = !!ad.price_in_description;
+  applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
   renderEditPhotoPreviews();
   elements.editModal.hidden = false;
   elements.editModal.style.display = "flex";

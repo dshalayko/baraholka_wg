@@ -28,20 +28,26 @@ def normalize_chat_id(value: Optional[str]) -> Optional[int]:
 def format_announcement_text(
     description: str,
     price: str,
+    price_in_description: bool,
     username: str,
+    contact_info: Optional[str],
     user_display: Optional[str],
     is_updated: bool,
 ) -> str:
     description = escape_markdown_v2(description)
-    price = escape_markdown_v2(price)
-
     if username != "None":
         contact_info = f"{texts_ru.CONTACT_TEXT}\n@{escape_markdown_v2(username)}"
     else:
-        display = user_display or texts_ru.ANONYMOUS_NAME
-        contact_info = f"{texts_ru.CONTACT_TEXT}\n{escape_markdown_v2(display)}"
+        contact_value = (contact_info or "").strip()
+        if contact_value:
+            contact_info = f"{texts_ru.CONTACT_TEXT}\n{escape_markdown_v2(contact_value)}"
+        else:
+            display = user_display or texts_ru.ANONYMOUS_NAME
+            contact_info = f"{texts_ru.CONTACT_TEXT}\n{escape_markdown_v2(display)}"
     message = f"{description}\n\n"
-    message += f"{texts_ru.PRICE_TEXT}\n{price}\n\n"
+    if not price_in_description:
+        price = escape_markdown_v2(price)
+        message += f"{texts_ru.PRICE_TEXT}\n{price}\n\n"
     message += contact_info
 
     if is_updated:

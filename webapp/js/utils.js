@@ -53,6 +53,76 @@ function autoResizeDescription() {
   autoResizeTextarea(elements.description);
 }
 
+function setFieldInvalid(input, isInvalid) {
+  if (!input) return;
+  input.classList.toggle("field-invalid", isInvalid);
+  if (isInvalid) {
+    input.setAttribute("aria-invalid", "true");
+  } else {
+    input.removeAttribute("aria-invalid");
+  }
+}
+
+function applyContactFieldVisibility() {
+  if (state.hasUsername) {
+    if (elements.contactField) {
+      elements.contactField.hidden = true;
+      elements.contactField.style.display = "none";
+    }
+    if (elements.editContactField) {
+      elements.editContactField.hidden = true;
+      elements.editContactField.style.display = "none";
+    }
+    if (elements.contactInfo) {
+      elements.contactInfo.value = "";
+    }
+    if (elements.editContactInfo) {
+      elements.editContactInfo.value = "";
+    }
+  } else {
+    if (elements.contactField) {
+      elements.contactField.hidden = false;
+      elements.contactField.style.display = "";
+    }
+    if (elements.editContactField) {
+      elements.editContactField.hidden = false;
+      elements.editContactField.style.display = "";
+    }
+  }
+}
+
+function applyPriceInDescriptionToggle(checkbox, input, field) {
+  if (!checkbox || !input) return;
+  input.disabled = checkbox.checked;
+  if (field) {
+    field.hidden = checkbox.checked;
+    field.style.display = checkbox.checked ? "none" : "";
+  }
+  if (checkbox.checked) {
+    input.value = "";
+    setFieldInvalid(input, false);
+  }
+}
+
+function validateAdForm({
+  description,
+  price,
+  priceInDescription,
+  contactInfo,
+  requireContact,
+  descriptionInput,
+  priceInput,
+  contactInput,
+}) {
+  const hasDescription = !!description.trim();
+  const hasPrice = priceInDescription || !!price.trim();
+  const hasContact = !requireContact || !!(contactInfo || "").trim();
+  setFieldInvalid(descriptionInput, !hasDescription);
+  setFieldInvalid(priceInput, !hasPrice && !priceInDescription);
+  setFieldInvalid(contactInput, !hasContact);
+  return hasDescription && hasPrice && hasContact;
+}
+
 function formatPublishedAt(value) {
   if (!value) return "";
   const match = String(value).match(/^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}:\d{2})$/);

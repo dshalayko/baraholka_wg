@@ -15,6 +15,8 @@ async def ensure_db() -> None:
                 username TEXT NOT NULL,
                 description TEXT NOT NULL,
                 price TEXT NOT NULL,
+                price_in_description INTEGER DEFAULT 0,
+                contact_info TEXT,
                 photo_file_ids TEXT,
                 message_ids TEXT,
                 timestamp TEXT,
@@ -26,4 +28,8 @@ async def ensure_db() -> None:
         columns = {row[1] for row in await cursor.fetchall()}
         if "last_published_is_edit" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN last_published_is_edit INTEGER DEFAULT 0")
+        if "price_in_description" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN price_in_description INTEGER DEFAULT 0")
+        if "contact_info" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN contact_info TEXT")
         await db.commit()
