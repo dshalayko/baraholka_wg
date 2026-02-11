@@ -14,19 +14,13 @@ def _texts_for_language(language_code: str | None):
 
 def get_main_markup(language_code: str | None):
     texts = _texts_for_language(language_code)
-    webapp_url = os.getenv("WEBAPP_URL")
-    webapp_button = KeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url)) if webapp_url else texts.OPEN_WEBAPP_BUTTON
     reply_keyboard = [[texts.NEW_AD_CHOICE, texts.MY_ADS_CHOICE]]
-    reply_keyboard.append([webapp_button])
     return ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
 
 def get_add_advertisement_keyboard(language_code: str | None):
     texts = _texts_for_language(language_code)
-    webapp_url = os.getenv("WEBAPP_URL")
-    webapp_button = KeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url)) if webapp_url else texts.OPEN_WEBAPP_BUTTON
     reply_keyboard = [[texts.NEW_AD_CHOICE]]
-    reply_keyboard.append([webapp_button])
     return ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
 
