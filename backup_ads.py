@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from datetime import datetime
 
 import aiosqlite
@@ -8,7 +9,10 @@ from pyrogram.enums import ChatType, MessageMediaType
 from config import API_ID, API_HASH
 
 DB_PATH = "announcements.db"
-SESSION_NAME = "my_session"
+BASE_DIR = os.path.dirname(__file__)
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+SESSION_NAME = os.path.join(DATA_DIR, "my_session")
 
 
 import re

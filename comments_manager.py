@@ -8,7 +8,9 @@ from logger import logger
 from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID
 
 BASE_DIR = os.path.dirname(__file__)
-SESSION_PATH = os.path.join(BASE_DIR, "my_session")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+SESSION_PATH = os.path.join(DATA_DIR, "my_session")
 _forward_lock = asyncio.Lock()
 
 

@@ -40,7 +40,7 @@ h2 {
   padding: 6px;
   background: var(--glass);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(var(--blur));
   position: sticky;
@@ -51,7 +51,7 @@ h2 {
 .tab {
   flex: 1;
   padding: 9px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: rgba(245, 247, 250, 0.82);
@@ -87,7 +87,7 @@ h2 {
   margin-top: 20px;
   background: var(--glass);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(var(--blur));

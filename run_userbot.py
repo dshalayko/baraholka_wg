@@ -6,9 +6,13 @@ from pyrogram.enums import ChatType
 from config import API_ID, API_HASH
 
 ENV_FILE = ".env"
+BASE_DIR = os.path.dirname(__file__)
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+SESSION_PATH = os.path.join(DATA_DIR, "my_session")
 
 async def get_supergroup_id():
-    async with Client("my_session", api_id=API_ID, api_hash=API_HASH) as app:
+    async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH) as app:
         print("Получаем список чатов...")
 
         async for dialog in app.get_dialogs():
@@ -32,7 +36,7 @@ async def get_supergroup_id():
         print("❌ Не найдено ни одной супергруппы!")
 
 async def show_all_dialogs():
-    async with Client("my_session", api_id=API_ID, api_hash=API_HASH) as app:
+    async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH) as app:
         async for dialog in app.get_dialogs():
             chat = dialog.chat
             chat_title = chat.title or "Без названия"
