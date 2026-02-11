@@ -117,6 +117,8 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if choice in (texts_ru.NEW_AD_CHOICE, texts_en.NEW_AD_CHOICE):
         context.user_data.clear()
         return await create_announcement(update, context)
+    if choice in (texts_ru.OPEN_WEBAPP_BUTTON, texts_en.OPEN_WEBAPP_BUTTON):
+        return await open_webapp(update, context)
 
     elif choice in (texts_ru.MY_ADS_CHOICE, texts_en.MY_ADS_CHOICE):
         return await show_user_announcements(update, context)
