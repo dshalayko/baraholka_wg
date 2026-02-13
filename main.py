@@ -69,7 +69,7 @@ async def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("lang", lang))
-    app.add_handler(CommandHandler("app", open_webapp))
+    #app.add_handler(CommandHandler("app", open_webapp))
     app.add_handler(CommandHandler('my_ads', show_user_announcements))
 
     # Добавляем ConversationHandler
