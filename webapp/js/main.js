@@ -35,6 +35,8 @@ function applyTranslations() {
   elements.errorTitle.textContent = t("errorTitle");
   elements.errorCloseBtn.textContent = t("errorClose");
   elements.errorReportBtn.textContent = t("reportError");
+  elements.unauthorizedTitle.textContent = t("unauthorizedTitle");
+  elements.unauthorizedText.textContent = t("unauthorizedText");
 }
 
 function bindEvents() {

@@ -36,7 +36,6 @@ async def main():
         entry_points=[
             CommandHandler('start', start),
             MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice),
-            CallbackQueryHandler(handle_choice, pattern='^(add_advertisement|my_advertisements)$'),
         ],
         states={
             CHOOSING: [
@@ -44,7 +43,6 @@ async def main():
                 CallbackQueryHandler(button_handler,
                                      pattern=r'^(editdescription|editprice|editphotos|delete|post|cancel)_\d+$'),
                 CallbackQueryHandler(edit_announcement_handler, pattern=r'^edit_\d+$'),
-                CallbackQueryHandler(show_user_announcements, pattern='^my_advertisements$')
             ],
             EDIT_CHOICE: [
                 CallbackQueryHandler(button_handler, pattern=r'^(editdescription|editprice|editphotos|cancel)_\d+$'),

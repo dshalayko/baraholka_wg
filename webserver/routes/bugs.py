@@ -17,7 +17,7 @@ async def report_bug(
 ) -> Dict[str, Any]:
     chat_id = normalize_chat_id(BUG_CHAT_ID)
     if chat_id is None:
-        raise HTTPException(status_code=500, detail="BUG_CHAT_IT is not set")
+        raise HTTPException(status_code=500, detail="BUG_CHAT_ID is not set")
 
     user_id = user.get("id")
     username = user.get("username") or "None"

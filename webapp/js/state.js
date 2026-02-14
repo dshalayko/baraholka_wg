@@ -18,4 +18,5 @@ const state = {
   },
   busyCount: 0,
   lastError: null,
+  unauthorized: false,
 };

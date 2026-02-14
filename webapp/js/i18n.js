@@ -57,6 +57,8 @@ const i18n = {
     busyPublishing: "Публикация...",
     busyDeleting: "Удаление...",
     busyUploading: "Загрузка фото...",
+    unauthorizedTitle: "Приложение доступно только в Telegram",
+    unauthorizedText: "Откройте эту страницу из Telegram Mini App. При обычном открытии в браузере авторизация недоступна.",
   },
   en: {
     title: "Ads",
@@ -116,6 +118,8 @@ const i18n = {
     busyPublishing: "Publishing...",
     busyDeleting: "Deleting...",
     busyUploading: "Uploading photos...",
+    unauthorizedTitle: "This app is available only in Telegram",
+    unauthorizedText: "Open this page from the Telegram Mini App. Regular browser opening does not provide authorization.",
   }
 };
 

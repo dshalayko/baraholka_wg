@@ -1,4 +1,8 @@
 const elements = {
+  authorizedContent: document.getElementById("authorizedContent"),
+  unauthorizedState: document.getElementById("unauthorizedState"),
+  unauthorizedTitle: document.getElementById("unauthorizedTitle"),
+  unauthorizedText: document.getElementById("unauthorizedText"),
   tabMyAds: document.getElementById("tabMyAds"),
   tabCreate: document.getElementById("tabCreate"),
   themeToggle: document.getElementById("themeToggle"),

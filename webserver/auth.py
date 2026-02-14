@@ -1,12 +1,15 @@
 import hashlib
 import hmac
 import json
+import time
 import urllib.parse
 from typing import Any, Dict
 
 from fastapi import HTTPException, Request
 
-from webserver.settings import BOT_TOKEN, LOG_LEVEL, logger
+from webserver.settings import BOT_TOKEN, logger
+
+MAX_INIT_DATA_AGE_SECONDS = 15 * 60
 
 
 def _parse_init_data(init_data: str) -> Dict[str, str]:
@@ -21,20 +24,28 @@ def _verify_init_data(init_data: str, bot_token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Missing hash")
 
     logger.debug("auth: fields=%s", ",".join(sorted(data.keys())))
-    if LOG_LEVEL == "DEBUG" and bot_token:
-        token_hash = hashlib.sha256(bot_token.encode()).hexdigest()[:12]
-        logger.debug("auth: bot_token_sha256_prefix=%s", token_hash)
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
     secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
     calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
     if not hmac.compare_digest(calculated_hash, received_hash):
-        logger.warning(
-            "auth: invalid init data hash | calc=%s recv=%s",
-            calculated_hash,
-            received_hash,
-        )
+        logger.warning("auth: invalid init data hash")
         raise HTTPException(status_code=401, detail="Invalid init data")
+
+    auth_date_raw = data.get("auth_date")
+    try:
+        auth_date = int(auth_date_raw) if auth_date_raw is not None else None
+    except ValueError:
+        logger.warning("auth: invalid auth_date format")
+        raise HTTPException(status_code=401, detail="Invalid auth_date")
+    if auth_date is None:
+        logger.warning("auth: missing auth_date")
+        raise HTTPException(status_code=401, detail="Missing auth_date")
+
+    now = int(time.time())
+    if abs(now - auth_date) > MAX_INIT_DATA_AGE_SECONDS:
+        logger.warning("auth: stale init data auth_date=%s now=%s", auth_date, now)
+        raise HTTPException(status_code=401, detail="Expired init data")
 
     user_raw = data.get("user")
     user = json.loads(user_raw) if user_raw else None
@@ -51,5 +62,4 @@ def get_user_from_request(request: Request) -> Dict[str, Any]:
         logger.warning("auth: missing init data")
         raise HTTPException(status_code=401, detail="Missing init data")
     logger.debug("auth: init_data_len=%s", len(init_data))
-    logger.debug("auth: init_data_prefix=%s", init_data[:64])
     return _verify_init_data(init_data, BOT_TOKEN)

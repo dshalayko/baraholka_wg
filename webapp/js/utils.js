@@ -158,6 +158,21 @@ function setBusy(isBusy, text = "") {
   });
 }
 
+function setUnauthorizedMode(enabled) {
+  state.unauthorized = !!enabled;
+  if (elements.authorizedContent) {
+    elements.authorizedContent.hidden = state.unauthorized;
+  }
+  if (elements.unauthorizedState) {
+    elements.unauthorizedState.hidden = !state.unauthorized;
+  }
+  if (state.unauthorized) {
+    closeDeleteConfirm();
+    closeEditModal();
+    closeErrorModal();
+  }
+}
+
 function isDarkTheme() {
   return document.documentElement.dataset.theme === "dark";
 }

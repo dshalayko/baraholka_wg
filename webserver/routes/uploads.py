@@ -3,7 +3,7 @@ import io
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from telegram.error import NetworkError, RetryAfter, TimedOut
+from telegram.error import NetworkError, RetryAfter, TelegramError, TimedOut
 
 from webserver.auth import get_user_from_request
 from webserver.settings import MEDIA_STORAGE_CHAT_ID, logger
@@ -53,8 +53,14 @@ async def upload_files(
         file_ids.append(file_id)
         try:
             await bot.delete_message(chat_id=storage_chat_id, message_id=message.message_id)
-        except Exception:
-            pass
+        except TelegramError as exc:
+            logger.warning(
+                "upload:cleanup_failed user_id=%s chat_id=%s message_id=%s error=%s",
+                user.get("id"),
+                storage_chat_id,
+                message.message_id,
+                exc,
+            )
 
     logger.info("upload:done user_id=%s file_ids=%s", user.get("id"), len(file_ids))
     return {"file_ids": file_ids}

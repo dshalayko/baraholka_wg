@@ -1,3 +1,5 @@
+import json
+
 import aiosqlite
 from telegram.ext import ContextTypes
 from telegram.helpers import escape_markdown
@@ -116,7 +118,17 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
                 logger.warning(f"⚠️ [notify_owner_about_comment] У объявления {ann_id} отсутствуют message_ids, пропускаем.")
                 continue
 
-            message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
+            if isinstance(message_ids, str):
+                try:
+                    message_ids_list = json.loads(message_ids)
+                except Exception:
+                    logger.warning(
+                        "⚠️ [notify_owner_about_comment] Некорректный формат message_ids для объявления %s",
+                        ann_id,
+                    )
+                    message_ids_list = []
+            else:
+                message_ids_list = message_ids or []
             if message_id in message_ids_list:
                 announcement = (ann_id, owner_id)
                 logger.info(f"✅ [notify_owner_about_comment] Найдено соответствующее объявление: ID {ann_id}, владелец {owner_id}")

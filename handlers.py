@@ -18,6 +18,14 @@ from logger import logger
 
 logger = logging.getLogger(__name__)
 
+async def _user_owns_announcement(user_id: int, ann_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT id FROM announcements WHERE id = ? AND user_id = ?",
+            (ann_id, user_id),
+        )
+        return await cursor.fetchone() is not None
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает команду /start, отправляет приветственное сообщение и удаляет команду пользователя."""
     user_id = update.message.from_user.id
@@ -134,6 +142,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = query.from_user.id
     await query.answer()
     texts = get_texts(update)
 
@@ -151,13 +160,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(texts.ERROR_ANN_ID_NOT_FOUND)
         return CHOOSING
 
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute('SELECT id FROM announcements WHERE id = ?', (ann_id,))
-        row = await cursor.fetchone()
-        if not row:
-            logger.error(f"❌ Ошибка: объявление {ann_id} не найдено в БД.")
-            await query.message.reply_text(texts.ERROR_ANNOUNCEMENT_NOT_FOUND)
-            return CHOOSING
+    if not await _user_owns_announcement(user_id, ann_id):
+        logger.warning("⚠️ [button_handler] Нет доступа к объявлению ann_id=%s user_id=%s", ann_id, user_id)
+        await query.message.reply_text(texts.ERROR_ANNOUNCEMENT_NOT_FOUND)
+        return CHOOSING
 
     context.user_data['ann_id'] = ann_id
     context.user_data['is_editing'] = True
@@ -215,10 +221,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def edit_announcement_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = query.from_user.id
     await query.answer()
     texts = get_texts(update)
 
     ann_id = int(query.data.split("_")[1])
+    if not await _user_owns_announcement(user_id, ann_id):
+        logger.warning(
+            "⚠️ [edit_announcement_handler] Нет доступа к объявлению ann_id=%s user_id=%s",
+            ann_id,
+            user_id,
+        )
+        await query.message.reply_text(texts.ERROR_ANNOUNCEMENT_NOT_FOUND)
+        return CHOOSING
     context.user_data["ann_id"] = ann_id
 
     logger.info(f"✏️ [edit_announcement_handler] Открыто меню редактирования для объявления ID: {ann_id}")

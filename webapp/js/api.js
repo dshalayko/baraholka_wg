@@ -19,7 +19,13 @@ async function apiFetch(path, options = {}) {
     const error = new Error(message);
     error.status = response.status;
     error.data = detail;
+    if (response.status === 401) {
+      setUnauthorizedMode(true);
+    }
     throw error;
+  }
+  if (state.unauthorized) {
+    setUnauthorizedMode(false);
   }
   return response.json();
 }
@@ -30,6 +36,11 @@ async function refreshAds() {
     const data = await apiFetch("/api/announcements");
     state.ads = (data.items || []).slice().sort((a, b) => (b.id || 0) - (a.id || 0));
     renderAds();
+  } catch (err) {
+    if (err?.status === 401) {
+      return;
+    }
+    throw err;
   } finally {
     setBusy(false);
   }

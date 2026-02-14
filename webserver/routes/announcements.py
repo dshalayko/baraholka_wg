@@ -359,10 +359,14 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         await db.commit()
 
     if is_editing and old_message_ids:
-        try:
-            await forward_thread_replies(old_message_ids[0], new_message_ids[0])
-        except Exception:
-            pass
+        transfer_success = await forward_thread_replies(old_message_ids[0], new_message_ids[0])
+        if not transfer_success:
+            logger.warning(
+                "ann:publish comments transfer failed ann_id=%s old_message_id=%s new_message_id=%s",
+                ann_id,
+                old_message_ids[0],
+                new_message_ids[0],
+            )
 
         for message_id in old_message_ids:
             try:

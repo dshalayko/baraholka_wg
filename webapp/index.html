@@ -20,61 +20,71 @@
           <div class="busy-text" id="busyText">Загрузка...</div>
         </div>
       </div>
-      <header class="app-header">
-        <div class="app-title">WG Black Market app <span class="app-badge">beta</span></div>
-      </header>
-      <nav class="tabs">
-        <button class="tab active" id="tabMyAds">My ads</button>
-        <button class="tab" id="tabCreate">Create ad</button>
-        <button class="tab tab-icon" id="themeToggle" aria-label="Toggle theme">◐</button>
-      </nav>
+      <div id="authorizedContent">
+        <header class="app-header">
+          <div class="app-title">WG Black Market app <span class="app-badge">beta</span></div>
+        </header>
+        <nav class="tabs">
+          <button class="tab active" id="tabMyAds">My ads</button>
+          <button class="tab" id="tabCreate">Create ad</button>
+          <button class="tab tab-icon" id="themeToggle" aria-label="Toggle theme">◐</button>
+        </nav>
 
-      <section class="panel panel-list" id="listPanel">
-        <div class="list-shell" id="adsList">
-          <div class="empty" id="emptyState">No ads yet</div>
-        </div>
-      </section>
-
-      <section class="panel" id="formPanel" hidden>
-        <div class="panel-body">
-          <label class="field">
-            <span id="descLabel">Description</span>
-            <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
-          </label>
-          <label class="field" id="contactField">
-            <span id="contactLabel">Как связаться</span>
-            <input
-              id="contactInfo"
-              type="text"
-              maxlength="200"
-              placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
-            />
-          </label>
-          <label class="field field-checkbox">
-            <input id="priceInDescription" type="checkbox" />
-            <span id="priceInDescriptionLabel">Цена в описании</span>
-          </label>
-          <label class="field" id="priceField">
-            <span id="priceLabel">Price</span>
-            <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
-          </label>
-          <label class="field">
-            <span id="photosLabel">Photos (max 10)</span>
-            <div class="photo-actions" id="photoActions">
-              <button class="ghost" id="addMorePhotosBtn">Add photos</button>
-            </div>
-            <input id="photos" type="file" accept="image/*" multiple hidden />
-            <div class="upload-row">
-              <div class="chips" id="photoChips"></div>
-              <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
-            </div>
-            <div class="photo-grid" id="photoGrid"></div>
-          </label>
-          <div class="form-actions">
-            <button class="ghost" id="cancelFormBtn">Cancel</button>
-            <button class="ghost" id="saveAdBtn">Save draft</button>
+        <section class="panel panel-list" id="listPanel">
+          <div class="list-shell" id="adsList">
+            <div class="empty" id="emptyState">No ads yet</div>
           </div>
-          <button class="primary publish-wide" id="publishBtn">Publish</button>
+        </section>
+
+        <section class="panel" id="formPanel" hidden>
+          <div class="panel-body">
+            <label class="field">
+              <span id="descLabel">Description</span>
+              <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
+            </label>
+            <label class="field" id="contactField">
+              <span id="contactLabel">Как связаться</span>
+              <input
+                id="contactInfo"
+                type="text"
+                maxlength="200"
+                placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
+              />
+            </label>
+            <label class="field field-checkbox">
+              <input id="priceInDescription" type="checkbox" />
+              <span id="priceInDescriptionLabel">Цена в описании</span>
+            </label>
+            <label class="field" id="priceField">
+              <span id="priceLabel">Price</span>
+              <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
+            </label>
+            <label class="field">
+              <span id="photosLabel">Photos (max 10)</span>
+              <div class="photo-actions" id="photoActions">
+                <button class="ghost" id="addMorePhotosBtn">Add photos</button>
+              </div>
+              <input id="photos" type="file" accept="image/*" multiple hidden />
+              <div class="upload-row">
+                <div class="chips" id="photoChips"></div>
+                <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
+              </div>
+              <div class="photo-grid" id="photoGrid"></div>
+            </label>
+            <div class="form-actions">
+              <button class="ghost" id="cancelFormBtn">Cancel</button>
+              <button class="ghost" id="saveAdBtn">Save draft</button>
+            </div>
+            <button class="primary publish-wide" id="publishBtn">Publish</button>
+          </div>
+        </section>
+      </div>
+      <section class="unauthorized-state" id="unauthorizedState" hidden>
+        <div class="unauthorized-card">
+          <h2 class="unauthorized-title" id="unauthorizedTitle">Приложение доступно только в Telegram</h2>
+          <p class="unauthorized-text" id="unauthorizedText">
+            Откройте эту страницу из Telegram Mini App. При обычном открытии в браузере авторизация недоступна.
+          </p>
         </div>
       </section>
     </div>
