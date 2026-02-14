@@ -67,7 +67,11 @@ function openEditModal(ad) {
   renderEditPhotoPreviews();
   elements.editModal.hidden = false;
   elements.editModal.style.display = "flex";
-  autoResizeTextarea(elements.editDescription);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      autoResizeTextarea(elements.editDescription);
+    });
+  });
 }
 
 function closeEditModal() {

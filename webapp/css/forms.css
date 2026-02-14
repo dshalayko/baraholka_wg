@@ -11,6 +11,28 @@
   color: var(--ink);
 }
 
+.text-toolbar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tool-btn {
+  min-width: 34px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tool-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
 .field-checkbox {
   display: flex;
   align-items: center;
@@ -35,19 +57,19 @@ input[type="text"] {
   border-radius: 10px;
   border: 1px solid var(--border);
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--ink);
   backdrop-filter: blur(calc(var(--blur) / 2));
 }
 
 textarea::placeholder,
 input[type="text"]::placeholder {
-  color: rgba(245, 247, 250, 0.6);
+  color: rgba(245, 247, 250, 0.72);
 }
 
 :root[data-theme="light"] textarea::placeholder,
 :root[data-theme="light"] input[type="text"]::placeholder {
-  color: rgba(15, 20, 26, 0.5);
+  color: rgba(15, 20, 26, 0.62);
 }
 
 textarea {
@@ -62,8 +84,8 @@ input[type="file"] {
 
 textarea:focus,
 input[type="text"]:focus {
-  outline: 2px solid rgba(36, 129, 204, 0.2);
-  border-color: rgba(36, 129, 204, 0.4);
+  outline: 2px solid rgba(79, 156, 228, 0.28);
+  border-color: rgba(79, 156, 228, 0.55);
 }
 
 .field-invalid {
@@ -85,8 +107,8 @@ input[type="text"]:focus {
 }
 
 .chip {
-  background: #efe7d1;
-  color: #4a3f25;
+  background: var(--chip-bg);
+  color: var(--chip-ink);
   padding: 6px 10px;
   border-radius: 999px;
   font-size: 12px;
@@ -104,7 +126,7 @@ input[type="text"]:focus {
 }
 
 .chips {
-  display: none;
+  display: flex;
 }
 
 .photo-grid {

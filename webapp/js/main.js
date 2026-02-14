@@ -1,7 +1,41 @@
+function closeSettingsMenu() {
+  elements.settingsMenu.hidden = true;
+}
+
+function toggleSettingsMenu() {
+  elements.settingsMenu.hidden = !elements.settingsMenu.hidden;
+}
+
+function setLanguage(languageCode) {
+  if (!languageCode) return;
+  state.languageCode = languageCode;
+  localStorage.setItem("language", languageCode);
+  applyTranslations();
+  renderAds();
+}
+
+function syncSettingsOptions() {
+  const isDark = isDarkTheme();
+  const isRu = state.languageCode?.startsWith("ru");
+  elements.themeDarkBtn.classList.toggle("active", isDark);
+  elements.themeLightBtn.classList.toggle("active", !isDark);
+  elements.languageRuBtn.classList.toggle("active", isRu);
+  elements.languageEnBtn.classList.toggle("active", !isRu);
+}
+
 function applyTranslations() {
   document.documentElement.lang = state.languageCode?.startsWith("ru") ? "ru" : "en";
+  elements.appTitleText.textContent = t("appTitle");
+  elements.appBadgeText.textContent = t("beta");
   elements.tabMyAds.textContent = t("myAds");
   elements.tabCreate.textContent = t("create");
+  elements.settingsToggle.setAttribute("aria-label", t("settings"));
+  elements.settingsThemeLabel.textContent = t("settingsTheme");
+  elements.settingsLanguageLabel.textContent = t("settingsLanguage");
+  elements.themeLightBtn.textContent = t("themeLight");
+  elements.themeDarkBtn.textContent = t("themeDark");
+  elements.languageRuBtn.textContent = t("languageRu");
+  elements.languageEnBtn.textContent = t("languageEn");
   elements.cancelFormBtn.textContent = t("cancel");
   elements.descLabel.textContent = t("description");
   elements.contactLabel.textContent = t("contactLabel");
@@ -11,7 +45,6 @@ function applyTranslations() {
   elements.emptyState.textContent = t("noAds");
   elements.description.placeholder = t("descPlaceholder");
   elements.price.placeholder = t("pricePlaceholder");
-  elements.themeToggle.textContent = isDarkTheme() ? "◐" : "◑";
   elements.saveAdBtn.textContent = t("saveDraft");
   elements.publishBtn.textContent = t("publishNow");
   elements.addMorePhotosBtn.textContent = t("addMore");
@@ -37,6 +70,7 @@ function applyTranslations() {
   elements.errorReportBtn.textContent = t("reportError");
   elements.unauthorizedTitle.textContent = t("unauthorizedTitle");
   elements.unauthorizedText.textContent = t("unauthorizedText");
+  syncSettingsOptions();
 }
 
 function bindEvents() {
@@ -132,7 +166,40 @@ function bindEvents() {
     elements.photos.click();
   });
   elements.photos.addEventListener("change", handlePhotoInput);
-  elements.themeToggle.addEventListener("click", toggleTheme);
+  elements.descBoldBtn.addEventListener("click", () => wrapSelection(elements.description, "**"));
+  elements.descItalicBtn.addEventListener("click", () => wrapSelection(elements.description, "_"));
+  elements.descStrikeBtn.addEventListener("click", () => wrapSelection(elements.description, "~~"));
+  elements.settingsToggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleSettingsMenu();
+  });
+  elements.settingsMenu.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  elements.themeLightBtn.addEventListener("click", () => {
+    setTheme("light");
+    closeSettingsMenu();
+  });
+  elements.themeDarkBtn.addEventListener("click", () => {
+    setTheme("dark");
+    closeSettingsMenu();
+  });
+  elements.languageRuBtn.addEventListener("click", () => {
+    setLanguage("ru");
+    closeSettingsMenu();
+  });
+  elements.languageEnBtn.addEventListener("click", () => {
+    setLanguage("en");
+    closeSettingsMenu();
+  });
+  document.addEventListener("click", () => {
+    closeSettingsMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeSettingsMenu();
+    }
+  });
   elements.editAddMorePhotosBtn.addEventListener("click", (event) => {
     event.preventDefault();
     elements.editPhotos.click();
@@ -141,6 +208,9 @@ function bindEvents() {
     autoResizeTextarea(elements.editDescription);
     setFieldInvalid(elements.editDescription, false);
   });
+  elements.editDescBoldBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "**"));
+  elements.editDescItalicBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "_"));
+  elements.editDescStrikeBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "~~"));
   elements.editContactInfo.addEventListener("input", () => {
     setFieldInvalid(elements.editContactInfo, false);
   });

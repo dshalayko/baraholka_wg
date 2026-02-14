@@ -53,6 +53,41 @@ function autoResizeDescription() {
   autoResizeTextarea(elements.description);
 }
 
+function wrapSelection(textarea, prefix, suffix = prefix) {
+  if (!textarea) return;
+  const start = textarea.selectionStart ?? 0;
+  const end = textarea.selectionEnd ?? start;
+  const value = textarea.value || "";
+  const selected = value.slice(start, end);
+  const left = value.slice(0, start);
+  const right = value.slice(end);
+
+  if (!selected) {
+    textarea.value = `${left}${prefix}${suffix}${right}`;
+    const caret = start + prefix.length;
+    textarea.setSelectionRange(caret, caret);
+  } else {
+    textarea.value = `${left}${prefix}${selected}${suffix}${right}`;
+    textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+  }
+
+  textarea.focus();
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function renderStyledText(text) {
+  const source = String(text || "");
+  const escaped = source
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return escaped
+    .replace(/\*\*(.+?)\*\*/gs, "<strong>$1</strong>")
+    .replace(/_(.+?)_/gs, "<em>$1</em>")
+    .replace(/~~(.+?)~~/gs, "<s>$1</s>")
+    .replace(/\n/g, "<br>");
+}
+
 function setFieldInvalid(input, isInvalid) {
   if (!input) return;
   input.classList.toggle("field-invalid", isInvalid);
@@ -153,7 +188,7 @@ function setBusy(isBusy, text = "") {
     elements.busyText.textContent = text;
   }
   document.querySelectorAll("button, input, textarea, select").forEach((el) => {
-    if (el === elements.themeToggle) return;
+    if (el === elements.settingsToggle) return;
     el.disabled = active;
   });
 }
@@ -178,6 +213,18 @@ function isDarkTheme() {
 }
 
 function applyTheme(theme) {
+  const root = document.documentElement.style;
+  [
+    "--bg",
+    "--secondary-bg",
+    "--ink",
+    "--muted",
+    "--meta-text",
+    "--link",
+    "--button",
+    "--button-text",
+    "--border",
+  ].forEach((prop) => root.removeProperty(prop));
   document.documentElement.dataset.theme = theme;
   if (tg?.themeParams) {
     tg.setBackgroundColor?.(tg.themeParams.bg_color || (theme === "dark" ? "#0f1116" : "#f2f5f9"));
@@ -191,21 +238,25 @@ function toggleTheme() {
   applyTheme(next);
 }
 
+function setTheme(theme) {
+  if (theme !== "light" && theme !== "dark") return;
+  localStorage.setItem("theme", theme);
+  applyTheme(theme);
+}
+
 function initTheme() {
-  if (applyTelegramTheme()) {
-    if (elements.themeToggle) {
-      elements.themeToggle.hidden = true;
-    }
-    tg?.setBackgroundColor?.(tg.themeParams.bg_color || "#ffffff");
-    tg?.onEvent?.("themeChanged", () => {
-      applyTelegramTheme();
-      applyTranslations();
-    });
-    return;
-  }
   const saved = localStorage.getItem("theme");
   if (saved === "light" || saved === "dark") {
     applyTheme(saved);
+    return;
+  }
+  if (applyTelegramTheme()) {
+    tg?.setBackgroundColor?.(tg.themeParams.bg_color || "#ffffff");
+    tg?.onEvent?.("themeChanged", () => {
+      if (localStorage.getItem("theme")) return;
+      applyTelegramTheme();
+      applyTranslations();
+    });
     return;
   }
   if (tg?.colorScheme === "light") {

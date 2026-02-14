@@ -4,6 +4,13 @@ function showTab(tab) {
   elements.formPanel.hidden = isList;
   elements.tabMyAds.classList.toggle("active", isList);
   elements.tabCreate.classList.toggle("active", !isList);
+  if (!isList) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        autoResizeDescription();
+      });
+    });
+  }
 }
 
 function resetForm() {
@@ -89,9 +96,29 @@ function renderAds() {
       }
     }
 
+    const body = document.createElement("div");
+    body.className = "ad-body";
+
+    const header = document.createElement("div");
+    header.className = "ad-header";
+
+    const statusTag = document.createElement("span");
+    statusTag.className = "ad-status-tag";
+    if (!ad.is_published) {
+      statusTag.textContent = t("statusDraft");
+      statusTag.classList.add("is-draft");
+    } else if (ad.is_updated) {
+      statusTag.textContent = t("statusUpdated");
+      statusTag.classList.add("is-updated");
+    } else {
+      statusTag.textContent = t("statusPublished");
+      statusTag.classList.add("is-published");
+    }
+    header.appendChild(statusTag);
+
     const title = document.createElement("h3");
     title.className = "ad-description";
-    title.textContent = ad.description || "(no description)";
+    title.innerHTML = renderStyledText(ad.description || t("noAds"));
 
     const meta = document.createElement("div");
     meta.className = "ad-meta ad-price";
@@ -107,7 +134,7 @@ function renderAds() {
     meta.append(priceLabel, priceValue);
 
     const status = document.createElement("div");
-    status.className = "ad-meta";
+    status.className = "ad-meta ad-timestamp";
     if (!ad.is_published) {
       status.textContent = t("draft");
     } else if (ad.is_updated) {
@@ -116,42 +143,13 @@ function renderAds() {
       status.textContent = `${t("publishedAt")} ${formatPublishedAt(ad.published_at)}`.trim();
     }
 
-    if (!ad.is_published) {
-      const publishBtn = document.createElement("button");
-      publishBtn.className = "primary ad-center";
-      publishBtn.textContent = t("publish");
-      publishBtn.onclick = () => publishAd(ad.id);
-      card.append(publishBtn);
-    }
-
-    if (ad.post_link) {
-      const openBtn = document.createElement("button");
-      openBtn.className = "ad-open ad-center";
-      openBtn.textContent = t("open");
-      openBtn.onclick = () => tg?.openTelegramLink?.(ad.post_link);
-      card.append(openBtn);
-    }
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "ad-delete";
-    deleteBtn.type = "button";
-    deleteBtn.setAttribute("aria-label", t("delete"));
-    deleteBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 7h2v8h-2v-8zm4 0h2v8h-2v-8zM7 8h10l-1 12H8L7 8z"></path>
-      </svg>
-    `;
-    deleteBtn.onclick = () => openDeleteConfirm(ad.id);
+    const actions = document.createElement("div");
+    actions.className = "ad-actions";
 
     const editBtn = document.createElement("button");
-    editBtn.className = "ad-edit";
+    editBtn.className = "ghost ad-action";
     editBtn.type = "button";
-    editBtn.setAttribute("aria-label", t("edit"));
-    editBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>
-      </svg>
-    `;
+    editBtn.textContent = t("edit");
     editBtn.onclick = () => {
       if (ad.is_published) {
         openEditModal(ad);
@@ -159,8 +157,36 @@ function renderAds() {
         startEdit(ad);
       }
     };
+    actions.appendChild(editBtn);
 
-    card.append(title, meta, status, editBtn, deleteBtn);
+    if (!ad.is_published) {
+      const publishBtn = document.createElement("button");
+      publishBtn.className = "primary ad-action ad-action-main";
+      publishBtn.type = "button";
+      publishBtn.textContent = t("publish");
+      publishBtn.onclick = () => publishAd(ad.id);
+      actions.appendChild(publishBtn);
+    }
+
+    if (ad.post_link) {
+      const openBtn = document.createElement("button");
+      openBtn.className = "ad-open ad-action ad-action-main";
+      openBtn.type = "button";
+      openBtn.textContent = t("open");
+      openBtn.onclick = () => tg?.openTelegramLink?.(ad.post_link);
+      actions.appendChild(openBtn);
+    }
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "danger ad-action";
+    deleteBtn.type = "button";
+    deleteBtn.setAttribute("aria-label", t("delete"));
+    deleteBtn.textContent = t("delete");
+    deleteBtn.onclick = () => openDeleteConfirm(ad.id);
+    actions.appendChild(deleteBtn);
+
+    body.append(header, title, meta, status, actions);
+    card.append(body);
     elements.adsList.appendChild(card);
   });
 }
@@ -182,8 +208,12 @@ function startEdit(ad) {
   elements.priceInDescription.checked = !!ad.price_in_description;
   applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
   elements.saveAdBtn.hidden = !!ad.is_published;
-  autoResizeDescription();
   renderPhotoPreviews();
   showTab("form");
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      autoResizeDescription();
+    });
+  });
   updateCounts();
 }

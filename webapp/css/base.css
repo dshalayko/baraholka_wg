@@ -2,13 +2,15 @@
   --bg: #15181d;
   --secondary-bg: rgba(255, 255, 255, 0.06);
   --ink: #f4f5f7;
-  --muted: rgba(244, 245, 247, 0.6);
-  --meta-text: rgba(240, 242, 245, 0.78);
+  --muted: rgba(244, 245, 247, 0.78);
+  --meta-text: rgba(240, 242, 245, 0.9);
   --link: #84b7ff;
   --button: rgba(120, 180, 255, 0.2);
   --button-text: #eef6ff;
   --border: rgba(255, 255, 255, 0.12);
   --danger: rgba(255, 99, 99, 0.75);
+  --chip-bg: rgba(236, 199, 124, 0.2);
+  --chip-ink: #f4ddb1;
   --radius: 18px;
   --radius-lg: 22px;
   --radius-sm: 12px;
@@ -25,13 +27,15 @@
   --bg: #f2f3f6;
   --secondary-bg: rgba(255, 255, 255, 0.7);
   --ink: #0f1216;
-  --muted: rgba(15, 18, 22, 0.5);
-  --meta-text: rgba(15, 18, 22, 0.75);
+  --muted: rgba(15, 18, 22, 0.72);
+  --meta-text: rgba(15, 18, 22, 0.86);
   --link: #1d66d6;
   --button: rgba(60, 120, 210, 0.16);
   --button-text: #0f1216;
   --border: rgba(15, 18, 22, 0.1);
   --danger: rgba(228, 71, 79, 0.75);
+  --chip-bg: rgba(153, 112, 35, 0.16);
+  --chip-ink: #4b3314;
   --radius: 18px;
   --radius-lg: 22px;
   --radius-sm: 12px;
@@ -54,7 +58,7 @@
 
 body {
   margin: 0;
-  font-family: "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  font-family: "Manrope", "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   color: var(--ink);
   background: var(--page-bg);
   min-height: 100vh;

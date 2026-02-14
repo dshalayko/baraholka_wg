@@ -1,9 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>WG Black Market Mini App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="icon" href="/favicon.ico" />
     <link rel="stylesheet" href="/static/css/base.css" />
     <link rel="stylesheet" href="/static/css/layout.css" />
@@ -22,12 +25,33 @@
       </div>
       <div id="authorizedContent">
         <header class="app-header">
-          <div class="app-title">WG Black Market app <span class="app-badge">beta</span></div>
+          <div class="app-title">
+            <span id="appTitleText">WG Black Market</span>
+            <span class="app-badge" id="appBadgeText">beta</span>
+          </div>
+          <div class="settings-wrap">
+            <button class="settings-toggle" id="settingsToggle" aria-label="Settings">⚙</button>
+            <div class="settings-menu" id="settingsMenu" hidden>
+              <div class="settings-group">
+                <div class="settings-label" id="settingsThemeLabel">Theme</div>
+                <div class="settings-options">
+                  <button class="settings-option" id="themeLightBtn" type="button">Light</button>
+                  <button class="settings-option" id="themeDarkBtn" type="button">Dark</button>
+                </div>
+              </div>
+              <div class="settings-group">
+                <div class="settings-label" id="settingsLanguageLabel">Language</div>
+                <div class="settings-options">
+                  <button class="settings-option" id="languageRuBtn" type="button">RU</button>
+                  <button class="settings-option" id="languageEnBtn" type="button">EN</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </header>
         <nav class="tabs">
           <button class="tab active" id="tabMyAds">My ads</button>
           <button class="tab" id="tabCreate">Create ad</button>
-          <button class="tab tab-icon" id="themeToggle" aria-label="Toggle theme">◐</button>
         </nav>
 
         <section class="panel panel-list" id="listPanel">
@@ -40,6 +64,11 @@
           <div class="panel-body">
             <label class="field">
               <span id="descLabel">Description</span>
+              <div class="text-toolbar">
+                <button class="tool-btn" id="descBoldBtn" type="button" title="Bold"><strong>B</strong></button>
+                <button class="tool-btn" id="descItalicBtn" type="button" title="Italic"><em>I</em></button>
+                <button class="tool-btn" id="descStrikeBtn" type="button" title="Strikethrough"><s>S</s></button>
+              </div>
               <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
             </label>
             <label class="field" id="contactField">
@@ -95,6 +124,11 @@
         <div class="modal-body">
           <label class="field">
             <span id="editDescLabel">Описание</span>
+            <div class="text-toolbar">
+              <button class="tool-btn" id="editDescBoldBtn" type="button" title="Bold"><strong>B</strong></button>
+              <button class="tool-btn" id="editDescItalicBtn" type="button" title="Italic"><em>I</em></button>
+              <button class="tool-btn" id="editDescStrikeBtn" type="button" title="Strikethrough"><s>S</s></button>
+            </div>
             <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
           </label>
           <label class="field" id="editContactField">

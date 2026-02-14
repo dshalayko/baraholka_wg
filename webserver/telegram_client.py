@@ -1,4 +1,5 @@
 import io
+import re
 from typing import Optional
 
 from telegram import Bot, InputFile
@@ -25,6 +26,37 @@ def normalize_chat_id(value: Optional[str]) -> Optional[int]:
         return None
 
 
+def _escape_description_with_styles(text: str) -> str:
+    if not text:
+        return ""
+
+    placeholders: list[str] = []
+
+    def _stash(match: re.Match[str], marker: str) -> str:
+        inner = match.group(1).strip()
+        if not inner:
+            return match.group(0)
+        escaped_inner = escape_markdown_v2(inner)
+        if marker == "bold":
+            rendered = f"*{escaped_inner}*"
+        elif marker == "italic":
+            rendered = f"_{escaped_inner}_"
+        else:
+            rendered = f"~{escaped_inner}~"
+        idx = len(placeholders)
+        placeholders.append(rendered)
+        return f"\x00STYLE{idx}\x00"
+
+    processed = re.sub(r"\*\*(.+?)\*\*", lambda m: _stash(m, "bold"), text, flags=re.DOTALL)
+    processed = re.sub(r"_(.+?)_", lambda m: _stash(m, "italic"), processed, flags=re.DOTALL)
+    processed = re.sub(r"~~(.+?)~~", lambda m: _stash(m, "strike"), processed, flags=re.DOTALL)
+    escaped = escape_markdown_v2(processed)
+
+    for idx, rendered in enumerate(placeholders):
+        escaped = escaped.replace(f"\x00STYLE{idx}\x00", rendered)
+    return escaped
+
+
 def format_announcement_text(
     description: str,
     price: str,
@@ -34,7 +66,7 @@ def format_announcement_text(
     user_display: Optional[str],
     is_updated: bool,
 ) -> str:
-    description = escape_markdown_v2(description)
+    description = _escape_description_with_styles(description)
     if username != "None":
         contact_info = f"{texts_ru.CONTACT_TEXT}\n@{escape_markdown_v2(username)}"
     else:
