@@ -188,8 +188,8 @@ function renderAds() {
     deleteBtn.onclick = () => openDeleteConfirm(ad.id);
     actions.appendChild(deleteBtn);
 
-    body.append(header, title, meta, status, actions);
-    card.append(body);
+    body.append(title, meta, status, actions);
+    card.append(header, body);
     elements.adsList.appendChild(card);
   });
 }
