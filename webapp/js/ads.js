@@ -50,6 +50,9 @@ function renderAds() {
     card.className = "ad-card";
 
     const photos = Array.isArray(ad.photo_file_ids) ? ad.photo_file_ids : [];
+    if (photos.length) {
+      card.classList.add("ad-card-media");
+    }
     if (photos.length && tg?.initData) {
       const gallery = document.createElement("div");
       const initData = encodeURIComponent(tg.initData);
