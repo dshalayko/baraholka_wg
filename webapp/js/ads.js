@@ -48,6 +48,7 @@ function renderAds() {
   state.ads.forEach((ad) => {
     const card = document.createElement("div");
     card.className = "ad-card";
+    card.style.position = "relative";
 
     const photos = Array.isArray(ad.photo_file_ids) ? ad.photo_file_ids : [];
     if (photos.length) {
@@ -101,9 +102,17 @@ function renderAds() {
 
     const body = document.createElement("div");
     body.className = "ad-body";
+    if (!photos.length) {
+      body.style.paddingTop = "44px";
+    }
 
     const header = document.createElement("div");
     header.className = "ad-header";
+    header.style.position = "absolute";
+    header.style.top = "10px";
+    header.style.right = "10px";
+    header.style.zIndex = "4";
+    header.style.pointerEvents = "none";
 
     const statusTag = document.createElement("span");
     statusTag.className = "ad-status-tag";
