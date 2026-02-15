@@ -1,17 +1,29 @@
 import asyncio
 import os
+import time
+from typing import Dict, Iterable
 
 from pyrogram import Client
 from pyrogram.enums import ChatType
+from pyrogram.errors import FloodWait
 
 from logger import logger
-from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID
+from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID, PRIVATE_CHANNEL_ID
 
 BASE_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 SESSION_PATH = os.path.join(DATA_DIR, "my_session")
 _forward_lock = asyncio.Lock()
+_comments_count_cache: Dict[int, tuple[int, float]] = {}
+_COMMENTS_CACHE_TTL_SECONDS = 30.0
+
+
+def _normalize_int_chat_id(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 async def get_supergroup_id(app, group_name=None):
@@ -157,3 +169,68 @@ async def get_message_id_by_thread_id(thread_id):
         except Exception as e:
             logger.error(f"❌ [get_message_id_by_thread_id] Ошибка при поиске message_id: {e}")
             return None
+
+
+async def get_discussion_replies_counts(post_message_ids: Iterable[int]) -> Dict[int, int]:
+    ids = []
+    for raw_id in post_message_ids:
+        try:
+            value = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            ids.append(value)
+    unique_ids = sorted(set(ids))
+    if not unique_ids:
+        return {}
+
+    channel_id = _normalize_int_chat_id(PRIVATE_CHANNEL_ID)
+    if channel_id is None:
+        logger.warning("⚠️ [get_discussion_replies_counts] PRIVATE_CHANNEL_ID is not configured")
+        return {msg_id: 0 for msg_id in unique_ids}
+
+    now = time.monotonic()
+    results: Dict[int, int] = {}
+    ids_to_fetch = []
+    for msg_id in unique_ids:
+        cached = _comments_count_cache.get(msg_id)
+        if cached and (now - cached[1]) < _COMMENTS_CACHE_TTL_SECONDS:
+            results[msg_id] = cached[0]
+            continue
+        ids_to_fetch.append(msg_id)
+
+    if not ids_to_fetch:
+        return results
+
+    for msg_id in ids_to_fetch:
+        results.setdefault(msg_id, 0)
+
+    async with _forward_lock:
+        try:
+            async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, sleep_threshold=0) as app:
+                for msg_id in ids_to_fetch:
+                    try:
+                        count = await app.get_discussion_replies_count(channel_id, msg_id)
+                        safe_count = max(0, int(count or 0))
+                        results[msg_id] = safe_count
+                        _comments_count_cache[msg_id] = (safe_count, time.monotonic())
+                    except FloodWait as exc:
+                        logger.warning(
+                            "⚠️ [get_discussion_replies_counts] FloodWait %ss on post %s. "
+                            "Returning cached/zero value without blocking.",
+                            getattr(exc, "value", None) or "unknown",
+                            msg_id,
+                        )
+                        cached = _comments_count_cache.get(msg_id)
+                        results[msg_id] = cached[0] if cached else 0
+                    except Exception as exc:
+                        logger.warning(
+                            "⚠️ [get_discussion_replies_counts] Failed to fetch count for post %s: %s",
+                            msg_id,
+                            exc,
+                        )
+                        cached = _comments_count_cache.get(msg_id)
+                        results[msg_id] = cached[0] if cached else 0
+        except Exception as exc:
+            logger.warning("⚠️ [get_discussion_replies_counts] Failed to initialize client: %s", exc)
+    return results

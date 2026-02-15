@@ -205,6 +205,7 @@ function setUnauthorizedMode(enabled) {
     closeDeleteConfirm();
     closeEditModal();
     closeErrorModal();
+    closeCommentsOverviewModal();
   }
 }
 

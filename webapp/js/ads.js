@@ -37,11 +37,96 @@ function resetForm() {
 
 function updatePreview() {}
 
+function formatCommentsCount(value) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count <= 0) return "0";
+  if (count > 99) return "99+";
+  return String(count);
+}
+
+function buildCommentsLink(postLink) {
+  if (!postLink) return "";
+  const separator = postLink.includes("?") ? "&" : "?";
+  return `${postLink}${separator}comment=1`;
+}
+
+function getAdCommentsCount(ad) {
+  const count = Number(ad?.comments_count);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+function getAdsWithComments() {
+  return (state.ads || [])
+    .filter((ad) => ad?.is_published && ad?.post_link && getAdCommentsCount(ad) > 0)
+    .sort((a, b) => {
+      const byCount = getAdCommentsCount(b) - getAdCommentsCount(a);
+      if (byCount !== 0) return byCount;
+      return (b.id || 0) - (a.id || 0);
+    });
+}
+
+function toShortDescription(value) {
+  const raw = String(value || "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/_(.*?)_/g, "$1")
+    .replace(/~~(.*?)~~/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return t("noAds");
+  if (raw.length <= 78) return raw;
+  return `${raw.slice(0, 75).trim()}...`;
+}
+
+function renderCommentsOverview() {
+  const commentedAds = getAdsWithComments();
+  const totalComments = commentedAds.reduce((sum, ad) => sum + getAdCommentsCount(ad), 0);
+
+  elements.commentsTotalBadge.hidden = totalComments <= 0;
+  elements.commentsTotalBadge.textContent = formatCommentsCount(totalComments);
+
+  elements.commentsOverviewList.innerHTML = "";
+  if (!commentedAds.length) {
+    const empty = document.createElement("div");
+    empty.className = "comments-overview-empty";
+    empty.textContent = t("commentsOverviewEmpty");
+    elements.commentsOverviewList.appendChild(empty);
+    return;
+  }
+
+  commentedAds.forEach((ad) => {
+    const commentsCount = getAdCommentsCount(ad);
+    const row = document.createElement("div");
+    row.className = "comments-overview-item";
+
+    const textWrap = document.createElement("div");
+    textWrap.className = "comments-overview-text";
+
+    const desc = document.createElement("div");
+    desc.className = "comments-overview-desc";
+    desc.textContent = toShortDescription(ad.description);
+
+    const meta = document.createElement("div");
+    meta.className = "comments-overview-meta";
+    meta.textContent = `${t("comments")}: ${commentsCount}`;
+    textWrap.append(desc, meta);
+
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "ghost comments-overview-open";
+    viewBtn.type = "button";
+    viewBtn.textContent = t("viewComments");
+    viewBtn.setAttribute("data-comments-link", buildCommentsLink(ad.post_link) || ad.post_link);
+
+    row.append(textWrap, viewBtn);
+    elements.commentsOverviewList.appendChild(row);
+  });
+}
+
 function renderAds() {
   elements.adsList.innerHTML = "";
   if (!state.ads.length) {
     elements.adsList.appendChild(elements.emptyState);
     elements.emptyState.hidden = false;
+    renderCommentsOverview();
     return;
   }
   elements.emptyState.hidden = true;
@@ -159,9 +244,15 @@ function renderAds() {
     actions.className = "ad-actions";
 
     const editBtn = document.createElement("button");
-    editBtn.className = "ghost ad-action";
+    editBtn.className = "ghost ad-action ad-action-icon";
     editBtn.type = "button";
-    editBtn.textContent = t("edit");
+    editBtn.setAttribute("aria-label", t("edit"));
+    editBtn.title = t("edit");
+    editBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 20h4l10.5-10.5a1.4 1.4 0 0 0 0-2L16.5 5.5a1.4 1.4 0 0 0-2 0L4 16v4zM13.8 7.2l3 3"></path>
+      </svg>
+    `;
     editBtn.onclick = () => {
       if (ad.is_published) {
         openEditModal(ad);
@@ -189,11 +280,38 @@ function renderAds() {
       actions.appendChild(openBtn);
     }
 
+    const commentsCount = Number(ad.comments_count) || 0;
+    if (ad.is_published && ad.post_link && commentsCount > 0) {
+      const commentsBtn = document.createElement("button");
+      commentsBtn.className = "ghost ad-action ad-action-icon ad-action-comments";
+      commentsBtn.type = "button";
+      commentsBtn.setAttribute("aria-label", `${t("comments")} (${commentsCount})`);
+      commentsBtn.title = `${t("comments")}: ${commentsCount}`;
+      commentsBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 18l-3 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H6z"></path>
+          <path d="M8 9h8M8 13h6"></path>
+        </svg>
+        <span class="ad-action-badge">${formatCommentsCount(commentsCount)}</span>
+      `;
+      commentsBtn.onclick = () => {
+        const commentsLink = buildCommentsLink(ad.post_link);
+        tg?.openTelegramLink?.(commentsLink || ad.post_link);
+      };
+      actions.appendChild(commentsBtn);
+    }
+
     const deleteBtn = document.createElement("button");
-    deleteBtn.className = "danger ad-action";
+    deleteBtn.className = "danger ad-action ad-action-icon ad-action-delete";
     deleteBtn.type = "button";
     deleteBtn.setAttribute("aria-label", t("delete"));
-    deleteBtn.textContent = t("delete");
+    deleteBtn.title = t("delete");
+    deleteBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M9 4h6l1 2h4v2H4V6h4l1-2z"></path>
+        <path d="M6 8h12l-1 12H7L6 8z"></path>
+      </svg>
+    `;
     deleteBtn.onclick = () => openDeleteConfirm(ad.id);
     actions.appendChild(deleteBtn);
 
@@ -201,6 +319,7 @@ function renderAds() {
     card.append(header, body);
     elements.adsList.appendChild(card);
   });
+  renderCommentsOverview();
 }
 
 function startEdit(ad) {

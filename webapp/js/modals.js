@@ -29,6 +29,16 @@ function closeErrorModal() {
   elements.errorModal.style.display = "none";
 }
 
+function openCommentsOverviewModal() {
+  elements.commentsOverviewModal.hidden = false;
+  elements.commentsOverviewModal.style.display = "flex";
+}
+
+function closeCommentsOverviewModal() {
+  elements.commentsOverviewModal.hidden = true;
+  elements.commentsOverviewModal.style.display = "none";
+}
+
 function resetEditModal() {
   state.editModal.id = null;
   state.editModal.photoFileIds = [];

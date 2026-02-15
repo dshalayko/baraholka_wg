@@ -20,5 +20,6 @@ class AnnouncementOut(BaseModel):
     photo_file_ids: List[str]
     is_published: bool
     post_link: Optional[str] = None
+    comments_count: int = 0
     published_at: Optional[str] = None
     is_updated: bool = False

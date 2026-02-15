@@ -9,7 +9,7 @@ from fastapi.responses import Response
 from telegram import InputMediaPhoto
 from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 
-from comments_manager import forward_thread_replies
+from comments_manager import forward_thread_replies, get_discussion_replies_counts
 from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
 from utils import get_private_channel_post_link, get_serbia_time
 from webserver.auth import get_user_from_request
@@ -35,32 +35,45 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
         )
         rows = await cursor.fetchall()
 
+    published_root_message_ids = []
+    pending_items = []
+
     for row in rows:
         ann_id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, last_published_is_edit = row
         photo_list = json.loads(photo_file_ids) if photo_file_ids else []
         message_list = json.loads(message_ids) if message_ids else []
         is_published = bool(message_list)
         is_updated = bool(last_published_is_edit) if is_published else False
+        root_message_id = message_list[0] if is_published else None
+        if root_message_id:
+            published_root_message_ids.append(root_message_id)
         private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
         post_link = (
             get_private_channel_post_link(private_channel_id, message_list[0])
             if is_published and private_channel_id is not None
             else None
         )
-        items.append(
-            AnnouncementOut(
-                id=ann_id,
-                description=description,
-                price=price,
-                price_in_description=bool(price_in_description),
-                contact_info=contact_info,
-                photo_file_ids=photo_list,
-                is_published=is_published,
-                post_link=post_link,
-                published_at=timestamp if is_published else None,
-                is_updated=is_updated,
-            ).dict()
+        pending_items.append(
+            {
+                "id": ann_id,
+                "description": description,
+                "price": price,
+                "price_in_description": bool(price_in_description),
+                "contact_info": contact_info,
+                "photo_file_ids": photo_list,
+                "is_published": is_published,
+                "post_link": post_link,
+                "published_at": timestamp if is_published else None,
+                "is_updated": is_updated,
+                "_root_message_id": root_message_id,
+            }
         )
+
+    comments_counts = await get_discussion_replies_counts(published_root_message_ids) if published_root_message_ids else {}
+    for item in pending_items:
+        root_message_id = item.pop("_root_message_id", None)
+        item["comments_count"] = comments_counts.get(root_message_id, 0) if root_message_id else 0
+        items.append(AnnouncementOut(**item).dict())
 
     return {"items": items}
 

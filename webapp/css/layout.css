@@ -18,6 +18,9 @@
 
 .settings-wrap {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .settings-toggle {
@@ -32,6 +35,39 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.comments-toggle {
+  position: relative;
+}
+
+.comments-toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.header-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ff8b6b, #ff5d7a);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
 .settings-menu {

@@ -30,6 +30,7 @@ function applyTranslations() {
   elements.tabMyAds.textContent = t("myAds");
   elements.tabCreate.textContent = t("create");
   elements.settingsToggle.setAttribute("aria-label", t("settings"));
+  elements.commentsToggle.setAttribute("aria-label", t("comments"));
   elements.settingsThemeLabel.textContent = t("settingsTheme");
   elements.settingsLanguageLabel.textContent = t("settingsLanguage");
   elements.themeLightBtn.textContent = t("themeLight");
@@ -68,8 +69,11 @@ function applyTranslations() {
   elements.errorTitle.textContent = t("errorTitle");
   elements.errorCloseBtn.textContent = t("errorClose");
   elements.errorReportBtn.textContent = t("reportError");
+  elements.commentsOverviewTitle.textContent = t("commentsOverviewTitle");
+  elements.commentsOverviewCloseBtn.textContent = t("close");
   elements.unauthorizedTitle.textContent = t("unauthorizedTitle");
   elements.unauthorizedText.textContent = t("unauthorizedText");
+  renderCommentsOverview();
   syncSettingsOptions();
 }
 
@@ -172,6 +176,11 @@ function bindEvents() {
   elements.settingsToggle.addEventListener("click", (event) => {
     event.stopPropagation();
     toggleSettingsMenu();
+  });
+  elements.commentsToggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeSettingsMenu();
+    openCommentsOverviewModal();
   });
   elements.settingsMenu.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -307,6 +316,20 @@ function bindEvents() {
       closeErrorModal();
     }
   });
+  elements.commentsOverviewCloseBtn.addEventListener("click", closeCommentsOverviewModal);
+  elements.commentsOverviewModal.addEventListener("click", (event) => {
+    if (event.target === elements.commentsOverviewModal) {
+      closeCommentsOverviewModal();
+    }
+  });
+  elements.commentsOverviewList.addEventListener("click", (event) => {
+    const viewBtn = event.target.closest("button[data-comments-link]");
+    if (!viewBtn) return;
+    const link = viewBtn.getAttribute("data-comments-link");
+    if (!link) return;
+    closeCommentsOverviewModal();
+    tg?.openTelegramLink?.(link);
+  });
   elements.errorReportBtn.addEventListener("click", async () => {
     if (!state.lastError) {
       closeErrorModal();
@@ -346,3 +369,4 @@ initTheme();
 closeDeleteConfirm();
 closeEditModal();
 closeErrorModal();
+closeCommentsOverviewModal();

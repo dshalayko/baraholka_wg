@@ -30,6 +30,13 @@
             <span class="app-badge" id="appBadgeText">beta</span>
           </div>
           <div class="settings-wrap">
+            <button class="settings-toggle comments-toggle" id="commentsToggle" aria-label="Comments">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M7 10a5 5 0 1 1 10 0v4l2 2H5l2-2v-4"></path>
+                <path d="M10 18a2 2 0 0 0 4 0"></path>
+              </svg>
+              <span class="header-badge" id="commentsTotalBadge" hidden>0</span>
+            </button>
             <button class="settings-toggle" id="settingsToggle" aria-label="Settings">⚙</button>
             <div class="settings-menu" id="settingsMenu" hidden>
               <div class="settings-group">
@@ -186,6 +193,16 @@
         <div class="modal-actions">
           <button class="ghost" id="errorCloseBtn">Закрыть</button>
           <button class="primary" id="errorReportBtn">Сообщить об ошибке</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="commentsOverviewModal" hidden>
+      <div class="modal">
+        <div class="modal-title" id="commentsOverviewTitle">Комментарии к объявлениям</div>
+        <div class="modal-body comments-overview-body" id="commentsOverviewList"></div>
+        <div class="modal-actions comments-overview-actions">
+          <button class="ghost" id="commentsOverviewCloseBtn">Закрыть</button>
         </div>
       </div>
     </div>

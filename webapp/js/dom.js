@@ -4,6 +4,8 @@ const elements = {
   unauthorizedTitle: document.getElementById("unauthorizedTitle"),
   unauthorizedText: document.getElementById("unauthorizedText"),
   settingsToggle: document.getElementById("settingsToggle"),
+  commentsToggle: document.getElementById("commentsToggle"),
+  commentsTotalBadge: document.getElementById("commentsTotalBadge"),
   settingsMenu: document.getElementById("settingsMenu"),
   settingsThemeLabel: document.getElementById("settingsThemeLabel"),
   settingsLanguageLabel: document.getElementById("settingsLanguageLabel"),
@@ -77,4 +79,8 @@ const elements = {
   errorDetails: document.getElementById("errorDetails"),
   errorReportBtn: document.getElementById("errorReportBtn"),
   errorCloseBtn: document.getElementById("errorCloseBtn"),
+  commentsOverviewModal: document.getElementById("commentsOverviewModal"),
+  commentsOverviewTitle: document.getElementById("commentsOverviewTitle"),
+  commentsOverviewList: document.getElementById("commentsOverviewList"),
+  commentsOverviewCloseBtn: document.getElementById("commentsOverviewCloseBtn"),
 };
