@@ -15,6 +15,7 @@ from utils import get_private_channel_post_link, get_serbia_time
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, AnnouncementOut
 from webserver.settings import logger
+from webserver.stats import increment_stat
 from webserver.telegram_client import bot, format_announcement_text, normalize_chat_id
 
 router = APIRouter()
@@ -307,99 +308,104 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_us
 
 @router.post("/api/announcements/{ann_id}/publish")
 async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
-    user_id = user.get("id")
-    private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
-    admin_id = normalize_chat_id(SLONSKI_ID)
-    logger.info("ann:publish user_id=%s ann_id=%s", user_id, ann_id)
+    try:
+        user_id = user.get("id")
+        private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
+        admin_id = normalize_chat_id(SLONSKI_ID)
+        logger.info("ann:publish user_id=%s ann_id=%s", user_id, ann_id)
 
-    if private_channel_id is None:
-        raise HTTPException(status_code=500, detail="PRIVATE_CHANNEL_ID is not set")
+        if private_channel_id is None:
+            raise HTTPException(status_code=500, detail="PRIVATE_CHANNEL_ID is not set")
 
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            """
-            SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids
-            FROM announcements WHERE id = ? AND user_id = ?
-            """,
-            (ann_id, user_id),
-        )
-        row = await cursor.fetchone()
-
-        if not row:
-            raise HTTPException(status_code=404, detail="Announcement not found")
-
-        description, price, price_in_description, username, contact_info, photo_file_ids, message_ids_json = row
-        photos = json.loads(photo_file_ids) if photo_file_ids else []
-        old_message_ids = json.loads(message_ids_json) if message_ids_json else []
-
-    is_editing = bool(old_message_ids)
-    display_name = " ".join(
-        filter(None, [user.get("first_name"), user.get("last_name")])
-    ).strip() or None
-    message = format_announcement_text(
-        description,
-        price,
-        bool(price_in_description),
-        username,
-        contact_info,
-        display_name,
-        is_updated=is_editing,
-    )
-
-    if photos:
-        media = [
-            InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="MarkdownV2")
-            for idx, photo_id in enumerate(photos)
-        ]
-        sent_messages = await bot.send_media_group(
-            chat_id=private_channel_id, media=media, disable_notification=is_editing
-        )
-        new_message_ids = [msg.message_id for msg in sent_messages]
-    else:
-        sent_message = await bot.send_message(
-            chat_id=private_channel_id,
-            text=message,
-            parse_mode="MarkdownV2",
-            disable_notification=is_editing,
-        )
-        new_message_ids = [sent_message.message_id]
-
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE announcements SET message_ids = ?, timestamp = ?, last_published_is_edit = ? WHERE id = ?",
-            (json.dumps(new_message_ids), get_serbia_time(), 1 if is_editing else 0, ann_id),
-        )
-        await db.commit()
-
-    if is_editing and old_message_ids:
-        transfer_success = await forward_thread_replies(old_message_ids[0], new_message_ids[0])
-        if not transfer_success:
-            logger.warning(
-                "ann:publish comments transfer failed ann_id=%s old_message_id=%s new_message_id=%s",
-                ann_id,
-                old_message_ids[0],
-                new_message_ids[0],
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute(
+                """
+                SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids
+                FROM announcements WHERE id = ? AND user_id = ?
+                """,
+                (ann_id, user_id),
             )
+            row = await cursor.fetchone()
 
-        for message_id in old_message_ids:
-            try:
-                await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
-            except Exception as exc:
-                if admin_id is not None:
-                    link = get_private_channel_post_link(private_channel_id, message_id)
-                    await bot.send_message(
-                        chat_id=admin_id,
-                        text=(
-                            "Не удалось удалить сообщение боту:\n"
-                            f"Ссылка: {link}\n"
-                            "Пожалуйста, удалите вручную."
-                        ),
-                    )
-                raise HTTPException(status_code=500, detail=str(exc))
+            if not row:
+                raise HTTPException(status_code=404, detail="Announcement not found")
 
-    post_link = get_private_channel_post_link(private_channel_id, new_message_ids[0])
-    logger.info("ann:publish done ann_id=%s post_link=%s", ann_id, post_link)
-    return {"post_link": post_link}
+            description, price, price_in_description, username, contact_info, photo_file_ids, message_ids_json = row
+            photos = json.loads(photo_file_ids) if photo_file_ids else []
+            old_message_ids = json.loads(message_ids_json) if message_ids_json else []
+
+        is_editing = bool(old_message_ids)
+        display_name = " ".join(
+            filter(None, [user.get("first_name"), user.get("last_name")])
+        ).strip() or None
+        message = format_announcement_text(
+            description,
+            price,
+            bool(price_in_description),
+            username,
+            contact_info,
+            display_name,
+            is_updated=is_editing,
+        )
+
+        if photos:
+            media = [
+                InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="MarkdownV2")
+                for idx, photo_id in enumerate(photos)
+            ]
+            sent_messages = await bot.send_media_group(
+                chat_id=private_channel_id, media=media, disable_notification=is_editing
+            )
+            new_message_ids = [msg.message_id for msg in sent_messages]
+        else:
+            sent_message = await bot.send_message(
+                chat_id=private_channel_id,
+                text=message,
+                parse_mode="MarkdownV2",
+                disable_notification=is_editing,
+            )
+            new_message_ids = [sent_message.message_id]
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "UPDATE announcements SET message_ids = ?, timestamp = ?, last_published_is_edit = ? WHERE id = ?",
+                (json.dumps(new_message_ids), get_serbia_time(), 1 if is_editing else 0, ann_id),
+            )
+            await db.commit()
+
+        if is_editing and old_message_ids:
+            transfer_success = await forward_thread_replies(old_message_ids[0], new_message_ids[0])
+            if not transfer_success:
+                logger.warning(
+                    "ann:publish comments transfer failed ann_id=%s old_message_id=%s new_message_id=%s",
+                    ann_id,
+                    old_message_ids[0],
+                    new_message_ids[0],
+                )
+
+            for message_id in old_message_ids:
+                try:
+                    await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
+                except Exception as exc:
+                    if admin_id is not None:
+                        link = get_private_channel_post_link(private_channel_id, message_id)
+                        await bot.send_message(
+                            chat_id=admin_id,
+                            text=(
+                                "Не удалось удалить сообщение боту:\n"
+                                f"Ссылка: {link}\n"
+                                "Пожалуйста, удалите вручную."
+                            ),
+                        )
+                    raise HTTPException(status_code=500, detail=str(exc))
+
+        post_link = get_private_channel_post_link(private_channel_id, new_message_ids[0])
+        logger.info("ann:publish done ann_id=%s post_link=%s", ann_id, post_link)
+        await increment_stat("publish_success")
+        return {"post_link": post_link}
+    except Exception:
+        await increment_stat("publish_fail")
+        raise
 
 
 @router.get("/api/announcements/{ann_id}/photo")

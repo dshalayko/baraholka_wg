@@ -296,6 +296,7 @@ function renderAds() {
       `;
       commentsBtn.onclick = () => {
         const commentsLink = buildCommentsLink(ad.post_link);
+        void trackEvent("open_comments");
         tg?.openTelegramLink?.(commentsLink || ad.post_link);
       };
       actions.appendChild(commentsBtn);

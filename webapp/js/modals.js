@@ -39,6 +39,16 @@ function closeCommentsOverviewModal() {
   elements.commentsOverviewModal.style.display = "none";
 }
 
+function openStatsModal() {
+  elements.statsModal.hidden = false;
+  elements.statsModal.style.display = "flex";
+}
+
+function closeStatsModal() {
+  elements.statsModal.hidden = true;
+  elements.statsModal.style.display = "none";
+}
+
 function resetEditModal() {
   state.editModal.id = null;
   state.editModal.photoFileIds = [];

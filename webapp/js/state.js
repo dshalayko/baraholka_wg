@@ -22,4 +22,7 @@ const state = {
   busyCount: 0,
   lastError: null,
   unauthorized: false,
+  isAdmin: false,
+  statsSummary: null,
+  sentAppOpenEvent: false,
 };

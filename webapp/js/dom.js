@@ -4,6 +4,7 @@ const elements = {
   unauthorizedTitle: document.getElementById("unauthorizedTitle"),
   unauthorizedText: document.getElementById("unauthorizedText"),
   settingsToggle: document.getElementById("settingsToggle"),
+  statsToggle: document.getElementById("statsToggle"),
   commentsToggle: document.getElementById("commentsToggle"),
   commentsTotalBadge: document.getElementById("commentsTotalBadge"),
   settingsMenu: document.getElementById("settingsMenu"),
@@ -83,4 +84,8 @@ const elements = {
   commentsOverviewTitle: document.getElementById("commentsOverviewTitle"),
   commentsOverviewList: document.getElementById("commentsOverviewList"),
   commentsOverviewCloseBtn: document.getElementById("commentsOverviewCloseBtn"),
+  statsModal: document.getElementById("statsModal"),
+  statsTitle: document.getElementById("statsTitle"),
+  statsGrid: document.getElementById("statsGrid"),
+  statsCloseBtn: document.getElementById("statsCloseBtn"),
 };

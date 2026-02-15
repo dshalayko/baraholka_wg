@@ -24,6 +24,15 @@ async def ensure_db() -> None:
             )
             """
         )
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_stats (
+                stat_key TEXT PRIMARY KEY,
+                stat_value INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
         cursor = await db.execute("PRAGMA table_info(announcements)")
         columns = {row[1] for row in await cursor.fetchall()}
         if "last_published_is_edit" not in columns:

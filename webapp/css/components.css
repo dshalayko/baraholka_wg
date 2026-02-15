@@ -573,6 +573,41 @@
   padding-top: 2px;
 }
 
+.stats-body {
+  padding-right: 2px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stats-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="light"] .stats-card {
+  background: rgba(15, 20, 26, 0.04);
+}
+
+.stats-card-label {
+  font-size: 12px;
+  color: var(--meta-text);
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+
+.stats-card-value {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--ink);
+}
+
 @keyframes modal-enter {
   from {
     transform: translateY(8px) scale(0.98);

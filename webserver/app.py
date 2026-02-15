@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from webserver.db import ensure_db
 from webserver.routes.announcements import router as announcements_router
 from webserver.routes.bugs import router as bugs_router
+from webserver.routes.stats import router as stats_router
 from webserver.routes.uploads import router as uploads_router
 from webserver.settings import FAVICON_SVG, WEBAPP_DIR
 
@@ -48,3 +49,4 @@ async def favicon() -> Response:
 app.include_router(announcements_router)
 app.include_router(uploads_router)
 app.include_router(bugs_router)
+app.include_router(stats_router)

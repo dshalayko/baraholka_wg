@@ -2,6 +2,41 @@ function closeSettingsMenu() {
   elements.settingsMenu.hidden = true;
 }
 
+function renderStatsSummary() {
+  if (!elements.statsGrid) return;
+  elements.statsGrid.innerHTML = "";
+  const summary = state.statsSummary;
+  if (!state.isAdmin || !summary) {
+    return;
+  }
+  const counters = summary.counters || {};
+  const totals = summary.totals || {};
+  const items = [
+    { label: t("statsAppOpen"), value: counters.app_open || 0 },
+    { label: t("statsPublishSuccess"), value: counters.publish_success || 0 },
+    { label: t("statsPublishFail"), value: counters.publish_fail || 0 },
+    { label: t("statsOpenComments"), value: counters.open_comments || 0 },
+    { label: t("statsApiErrors"), value: counters.api_errors || 0 },
+    { label: t("statsAdsTotal"), value: totals.ads_total || 0 },
+    { label: t("statsAdsPublished"), value: totals.ads_published || 0 },
+  ];
+  items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "stats-card";
+
+    const label = document.createElement("div");
+    label.className = "stats-card-label";
+    label.textContent = item.label;
+
+    const value = document.createElement("div");
+    value.className = "stats-card-value";
+    value.textContent = String(item.value);
+
+    card.append(label, value);
+    elements.statsGrid.appendChild(card);
+  });
+}
+
 function toggleSettingsMenu() {
   elements.settingsMenu.hidden = !elements.settingsMenu.hidden;
 }
@@ -30,6 +65,7 @@ function applyTranslations() {
   elements.tabMyAds.textContent = t("myAds");
   elements.tabCreate.textContent = t("create");
   elements.settingsToggle.setAttribute("aria-label", t("settings"));
+  elements.statsToggle.setAttribute("aria-label", t("stats"));
   elements.commentsToggle.setAttribute("aria-label", t("comments"));
   elements.settingsThemeLabel.textContent = t("settingsTheme");
   elements.settingsLanguageLabel.textContent = t("settingsLanguage");
@@ -71,9 +107,12 @@ function applyTranslations() {
   elements.errorReportBtn.textContent = t("reportError");
   elements.commentsOverviewTitle.textContent = t("commentsOverviewTitle");
   elements.commentsOverviewCloseBtn.textContent = t("close");
+  elements.statsTitle.textContent = t("stats");
+  elements.statsCloseBtn.textContent = t("close");
   elements.unauthorizedTitle.textContent = t("unauthorizedTitle");
   elements.unauthorizedText.textContent = t("unauthorizedText");
   renderCommentsOverview();
+  renderStatsSummary();
   syncSettingsOptions();
 }
 
@@ -176,6 +215,13 @@ function bindEvents() {
   elements.settingsToggle.addEventListener("click", (event) => {
     event.stopPropagation();
     toggleSettingsMenu();
+  });
+  elements.statsToggle.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    closeSettingsMenu();
+    await refreshAdminStats();
+    if (!state.isAdmin) return;
+    openStatsModal();
   });
   elements.commentsToggle.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -328,7 +374,14 @@ function bindEvents() {
     const link = viewBtn.getAttribute("data-comments-link");
     if (!link) return;
     closeCommentsOverviewModal();
+    void trackEvent("open_comments");
     tg?.openTelegramLink?.(link);
+  });
+  elements.statsCloseBtn.addEventListener("click", closeStatsModal);
+  elements.statsModal.addEventListener("click", (event) => {
+    if (event.target === elements.statsModal) {
+      closeStatsModal();
+    }
   });
   elements.errorReportBtn.addEventListener("click", async () => {
     if (!state.lastError) {
@@ -365,8 +418,14 @@ bindEvents();
 updateCounts();
 showTab("list");
 refreshAds();
+refreshAdminStats();
+if (!state.sentAppOpenEvent) {
+  state.sentAppOpenEvent = true;
+  void trackEvent("app_open");
+}
 initTheme();
 closeDeleteConfirm();
 closeEditModal();
 closeErrorModal();
 closeCommentsOverviewModal();
+closeStatsModal();

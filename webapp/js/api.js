@@ -7,6 +7,9 @@ async function apiFetch(path, options = {}) {
   }
   const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
+    if (!String(path || "").startsWith("/api/stats/")) {
+      void trackEvent("api_errors");
+    }
     const text = await response.text();
     let data = null;
     try {
@@ -28,6 +31,44 @@ async function apiFetch(path, options = {}) {
     setUnauthorizedMode(false);
   }
   return response.json();
+}
+
+async function trackEvent(eventName) {
+  if (!eventName || !tg?.initData) return;
+  try {
+    await fetch("/api/stats/event", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "1",
+        "X-Telegram-Init-Data": tg.initData,
+      },
+      body: JSON.stringify({ event: eventName }),
+    });
+  } catch (err) {
+    // ignore analytics transport errors
+  }
+}
+
+async function refreshAdminStats() {
+  try {
+    const data = await apiFetch("/api/stats/summary");
+    state.isAdmin = true;
+    state.statsSummary = data || null;
+    elements.statsToggle.hidden = false;
+  } catch (err) {
+    if (err?.status === 401) {
+      state.isAdmin = false;
+      state.statsSummary = null;
+      elements.statsToggle.hidden = true;
+      renderStatsSummary();
+      return;
+    }
+    state.isAdmin = false;
+    state.statsSummary = null;
+    elements.statsToggle.hidden = true;
+  }
+  renderStatsSummary();
 }
 
 async function refreshAds() {

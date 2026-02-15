@@ -51,6 +51,11 @@
   position: relative;
 }
 
+.stats-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
 .comments-toggle svg {
   width: 16px;
   height: 16px;

@@ -30,6 +30,14 @@
             <span class="app-badge" id="appBadgeText">beta</span>
           </div>
           <div class="settings-wrap">
+            <button class="settings-toggle stats-toggle" id="statsToggle" aria-label="Stats" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 20h16"></path>
+                <path d="M7 20V11"></path>
+                <path d="M12 20V7"></path>
+                <path d="M17 20v-5"></path>
+              </svg>
+            </button>
             <button class="settings-toggle comments-toggle" id="commentsToggle" aria-label="Comments">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M7 10a5 5 0 1 1 10 0v4l2 2H5l2-2v-4"></path>
@@ -208,6 +216,18 @@
         <div class="modal-body comments-overview-body" id="commentsOverviewList"></div>
         <div class="modal-actions comments-overview-actions">
           <button class="ghost" id="commentsOverviewCloseBtn">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="statsModal" hidden>
+      <div class="modal">
+        <div class="modal-title" id="statsTitle">Статистика</div>
+        <div class="modal-body stats-body">
+          <div class="stats-grid" id="statsGrid"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost" id="statsCloseBtn">Закрыть</button>
         </div>
       </div>
     </div>

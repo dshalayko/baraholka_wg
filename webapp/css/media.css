@@ -87,6 +87,10 @@
     width: 100%;
   }
 
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
   .panel-body {
     padding: 14px;
   }
