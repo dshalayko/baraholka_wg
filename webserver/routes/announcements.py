@@ -14,8 +14,8 @@ from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
 from utils import get_private_channel_post_link, get_serbia_time
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, AnnouncementOut
+from webserver.routes.stats import increment_stat
 from webserver.settings import logger
-from webserver.stats import increment_stat
 from webserver.telegram_client import bot, format_announcement_text, normalize_chat_id
 
 router = APIRouter()
