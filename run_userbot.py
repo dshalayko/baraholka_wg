@@ -42,6 +42,6 @@ async def show_all_dialogs():
             chat_title = chat.title or "Без названия"
             print(f"Название: {chat_title}, ID: {chat.id}, Тип: {chat.type}")
 
-#asyncio.run(get_supergroup_id())
+
 
 asyncio.run(show_all_dialogs())
