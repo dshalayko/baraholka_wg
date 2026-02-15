@@ -35,6 +35,47 @@ function renderStatsSummary() {
     card.append(label, value);
     elements.statsGrid.appendChild(card);
   });
+
+  const adsListTitle = document.createElement("div");
+  adsListTitle.className = "stats-list-title";
+  adsListTitle.textContent = t("statsAdsList");
+  elements.statsGrid.appendChild(adsListTitle);
+
+  const ads = Array.isArray(summary.ads) ? summary.ads : [];
+  if (!ads.length) {
+    const empty = document.createElement("div");
+    empty.className = "stats-ads-empty";
+    empty.textContent = t("statsNoAds");
+    elements.statsGrid.appendChild(empty);
+    return;
+  }
+
+  ads.forEach((ad) => {
+    const row = document.createElement("div");
+    row.className = "stats-ad-row";
+
+    const ownerValue = ad.username ? `@${ad.username}` : `id:${ad.user_id}`;
+    const owner = document.createElement("div");
+    owner.className = "stats-ad-owner";
+    owner.textContent = `${t("statsOwner")}: ${ownerValue}`;
+
+    const statusKey =
+      ad.status === "draft" ? "statusDraft" : ad.status === "updated" ? "statusUpdated" : "statusPublished";
+    const status = document.createElement("span");
+    status.className = `stats-ad-status is-${ad.status}`;
+    status.textContent = t(statusKey);
+
+    const head = document.createElement("div");
+    head.className = "stats-ad-head";
+    head.append(owner, status);
+
+    const desc = document.createElement("div");
+    desc.className = "stats-ad-desc";
+    desc.textContent = toShortDescription(ad.description || "");
+
+    row.append(head, desc);
+    elements.statsGrid.appendChild(row);
+  });
 }
 
 function toggleSettingsMenu() {

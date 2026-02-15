@@ -101,6 +101,35 @@ async def stats_summary(user: Dict[str, Any] = Depends(get_user_from_request)) -
         total_ads = int((await total_ads_cursor.fetchone())[0] or 0)
         published_ads_cursor = await db.execute("SELECT COUNT(*) FROM announcements WHERE message_ids IS NOT NULL AND message_ids != '[]'")
         published_ads = int((await published_ads_cursor.fetchone())[0] or 0)
+        list_cursor = await db.execute(
+            """
+            SELECT id, user_id, username, description, message_ids, last_published_is_edit, timestamp
+            FROM announcements
+            ORDER BY id DESC
+            """
+        )
+        rows = await list_cursor.fetchall()
+
+    ads = []
+    for row in rows:
+        ann_id, user_id, username, description, message_ids_raw, last_published_is_edit, timestamp = row
+        is_published = bool(message_ids_raw and message_ids_raw != "[]")
+        if not is_published:
+            status = "draft"
+        elif bool(last_published_is_edit):
+            status = "updated"
+        else:
+            status = "published"
+        ads.append(
+            {
+                "id": ann_id,
+                "user_id": user_id,
+                "username": username or "",
+                "description": description or "",
+                "status": status,
+                "timestamp": timestamp,
+            }
+        )
 
     return {
         "is_admin": True,
@@ -109,4 +138,5 @@ async def stats_summary(user: Dict[str, Any] = Depends(get_user_from_request)) -
             "ads_total": total_ads,
             "ads_published": published_ads,
         },
+        "ads": ads,
     }
