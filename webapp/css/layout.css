@@ -37,11 +37,7 @@
   justify-content: center;
 }
 
-.comments-toggle {
-  position: relative;
-}
-
-.comments-toggle svg {
+.settings-toggle svg {
   width: 17px;
   height: 17px;
   fill: none;
@@ -49,6 +45,15 @@
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.comments-toggle {
+  position: relative;
+}
+
+.comments-toggle svg {
+  width: 16px;
+  height: 16px;
 }
 
 .header-badge {
