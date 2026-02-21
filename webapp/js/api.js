@@ -1,9 +1,55 @@
+function extractInitDataFromLocation() {
+  const tryDecode = (value) => {
+    if (!value) return "";
+    try {
+      return decodeURIComponent(value);
+    } catch (err) {
+      return value;
+    }
+  };
+
+  const query = new URLSearchParams(window.location.search || "");
+  const hashRaw = (window.location.hash || "").replace(/^#/, "");
+  const hash = new URLSearchParams(hashRaw);
+
+  const fromQuery = query.get("initData") || query.get("tgWebAppData");
+  if (fromQuery) return tryDecode(fromQuery);
+
+  const fromHash = hash.get("initData") || hash.get("tgWebAppData");
+  if (fromHash) return tryDecode(fromHash);
+
+  return "";
+}
+
+function getTelegramInitData() {
+  if (tg?.initData) return tg.initData;
+  return extractInitDataFromLocation();
+}
+
+async function waitTelegramInitData(timeoutMs = 2000) {
+  const started = Date.now();
+  if (tg?.ready) {
+    try {
+      tg.ready();
+    } catch (err) {
+      // ignore
+    }
+  }
+  while (Date.now() - started < timeoutMs) {
+    const value = getTelegramInitData();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  }
+  return getTelegramInitData();
+}
+
 async function apiFetch(path, options = {}) {
   const headers = options.headers || {};
   headers["Content-Type"] = headers["Content-Type"] || "application/json";
   headers["ngrok-skip-browser-warning"] = "1";
-  if (tg?.initData) {
-    headers["X-Telegram-Init-Data"] = tg.initData;
+  const initData = await waitTelegramInitData();
+  if (initData) {
+    headers["X-Telegram-Init-Data"] = initData;
   }
   const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
@@ -34,14 +80,16 @@ async function apiFetch(path, options = {}) {
 }
 
 async function trackEvent(eventName) {
-  if (!eventName || !tg?.initData) return;
+  if (!eventName) return;
+  const initData = await waitTelegramInitData(1200);
+  if (!initData) return;
   try {
     await fetch("/api/stats/event", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "ngrok-skip-browser-warning": "1",
-        "X-Telegram-Init-Data": tg.initData,
+        "X-Telegram-Init-Data": initData,
       },
       body: JSON.stringify({ event: eventName }),
     });

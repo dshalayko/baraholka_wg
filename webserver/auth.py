@@ -9,7 +9,7 @@ from fastapi import HTTPException, Request
 
 from webserver.settings import BOT_TOKEN, logger
 
-MAX_INIT_DATA_AGE_SECONDS = 15 * 60
+MAX_INIT_DATA_AGE_SECONDS = 24 * 60 * 60
 
 
 def _parse_init_data(init_data: str) -> Dict[str, str]:

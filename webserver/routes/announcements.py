@@ -11,11 +11,11 @@ from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 
 from comments_manager import forward_thread_replies, get_discussion_replies_counts
 from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
-from utils import get_private_channel_post_link, get_serbia_time
+from utils import get_private_channel_post_link, get_serbia_time, is_timestamp_older_than_days
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, AnnouncementOut
 from webserver.routes.stats import increment_stat
-from webserver.settings import logger
+from webserver.settings import BUG_CHAT_ID, logger
 from webserver.telegram_client import bot, format_announcement_text, normalize_chat_id
 
 router = APIRouter()
@@ -312,6 +312,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         user_id = user.get("id")
         private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
         admin_id = normalize_chat_id(SLONSKI_ID)
+        bug_chat_id = normalize_chat_id(BUG_CHAT_ID)
         logger.info("ann:publish user_id=%s ann_id=%s", user_id, ann_id)
 
         if private_channel_id is None:
@@ -320,7 +321,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute(
                 """
-                SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids
+                SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp
                 FROM announcements WHERE id = ? AND user_id = ?
                 """,
                 (ann_id, user_id),
@@ -330,11 +331,21 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
             if not row:
                 raise HTTPException(status_code=404, detail="Announcement not found")
 
-            description, price, price_in_description, username, contact_info, photo_file_ids, message_ids_json = row
+            (
+                description,
+                price,
+                price_in_description,
+                username,
+                contact_info,
+                photo_file_ids,
+                message_ids_json,
+                previous_timestamp,
+            ) = row
             photos = json.loads(photo_file_ids) if photo_file_ids else []
             old_message_ids = json.loads(message_ids_json) if message_ids_json else []
 
         is_editing = bool(old_message_ids)
+        show_updated_label = is_editing and is_timestamp_older_than_days(previous_timestamp, 2)
         display_name = " ".join(
             filter(None, [user.get("first_name"), user.get("last_name")])
         ).strip() or None
@@ -345,7 +356,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
             username,
             contact_info,
             display_name,
-            is_updated=is_editing,
+            is_updated=show_updated_label,
         )
 
         if photos:
@@ -369,10 +380,12 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
                 "UPDATE announcements SET message_ids = ?, timestamp = ?, last_published_is_edit = ? WHERE id = ?",
-                (json.dumps(new_message_ids), get_serbia_time(), 1 if is_editing else 0, ann_id),
+                (json.dumps(new_message_ids), get_serbia_time(), 1 if show_updated_label else 0, ann_id),
             )
             await db.commit()
 
+        not_deleted_ids: list[int] = []
+        delete_failures: list[str] = []
         if is_editing and old_message_ids:
             transfer_success = await forward_thread_replies(old_message_ids[0], new_message_ids[0])
             if not transfer_success:
@@ -387,22 +400,63 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 try:
                     await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
                 except Exception as exc:
-                    if admin_id is not None:
-                        link = get_private_channel_post_link(private_channel_id, message_id)
-                        await bot.send_message(
-                            chat_id=admin_id,
-                            text=(
-                                "Не удалось удалить сообщение боту:\n"
-                                f"Ссылка: {link}\n"
-                                "Пожалуйста, удалите вручную."
-                            ),
-                        )
-                    raise HTTPException(status_code=500, detail=str(exc))
+                    not_deleted_ids.append(message_id)
+                    link = get_private_channel_post_link(private_channel_id, message_id)
+                    delete_failures.append(f"{message_id} ({link}) -> {exc}")
+                    logger.warning(
+                        "ann:publish old message delete failed user_id=%s ann_id=%s message_id=%s error=%s",
+                        user_id,
+                        ann_id,
+                        message_id,
+                        exc,
+                    )
+            if delete_failures and admin_id is not None:
+                try:
+                    await bot.send_message(
+                        chat_id=admin_id,
+                        text=(
+                            "Не удалось удалить старые сообщения при обновлении объявления:\n"
+                            f"ann_id: {ann_id}\n"
+                            f"user_id: {user_id}\n"
+                            f"details:\n- " + "\n- ".join(delete_failures) + "\n"
+                            "Пожалуйста, удалите вручную."
+                        ),
+                    )
+                except Exception:
+                    logger.exception("ann:publish failed to notify admin delete issues ann_id=%s", ann_id)
+            if delete_failures and bug_chat_id is not None:
+                try:
+                    await bot.send_message(
+                        chat_id=bug_chat_id,
+                        text=(
+                            "BUG REPORT\n"
+                            f"Time: {get_serbia_time()}\n"
+                            f"User ID: {user_id}\n"
+                            f"Username: {user.get('username') or 'None'}\n"
+                            f"Name: {' '.join(filter(None, [user.get('first_name'), user.get('last_name')])).strip() or 'None'}\n"
+                            "Action: publish_ad_old_message_delete\n"
+                            f"Ad ID: {ann_id}\n"
+                            "Status: warning\n"
+                            "Error ID: None\n"
+                            "Message: Failed to delete old message(s) after publish. Publish completed.\n"
+                            f"Detail: {'; '.join(delete_failures)}\n"
+                            f"Post link: {get_private_channel_post_link(private_channel_id, new_message_ids[0])}\n"
+                            "Client time: None\n"
+                            "Language: None\n"
+                            "User-Agent: None\n"
+                        ),
+                    )
+                except Exception:
+                    logger.exception("ann:publish failed to send bug report ann_id=%s", ann_id)
 
         post_link = get_private_channel_post_link(private_channel_id, new_message_ids[0])
         logger.info("ann:publish done ann_id=%s post_link=%s", ann_id, post_link)
         await increment_stat("publish_success")
-        return {"post_link": post_link}
+        response = {"post_link": post_link}
+        if not_deleted_ids:
+            response["warning"] = "Old post in channel could not be deleted."
+            response["not_deleted_message_ids"] = not_deleted_ids
+        return response
     except Exception:
         await increment_stat("publish_fail")
         raise

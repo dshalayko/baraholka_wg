@@ -1,9 +1,10 @@
 import asyncio
+import html
 import os
 import time
 from typing import Dict, Iterable
 
-from pyrogram import Client
+from pyrogram import Client, enums
 from pyrogram.enums import ChatType
 from pyrogram.errors import FloodWait
 
@@ -28,6 +29,54 @@ def _normalize_int_chat_id(value):
 
 async def get_supergroup_id(app, group_name=None):
     return CHAT_ID
+
+
+def _comment_author_meta(comment) -> tuple[str, str, str]:
+    user = getattr(comment, "from_user", None)
+    if not user:
+        return html.escape("Unknown"), "Unknown", ""
+
+    first_name = (getattr(user, "first_name", None) or "").strip()
+    last_name = (getattr(user, "last_name", None) or "").strip()
+    full_name = f"{first_name} {last_name}".strip() or "Unknown"
+    safe_name = html.escape(full_name)
+    username = (getattr(user, "username", None) or "").strip()
+    if username:
+        return f'<a href="tg://resolve?domain={html.escape(username)}">{safe_name}</a>', full_name, username
+    return safe_name, full_name, ""
+
+
+def _strip_existing_author_prefix(raw_text: str, full_name: str, username: str) -> str:
+    lines = [line.rstrip() for line in raw_text.splitlines()]
+    if not lines:
+        return ""
+
+    username = (username or "").strip()
+    full_name = (full_name or "").strip()
+    while lines:
+        head = lines[0].strip()
+        is_author_line = False
+        if full_name and head == full_name:
+            is_author_line = True
+        elif username and head in {
+            f"{full_name} (tg://resolve?domain={username})",
+            f"{full_name} (https://t.me/{username})",
+            f"@{username}",
+        }:
+            is_author_line = True
+        if not is_author_line:
+            break
+        lines.pop(0)
+
+    return "\n".join(lines).strip()
+
+
+def _format_transfer_body(text: str | None, full_name: str, username: str) -> str:
+    cleaned = _strip_existing_author_prefix((text or "").strip(), full_name, username)
+    safe_text = html.escape(cleaned)
+    if safe_text:
+        return safe_text
+    return ""
 
 async def _forward_thread_replies_once(old_thread_id, new_thread_id):
     logger.info(f"🚀 [forward_thread_replies] Запуск функции с old_thread_id={old_thread_id}, new_thread_id={new_thread_id}")
@@ -85,18 +134,30 @@ async def _forward_thread_replies_once(old_thread_id, new_thread_id):
         logger.info(f"🔄 Отправляем {len(comments)} комментариев в обратном порядке.")
         for comment in reversed(comments):
             try:
-                first_name = comment.from_user.first_name if comment.from_user else ""
-                last_name = comment.from_user.last_name if comment.from_user and comment.from_user.last_name else ""
-                full_name = f"{first_name} {last_name}".strip()
+                author_line, full_name, username = _comment_author_meta(comment)
 
                 if comment.text:
-                    formatted_text = f"**{full_name}**\n{comment.text}"
-                    await app.send_message(chat_id=chat_id, text=formatted_text, reply_to_message_id=new_message_id)
+                    body = _format_transfer_body(comment.text, full_name, username)
+                    formatted_text = f"{author_line}\n{body}" if body else author_line
+                    await app.send_message(
+                        chat_id=chat_id,
+                        text=formatted_text,
+                        parse_mode=enums.ParseMode.HTML,
+                        disable_web_page_preview=True,
+                        reply_to_message_id=new_message_id,
+                    )
                     logger.info(f"📩 Отправлен текстовый комментарий ID {comment.id}")
 
                 elif comment.photo:
-                    caption = f"**{full_name}**\n{comment.caption or ''}".strip()
-                    await app.send_photo(chat_id=chat_id, photo=comment.photo.file_id, caption=caption, reply_to_message_id=new_message_id)
+                    body = _format_transfer_body(comment.caption, full_name, username)
+                    caption = f"{author_line}\n{body}" if body else author_line
+                    await app.send_photo(
+                        chat_id=chat_id,
+                        photo=comment.photo.file_id,
+                        caption=caption,
+                        parse_mode=enums.ParseMode.HTML,
+                        reply_to_message_id=new_message_id,
+                    )
                     logger.info(f"📸 Отправлена фотография ID {comment.id}")
 
                 elif comment.sticker:

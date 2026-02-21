@@ -9,7 +9,7 @@ from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 import texts as texts_ru
 import texts_en
 from logger import logger
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import pytz
 
@@ -91,6 +91,36 @@ def get_serbia_time():
     formatted_time = serbia_time.strftime('%d.%m.%Y в %H:%M')
 
     return formatted_time
+
+
+def parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    formats = (
+        "%d.%m.%Y в %H:%M",
+        "%d.%m.%Y %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+    )
+    for fmt in formats:
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def is_timestamp_older_than_days(value: str | None, days: int) -> bool:
+    if days <= 0:
+        return True
+    published_at = parse_timestamp(value)
+    now_at = parse_timestamp(get_serbia_time())
+    if not published_at or not now_at:
+        return False
+    return (now_at - published_at) >= timedelta(days=days)
 
 def get_private_channel_post_link(channel_id, message_id):
     channel_id_str = str(channel_id)

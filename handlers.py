@@ -7,9 +7,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from keyboards import get_main_markup, get_add_advertisement_keyboard
 from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts, escape_markdown_v2_url
-from database import (
-    has_user_ads,
-)
 from announcements import *
 import logging
 import aiosqlite
@@ -26,6 +23,21 @@ async def _user_owns_announcement(user_id: int, ann_id: int) -> bool:
         )
         return await cursor.fetchone() is not None
 
+
+async def _send_miniapp_prompt(update: Update):
+    texts = get_texts(update)
+    webapp_url = os.getenv("WEBAPP_URL")
+    if not webapp_url:
+        return await update.effective_chat.send_message("WEBAPP_URL не задан.")
+    keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))]]
+    )
+    return await update.effective_chat.send_message(
+        texts.START_MINIAPP_MESSAGE,
+        reply_markup=keyboard,
+    )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает команду /start, отправляет приветственное сообщение и удаляет команду пользователя."""
     user_id = update.message.from_user.id
@@ -38,16 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
 
-    if await has_user_ads(user_id):
-        welcome_message = await update.message.reply_text(
-            texts.WELCOME_NEW_USER,
-            reply_markup=get_main_markup(language_code)
-        )
-    else:
-        welcome_message = await update.message.reply_text(
-            texts.WELCOME_NEW_USER,
-            reply_markup=get_add_advertisement_keyboard(language_code)
-        )
+    welcome_message = await _send_miniapp_prompt(update)
 
     context.user_data["welcome_message_id"] = welcome_message.message_id
     logger.info(f"✅ [start] Сохранен message_id приветствия: {welcome_message.message_id}")
@@ -69,16 +72,7 @@ async def lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(texts.LANG_UNKNOWN)
 
 async def open_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    texts = get_texts(update)
-    webapp_url = os.getenv("WEBAPP_URL")
-    if not webapp_url:
-        await update.message.reply_text("WEBAPP_URL не задан.")
-        return
-
-    keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))]]
-    )
-    await update.message.reply_text(texts.OPEN_WEBAPP_BUTTON, reply_markup=keyboard)
+    await _send_miniapp_prompt(update)
 
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -123,13 +117,15 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"⚠️ [handle_choice] Не удалось удалить WELCOME_NEW_USER (message_id={bot_message_id})")
 
     if choice in (texts_ru.NEW_AD_CHOICE, texts_en.NEW_AD_CHOICE):
-        context.user_data.clear()
-        return await create_announcement(update, context)
+        await _send_miniapp_prompt(update)
+        return CHOOSING
     if choice in (texts_ru.OPEN_WEBAPP_BUTTON, texts_en.OPEN_WEBAPP_BUTTON):
-        return await open_webapp(update, context)
+        await _send_miniapp_prompt(update)
+        return CHOOSING
 
     elif choice in (texts_ru.MY_ADS_CHOICE, texts_en.MY_ADS_CHOICE):
-        return await show_user_announcements(update, context)
+        await _send_miniapp_prompt(update)
+        return CHOOSING
 
     else:
         texts = get_texts(update)

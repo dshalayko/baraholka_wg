@@ -55,3 +55,11 @@ def get_finish_photo_markup_no_menu(language_code: str | None):
         one_time_keyboard=True,
         resize_keyboard=True
     )
+
+
+def get_miniapp_keyboard(language_code: str | None, webapp_url: str):
+    texts = _texts_for_language(language_code)
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))]],
+        resize_keyboard=True,
+    )

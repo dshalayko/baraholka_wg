@@ -1,5 +1,6 @@
 # Common text variables
 WELCOME_NEW_USER = "Hi! I'm the WG Black Market channel bot. I will post ads on your behalf, and if you want to change or unpublish something later, you can come to me for that too."
+START_MINIAPP_MESSAGE = "Now Baraholka is an app, not a bot. Open the app using the button below."
 START_NEW_AD = "Send the text of your ad. Next I'll ask for the price and photos. But first — tell me what you want to sell or buy."
 CHOOSE_ACTION = "Something went wrong, but no worries. Let's start over?"
 NEW_AD_CHOICE = "Fresh crispy ad"
