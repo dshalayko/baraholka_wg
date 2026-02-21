@@ -108,6 +108,7 @@ function applyTranslations() {
   elements.settingsToggle.setAttribute("aria-label", t("settings"));
   elements.statsToggle.setAttribute("aria-label", t("stats"));
   elements.commentsToggle.setAttribute("aria-label", t("comments"));
+  elements.feedbackToggle.setAttribute("aria-label", t("feedback"));
   elements.settingsThemeLabel.textContent = t("settingsTheme");
   elements.settingsLanguageLabel.textContent = t("settingsLanguage");
   elements.themeLightBtn.textContent = t("themeLight");
@@ -119,6 +120,8 @@ function applyTranslations() {
   elements.contactLabel.textContent = t("contactLabel");
   elements.priceLabel.textContent = t("price");
   elements.priceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
+  elements.priceInDescriptionYesLabel.textContent = t("priceToggleYes");
+  elements.priceInDescriptionNoLabel.textContent = t("priceToggleNo");
   elements.photosLabel.textContent = t("photos");
   elements.emptyState.textContent = t("noAds");
   elements.description.placeholder = t("descPlaceholder");
@@ -131,6 +134,8 @@ function applyTranslations() {
   elements.editContactLabel.textContent = t("contactLabel");
   elements.editPriceLabel.textContent = t("price");
   elements.editPriceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
+  elements.editPriceInDescriptionYesLabel.textContent = t("priceToggleYes");
+  elements.editPriceInDescriptionNoLabel.textContent = t("priceToggleNo");
   elements.editPhotosLabel.textContent = t("photos");
   elements.editDescription.placeholder = t("descPlaceholder");
   elements.editPrice.placeholder = t("pricePlaceholder");
@@ -150,6 +155,11 @@ function applyTranslations() {
   elements.commentsOverviewCloseBtn.textContent = t("close");
   elements.statsTitle.textContent = t("stats");
   elements.statsCloseBtn.textContent = t("close");
+  elements.feedbackTitle.textContent = t("feedbackTitle");
+  elements.feedbackLabel.textContent = t("feedbackLabel");
+  elements.feedbackInput.placeholder = t("feedbackPlaceholder");
+  elements.feedbackCancelBtn.textContent = t("cancel");
+  elements.feedbackSendBtn.textContent = t("feedbackSend");
   elements.unauthorizedTitle.textContent = t("unauthorizedTitle");
   elements.unauthorizedText.textContent = t("unauthorizedText");
   renderCommentsOverview();
@@ -268,6 +278,11 @@ function bindEvents() {
     event.stopPropagation();
     closeSettingsMenu();
     openCommentsOverviewModal();
+  });
+  elements.feedbackToggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeSettingsMenu();
+    openFeedbackModal();
   });
   elements.settingsMenu.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -424,6 +439,37 @@ function bindEvents() {
       closeStatsModal();
     }
   });
+  elements.feedbackCancelBtn.addEventListener("click", closeFeedbackModal);
+  elements.feedbackModal.addEventListener("click", (event) => {
+    if (event.target === elements.feedbackModal) {
+      closeFeedbackModal();
+    }
+  });
+  elements.feedbackSendBtn.addEventListener("click", async () => {
+    const message = (elements.feedbackInput.value || "").trim();
+    if (!message) {
+      tg?.showAlert?.(t("feedbackEmpty"));
+      return;
+    }
+    setBusy(true, t("busySaving"));
+    try {
+      await reportBug({
+        action: "feedback",
+        status: "info",
+        message,
+        client_time: new Date().toISOString(),
+        language: state.languageCode,
+        user_agent: navigator.userAgent,
+      });
+      closeFeedbackModal();
+      showToast(t("feedbackSent"), "success");
+    } catch (err) {
+      console.error(err);
+      showToast(t("reportFailed"), "danger");
+    } finally {
+      setBusy(false);
+    }
+  });
   elements.errorReportBtn.addEventListener("click", async () => {
     if (!state.lastError) {
       closeErrorModal();
@@ -470,3 +516,4 @@ closeEditModal();
 closeErrorModal();
 closeCommentsOverviewModal();
 closeStatsModal();
+closeFeedbackModal();

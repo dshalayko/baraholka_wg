@@ -49,6 +49,22 @@ function closeStatsModal() {
   elements.statsModal.style.display = "none";
 }
 
+function openFeedbackModal() {
+  elements.feedbackModal.hidden = false;
+  elements.feedbackModal.style.display = "flex";
+  if (elements.feedbackInput) {
+    elements.feedbackInput.focus();
+  }
+}
+
+function closeFeedbackModal() {
+  elements.feedbackModal.hidden = true;
+  elements.feedbackModal.style.display = "none";
+  if (elements.feedbackInput) {
+    elements.feedbackInput.value = "";
+  }
+}
+
 function resetEditModal() {
   state.editModal.id = null;
   state.editModal.photoFileIds = [];

@@ -207,6 +207,7 @@ function setUnauthorizedMode(enabled) {
     closeErrorModal();
     closeCommentsOverviewModal();
     closeStatsModal();
+    closeFeedbackModal();
   }
 }
 

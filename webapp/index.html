@@ -45,6 +45,11 @@
               </svg>
               <span class="header-badge" id="commentsTotalBadge" hidden>0</span>
             </button>
+            <button class="settings-toggle feedback-toggle" id="feedbackToggle" aria-label="Feedback">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V7a2 2 0 0 1 2-2z"></path>
+              </svg>
+            </button>
             <button class="settings-toggle" id="settingsToggle" aria-label="Settings">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -100,10 +105,17 @@
                 placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
               />
             </label>
-            <label class="field field-checkbox">
-              <input id="priceInDescription" type="checkbox" />
-              <span id="priceInDescriptionLabel">Цена в описании</span>
-            </label>
+            <div class="field field-checkbox field-checkbox-glass">
+              <span id="priceInDescriptionLabel" class="glass-toggle-title">Цена написана в описании?</span>
+              <label class="glass-toggle">
+                <input id="priceInDescription" type="checkbox" />
+                <span id="priceInDescriptionNoLabel" class="glass-toggle-side glass-toggle-no">Нет</span>
+                <span class="glass-switch-track">
+                  <span class="glass-switch-thumb"></span>
+                </span>
+                <span id="priceInDescriptionYesLabel" class="glass-toggle-side glass-toggle-yes">Да</span>
+              </label>
+            </div>
             <label class="field" id="priceField">
               <span id="priceLabel">Price</span>
               <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
@@ -160,10 +172,17 @@
               placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
             />
           </label>
-          <label class="field field-checkbox">
-            <input id="editPriceInDescription" type="checkbox" />
-            <span id="editPriceInDescriptionLabel">Цена в описании</span>
-          </label>
+          <div class="field field-checkbox field-checkbox-glass">
+            <span id="editPriceInDescriptionLabel" class="glass-toggle-title">Цена написана в описании?</span>
+            <label class="glass-toggle">
+              <input id="editPriceInDescription" type="checkbox" />
+              <span id="editPriceInDescriptionNoLabel" class="glass-toggle-side glass-toggle-no">Нет</span>
+              <span class="glass-switch-track">
+                <span class="glass-switch-thumb"></span>
+              </span>
+              <span id="editPriceInDescriptionYesLabel" class="glass-toggle-side glass-toggle-yes">Да</span>
+            </label>
+          </div>
           <label class="field" id="editPriceField">
             <span id="editPriceLabel">Цена</span>
             <input id="editPrice" type="text" maxlength="130" placeholder="Например: 50 RSD" />
@@ -228,6 +247,27 @@
         </div>
         <div class="modal-actions">
           <button class="ghost" id="statsCloseBtn">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="feedbackModal" hidden>
+      <div class="modal">
+        <div class="modal-title" id="feedbackTitle">Оставить фидбэк</div>
+        <div class="modal-body">
+          <label class="field">
+            <span id="feedbackLabel">Что улучшить?</span>
+            <textarea
+              id="feedbackInput"
+              rows="5"
+              maxlength="1200"
+              placeholder="Напишите отзыв или идею."
+            ></textarea>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost" id="feedbackCancelBtn">Отмена</button>
+          <button class="primary" id="feedbackSendBtn">Отправить</button>
         </div>
       </div>
     </div>
