@@ -2,6 +2,45 @@ function updateCounts() {
   // Counters removed from UI; keep placeholder for future metrics if needed.
 }
 
+function buildUploadHeaders() {
+  const headers = { "ngrok-skip-browser-warning": "1" };
+  if (tg?.initData) {
+    headers["X-Telegram-Init-Data"] = tg.initData;
+  }
+  return headers;
+}
+
+async function uploadFilesSequentially(files) {
+  const fileIds = [];
+  const headers = buildUploadHeaders();
+
+  for (let index = 0; index < files.length; index += 1) {
+    const formData = new FormData();
+    formData.append("files", files[index]);
+
+    const response = await fetch("/api/uploads", {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      const base = text || `HTTP ${response.status}`;
+      throw new Error(`${base} (file ${index + 1}/${files.length})`);
+    }
+
+    const data = await response.json();
+    const uploaded = data.file_ids || [];
+    if (!uploaded.length || !uploaded[0]) {
+      throw new Error(`Invalid upload response (file ${index + 1}/${files.length})`);
+    }
+    fileIds.push(uploaded[0]);
+  }
+
+  return fileIds;
+}
+
 function setUploading(isUploading) {
   elements.uploadSpinner.classList.toggle("active", isUploading);
   elements.photos.disabled = isUploading;
@@ -110,34 +149,30 @@ async function appendPhotos(files) {
   }
   setBusy(true, t("busyUploading"));
   setUploading(true);
+  const prevPreviews = [...state.photoPreviews];
+  const prevFileIds = [...state.photoFileIds];
+  let newPreviews = [];
   try {
     const startIndex = state.photoPreviews.length;
-    const newPreviews = files.map((file, idx) => ({
+    newPreviews = files.map((file, idx) => ({
       source: "local",
       url: URL.createObjectURL(file),
       label: `#${startIndex + idx + 1}`,
     }));
     state.photoPreviews = [...state.photoPreviews, ...newPreviews];
     renderPhotoPreviews();
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-    const headers = {};
-    headers["ngrok-skip-browser-warning"] = "1";
-    if (tg?.initData) {
-      headers["X-Telegram-Init-Data"] = tg.initData;
-    }
-    const response = await fetch("/api/uploads", {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `HTTP ${response.status}`);
-    }
-    const data = await response.json();
-    const newFileIds = data.file_ids || [];
+    const newFileIds = await uploadFilesSequentially(files);
     state.photoFileIds = [...state.photoFileIds, ...newFileIds];
+  } catch (error) {
+    newPreviews.forEach((item) => {
+      if (item?.source === "local") {
+        URL.revokeObjectURL(item.url);
+      }
+    });
+    state.photoPreviews = prevPreviews;
+    state.photoFileIds = prevFileIds;
+    renderPhotoPreviews();
+    throw error;
   } finally {
     setUploading(false);
     setBusy(false);
@@ -153,31 +188,26 @@ async function uploadPhotos(files) {
   }
   setBusy(true, t("busyUploading"));
   setUploading(true);
+  const prevPreviews = [...state.photoPreviews];
+  let nextPreviews = [];
   try {
-    state.photoPreviews = files.map((file, idx) => ({
+    nextPreviews = files.map((file, idx) => ({
       source: "local",
       url: URL.createObjectURL(file),
       label: `#${idx + 1}`,
     }));
+    state.photoPreviews = nextPreviews;
     renderPhotoPreviews();
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-    const headers = {};
-    headers["ngrok-skip-browser-warning"] = "1";
-    if (tg?.initData) {
-      headers["X-Telegram-Init-Data"] = tg.initData;
-    }
-    const response = await fetch("/api/uploads", {
-      method: "POST",
-      headers,
-      body: formData,
+    return await uploadFilesSequentially(files);
+  } catch (error) {
+    nextPreviews.forEach((item) => {
+      if (item?.source === "local") {
+        URL.revokeObjectURL(item.url);
+      }
     });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `HTTP ${response.status}`);
-    }
-    const data = await response.json();
-    return data.file_ids || [];
+    state.photoPreviews = prevPreviews;
+    renderPhotoPreviews();
+    throw error;
   } finally {
     setUploading(false);
     setBusy(false);
@@ -193,34 +223,30 @@ async function appendEditPhotos(files) {
   }
   setBusy(true, t("busyUploading"));
   setEditUploading(true);
+  const prevPreviews = [...state.editModal.photoPreviews];
+  const prevFileIds = [...state.editModal.photoFileIds];
+  let newPreviews = [];
   try {
     const startIndex = state.editModal.photoPreviews.length;
-    const newPreviews = files.map((file, idx) => ({
+    newPreviews = files.map((file, idx) => ({
       source: "local",
       url: URL.createObjectURL(file),
       label: `#${startIndex + idx + 1}`,
     }));
     state.editModal.photoPreviews = [...state.editModal.photoPreviews, ...newPreviews];
     renderEditPhotoPreviews();
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-    const headers = {};
-    headers["ngrok-skip-browser-warning"] = "1";
-    if (tg?.initData) {
-      headers["X-Telegram-Init-Data"] = tg.initData;
-    }
-    const response = await fetch("/api/uploads", {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `HTTP ${response.status}`);
-    }
-    const data = await response.json();
-    const newFileIds = data.file_ids || [];
+    const newFileIds = await uploadFilesSequentially(files);
     state.editModal.photoFileIds = [...state.editModal.photoFileIds, ...newFileIds];
+  } catch (error) {
+    newPreviews.forEach((item) => {
+      if (item?.source === "local") {
+        URL.revokeObjectURL(item.url);
+      }
+    });
+    state.editModal.photoPreviews = prevPreviews;
+    state.editModal.photoFileIds = prevFileIds;
+    renderEditPhotoPreviews();
+    throw error;
   } finally {
     setEditUploading(false);
     setBusy(false);
@@ -236,31 +262,26 @@ async function uploadEditPhotos(files) {
   }
   setBusy(true, t("busyUploading"));
   setEditUploading(true);
+  const prevPreviews = [...state.editModal.photoPreviews];
+  let nextPreviews = [];
   try {
-    state.editModal.photoPreviews = files.map((file, idx) => ({
+    nextPreviews = files.map((file, idx) => ({
       source: "local",
       url: URL.createObjectURL(file),
       label: `#${idx + 1}`,
     }));
+    state.editModal.photoPreviews = nextPreviews;
     renderEditPhotoPreviews();
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-    const headers = {};
-    headers["ngrok-skip-browser-warning"] = "1";
-    if (tg?.initData) {
-      headers["X-Telegram-Init-Data"] = tg.initData;
-    }
-    const response = await fetch("/api/uploads", {
-      method: "POST",
-      headers,
-      body: formData,
+    return await uploadFilesSequentially(files);
+  } catch (error) {
+    nextPreviews.forEach((item) => {
+      if (item?.source === "local") {
+        URL.revokeObjectURL(item.url);
+      }
     });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `HTTP ${response.status}`);
-    }
-    const data = await response.json();
-    return data.file_ids || [];
+    state.editModal.photoPreviews = prevPreviews;
+    renderEditPhotoPreviews();
+    throw error;
   } finally {
     setEditUploading(false);
     setBusy(false);
