@@ -4,7 +4,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from telegram.error import NetworkError, RetryAfter, TelegramError, TimedOut
+from telegram.error import BadRequest, NetworkError, RetryAfter, TelegramError, TimedOut
 
 from utils import get_serbia_time
 from webserver.auth import get_user_from_request
@@ -12,6 +12,13 @@ from webserver.settings import BUG_CHAT_ID, MEDIA_STORAGE_CHAT_ID, logger
 from webserver.telegram_client import bot, normalize_chat_id, upload_photo
 
 router = APIRouter()
+MAX_TELEGRAM_PHOTO_SIZE_BYTES = 10 * 1024 * 1024
+PHOTO_TOO_LARGE_MESSAGE = "Фото слишком большое. Загрузите фото меньшего размера (до 10 МБ)."
+
+
+def _is_photo_too_large_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "too big for a photo" in text or "maximum size is 10485760 bytes" in text
 
 
 @router.post("/api/uploads")
@@ -36,6 +43,8 @@ async def upload_files(
     for upload in files:
         data = await upload.read()
         filename = upload.filename or "photo.jpg"
+        if len(data) > MAX_TELEGRAM_PHOTO_SIZE_BYTES:
+            raise HTTPException(status_code=400, detail=PHOTO_TOO_LARGE_MESSAGE)
         message = None
         last_error: Optional[Exception] = None
         for attempt in range(3):
@@ -43,12 +52,22 @@ async def upload_files(
                 message = await upload_photo(storage_chat_id, data, filename)
                 last_error = None
                 break
+            except BadRequest as exc:
+                if _is_photo_too_large_error(exc):
+                    raise HTTPException(status_code=400, detail=PHOTO_TOO_LARGE_MESSAGE)
+                raise HTTPException(status_code=400, detail=f"Failed to upload photo: {exc}")
             except RetryAfter as exc:
                 last_error = exc
                 await asyncio.sleep(min(exc.retry_after + 1, 10))
             except (TimedOut, NetworkError) as exc:
+                if _is_photo_too_large_error(exc):
+                    raise HTTPException(status_code=400, detail=PHOTO_TOO_LARGE_MESSAGE)
                 last_error = exc
                 await asyncio.sleep(1 + attempt)
+            except TelegramError as exc:
+                if _is_photo_too_large_error(exc):
+                    raise HTTPException(status_code=400, detail=PHOTO_TOO_LARGE_MESSAGE)
+                raise HTTPException(status_code=502, detail=f"Telegram upload failed: {exc}")
         if last_error is not None:
             error_id = uuid.uuid4().hex[:8]
             logger.warning(

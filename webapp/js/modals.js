@@ -49,6 +49,16 @@ function closeStatsModal() {
   elements.statsModal.style.display = "none";
 }
 
+function openExpiredAdsModal() {
+  elements.expiredAdsModal.hidden = false;
+  elements.expiredAdsModal.style.display = "flex";
+}
+
+function closeExpiredAdsModal() {
+  elements.expiredAdsModal.hidden = true;
+  elements.expiredAdsModal.style.display = "none";
+}
+
 function openFeedbackModal() {
   elements.feedbackModal.hidden = false;
   elements.feedbackModal.style.display = "flex";

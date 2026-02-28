@@ -78,6 +78,112 @@ function renderStatsSummary() {
   });
 }
 
+function renderExpiredAdsList() {
+  if (!elements.expiredAdsList) return;
+  elements.expiredAdsList.innerHTML = "";
+  const expiredItems = Array.isArray(state.expiredAds) ? state.expiredAds : [];
+  const draftItems = Array.isArray(state.adminDrafts) ? state.adminDrafts : [];
+
+  const expiredTitle = document.createElement("div");
+  expiredTitle.className = "expired-section-title";
+  expiredTitle.textContent = t("statsExpiredTitle");
+  elements.expiredAdsList.appendChild(expiredTitle);
+
+  if (!expiredItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "expired-ads-empty";
+    empty.textContent = t("statsExpiredEmpty");
+    elements.expiredAdsList.appendChild(empty);
+  }
+
+  expiredItems.forEach((ad) => {
+    const row = document.createElement("div");
+    row.className = "expired-ad-row";
+
+    const top = document.createElement("div");
+    top.className = "expired-ad-top";
+
+    const owner = document.createElement("div");
+    owner.className = "expired-ad-owner";
+    const ownerValue = ad.username ? `@${ad.username}` : `id:${ad.user_id}`;
+    owner.textContent = `${t("statsOwner")}: ${ownerValue}`;
+
+    const age = document.createElement("span");
+    age.className = "expired-ad-age";
+    age.textContent = `${t("statsAgeDays")}: ${Number(ad.age_days) || 0}`;
+    top.append(owner, age);
+
+    const desc = document.createElement("div");
+    desc.className = "expired-ad-desc";
+    desc.textContent = toShortDescription(ad.description || "");
+
+    const date = document.createElement("div");
+    date.className = "expired-ad-date";
+    date.textContent = `${t("statsPublishedDate")}: ${formatPublishedAt(ad.published_at)}`;
+
+    row.append(top, desc, date);
+
+    if (ad.post_link) {
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "ghost expired-ad-open";
+      openBtn.textContent = t("open");
+      openBtn.setAttribute("data-expired-link", ad.post_link);
+      row.appendChild(openBtn);
+    }
+
+    elements.expiredAdsList.appendChild(row);
+  });
+
+  const draftsTitle = document.createElement("div");
+  draftsTitle.className = "expired-section-title";
+  draftsTitle.textContent = t("statsDraftsTitle");
+  elements.expiredAdsList.appendChild(draftsTitle);
+
+  if (!draftItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "expired-ads-empty";
+    empty.textContent = t("statsDraftsEmpty");
+    elements.expiredAdsList.appendChild(empty);
+    return;
+  }
+
+  draftItems.forEach((ad) => {
+    const row = document.createElement("div");
+    row.className = "draft-ad-row";
+
+    const top = document.createElement("div");
+    top.className = "expired-ad-top";
+
+    const owner = document.createElement("div");
+    owner.className = "expired-ad-owner";
+    const ownerValue = ad.username ? `@${ad.username}` : `id:${ad.user_id}`;
+    owner.textContent = `${t("statsOwner")}: ${ownerValue}`;
+    top.appendChild(owner);
+
+    const desc = document.createElement("div");
+    desc.className = "expired-ad-desc";
+    desc.textContent = toShortDescription(ad.description || "");
+
+    const updated = document.createElement("div");
+    updated.className = "expired-ad-date";
+    updated.textContent = `${t("editedAt")}: ${formatPublishedAt(ad.updated_at)}`;
+
+    const actions = document.createElement("div");
+    actions.className = "expired-draft-actions";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "danger expired-ad-delete";
+    deleteBtn.textContent = t("delete");
+    deleteBtn.setAttribute("data-draft-delete-id", String(ad.id));
+    actions.appendChild(deleteBtn);
+
+    row.append(top, desc, updated, actions);
+    elements.expiredAdsList.appendChild(row);
+  });
+}
+
 function toggleSettingsMenu() {
   elements.settingsMenu.hidden = !elements.settingsMenu.hidden;
 }
@@ -117,6 +223,21 @@ function applyTranslations() {
   elements.languageEnBtn.textContent = t("languageEn");
   elements.cancelFormBtn.textContent = t("cancel");
   elements.descLabel.textContent = t("description");
+  elements.descBoldBtn.title = t("formatBold");
+  elements.descBoldBtn.setAttribute("aria-label", t("formatBold"));
+  elements.descItalicBtn.title = t("formatItalic");
+  elements.descItalicBtn.setAttribute("aria-label", t("formatItalic"));
+  elements.descUnderlineBtn.title = t("formatUnderline");
+  elements.descUnderlineBtn.setAttribute("aria-label", t("formatUnderline"));
+  elements.descStrikeBtn.title = t("formatStrike");
+  elements.descStrikeBtn.setAttribute("aria-label", t("formatStrike"));
+  elements.descQuoteBtn.title = t("formatQuote");
+  elements.descQuoteBtn.setAttribute("aria-label", t("formatQuote"));
+  elements.descMonoBtn.title = t("formatMono");
+  elements.descMonoBtn.setAttribute("aria-label", t("formatMono"));
+  elements.descSpoilerBtn.title = t("formatSpoiler");
+  elements.descSpoilerBtn.setAttribute("aria-label", t("formatSpoiler"));
+  elements.descToolsHint.textContent = t("formatToolsHint");
   elements.contactLabel.textContent = t("contactLabel");
   elements.priceLabel.textContent = t("price");
   elements.priceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
@@ -131,6 +252,21 @@ function applyTranslations() {
   elements.addMorePhotosBtn.textContent = t("addMore");
   elements.editModalTitle.textContent = t("editTitle");
   elements.editDescLabel.textContent = t("description");
+  elements.editDescBoldBtn.title = t("formatBold");
+  elements.editDescBoldBtn.setAttribute("aria-label", t("formatBold"));
+  elements.editDescItalicBtn.title = t("formatItalic");
+  elements.editDescItalicBtn.setAttribute("aria-label", t("formatItalic"));
+  elements.editDescUnderlineBtn.title = t("formatUnderline");
+  elements.editDescUnderlineBtn.setAttribute("aria-label", t("formatUnderline"));
+  elements.editDescStrikeBtn.title = t("formatStrike");
+  elements.editDescStrikeBtn.setAttribute("aria-label", t("formatStrike"));
+  elements.editDescQuoteBtn.title = t("formatQuote");
+  elements.editDescQuoteBtn.setAttribute("aria-label", t("formatQuote"));
+  elements.editDescMonoBtn.title = t("formatMono");
+  elements.editDescMonoBtn.setAttribute("aria-label", t("formatMono"));
+  elements.editDescSpoilerBtn.title = t("formatSpoiler");
+  elements.editDescSpoilerBtn.setAttribute("aria-label", t("formatSpoiler"));
+  elements.editDescToolsHint.textContent = t("formatToolsHint");
   elements.editContactLabel.textContent = t("contactLabel");
   elements.editPriceLabel.textContent = t("price");
   elements.editPriceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
@@ -154,7 +290,10 @@ function applyTranslations() {
   elements.commentsOverviewTitle.textContent = t("commentsOverviewTitle");
   elements.commentsOverviewCloseBtn.textContent = t("close");
   elements.statsTitle.textContent = t("stats");
+  elements.statsExpiredBtn.textContent = t("statsExpiredBtn");
   elements.statsCloseBtn.textContent = t("close");
+  elements.expiredAdsTitle.textContent = t("statsExpiredTitle");
+  elements.expiredAdsCloseBtn.textContent = t("close");
   elements.feedbackTitle.textContent = t("feedbackTitle");
   elements.feedbackLabel.textContent = t("feedbackLabel");
   elements.feedbackInput.placeholder = t("feedbackPlaceholder");
@@ -164,6 +303,7 @@ function applyTranslations() {
   elements.unauthorizedText.textContent = t("unauthorizedText");
   renderCommentsOverview();
   renderStatsSummary();
+  renderExpiredAdsList();
   syncSettingsOptions();
 }
 
@@ -262,7 +402,11 @@ function bindEvents() {
   elements.photos.addEventListener("change", handlePhotoInput);
   elements.descBoldBtn.addEventListener("click", () => wrapSelection(elements.description, "**"));
   elements.descItalicBtn.addEventListener("click", () => wrapSelection(elements.description, "_"));
+  elements.descUnderlineBtn.addEventListener("click", () => wrapSelection(elements.description, "__"));
   elements.descStrikeBtn.addEventListener("click", () => wrapSelection(elements.description, "~~"));
+  elements.descQuoteBtn.addEventListener("click", () => prefixSelectionLines(elements.description, "> "));
+  elements.descMonoBtn.addEventListener("click", () => wrapSelection(elements.description, "`"));
+  elements.descSpoilerBtn.addEventListener("click", () => wrapSelection(elements.description, "||"));
   elements.settingsToggle.addEventListener("click", (event) => {
     event.stopPropagation();
     toggleSettingsMenu();
@@ -273,6 +417,15 @@ function bindEvents() {
     await refreshAdminStats();
     if (!state.isAdmin) return;
     openStatsModal();
+  });
+  elements.statsExpiredBtn.addEventListener("click", async () => {
+    setBusy(true, t("busyLoading"));
+    try {
+      await refreshAdminExpiredAds();
+      openExpiredAdsModal();
+    } finally {
+      setBusy(false);
+    }
   });
   elements.commentsToggle.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -321,7 +474,11 @@ function bindEvents() {
   });
   elements.editDescBoldBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "**"));
   elements.editDescItalicBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "_"));
+  elements.editDescUnderlineBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "__"));
   elements.editDescStrikeBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "~~"));
+  elements.editDescQuoteBtn.addEventListener("click", () => prefixSelectionLines(elements.editDescription, "> "));
+  elements.editDescMonoBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "`"));
+  elements.editDescSpoilerBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "||"));
   elements.editContactInfo.addEventListener("input", () => {
     setFieldInvalid(elements.editContactInfo, false);
   });
@@ -439,6 +596,42 @@ function bindEvents() {
       closeStatsModal();
     }
   });
+  elements.expiredAdsCloseBtn.addEventListener("click", closeExpiredAdsModal);
+  elements.expiredAdsModal.addEventListener("click", (event) => {
+    if (event.target === elements.expiredAdsModal) {
+      closeExpiredAdsModal();
+    }
+  });
+  elements.expiredAdsList.addEventListener("click", (event) => {
+    const deleteBtn = event.target.closest("button[data-draft-delete-id]");
+    if (deleteBtn) {
+      const idRaw = deleteBtn.getAttribute("data-draft-delete-id");
+      const draftId = Number(idRaw);
+      if (!Number.isFinite(draftId) || draftId <= 0) return;
+      if (!window.confirm(t("statsDeleteDraftConfirm"))) return;
+      setBusy(true, t("busyDeleting"));
+      deleteAdminDraft(draftId)
+        .then(async () => {
+          showToast(t("statsDraftDeleted"), "success");
+          await refreshAdminStats();
+          await refreshAdminExpiredAds();
+        })
+        .catch((err) => {
+          console.error(err);
+          showToast(err?.message || t("deleteFailed"), "danger");
+        })
+        .finally(() => {
+          setBusy(false);
+        });
+      return;
+    }
+
+    const openBtn = event.target.closest("button[data-expired-link]");
+    if (!openBtn) return;
+    const link = openBtn.getAttribute("data-expired-link");
+    if (!link) return;
+    tg?.openTelegramLink?.(link);
+  });
   elements.feedbackCancelBtn.addEventListener("click", closeFeedbackModal);
   elements.feedbackModal.addEventListener("click", (event) => {
     if (event.target === elements.feedbackModal) {
@@ -516,4 +709,5 @@ closeEditModal();
 closeErrorModal();
 closeCommentsOverviewModal();
 closeStatsModal();
+closeExpiredAdsModal();
 closeFeedbackModal();

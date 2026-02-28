@@ -75,16 +75,55 @@ function wrapSelection(textarea, prefix, suffix = prefix) {
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function prefixSelectionLines(textarea, prefix) {
+  if (!textarea || !prefix) return;
+  const value = textarea.value || "";
+  const start = textarea.selectionStart ?? 0;
+  const end = textarea.selectionEnd ?? start;
+
+  if (start === end) {
+    const lineStart = value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+    textarea.value = `${value.slice(0, lineStart)}${prefix}${value.slice(lineStart)}`;
+    const caret = start + prefix.length;
+    textarea.setSelectionRange(caret, caret);
+  } else {
+    const blockStart = value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+    const selected = value.slice(blockStart, end);
+    const prefixed = selected
+      .split("\n")
+      .map((line) => `${prefix}${line}`)
+      .join("\n");
+    textarea.value = `${value.slice(0, blockStart)}${prefixed}${value.slice(end)}`;
+    textarea.setSelectionRange(blockStart, blockStart + prefixed.length);
+  }
+
+  textarea.focus();
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 function renderStyledText(text) {
   const source = String(text || "");
   const escaped = source
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-  return escaped
+  const withBlocks = escaped
+    .split("\n")
+    .map((line) => {
+      if (line.startsWith("&gt;")) {
+        const quoteText = line.replace(/^&gt;\s?/, "");
+        return `<blockquote>${quoteText}</blockquote>`;
+      }
+      return line;
+    })
+    .join("\n");
+  return withBlocks
     .replace(/\*\*(.+?)\*\*/gs, "<strong>$1</strong>")
+    .replace(/__(.+?)__/gs, "<u>$1</u>")
     .replace(/_(.+?)_/gs, "<em>$1</em>")
     .replace(/~~(.+?)~~/gs, "<s>$1</s>")
+    .replace(/`(.+?)`/gs, "<code>$1</code>")
+    .replace(/\|\|(.+?)\|\|/gs, '<span class="spoiler-text">$1</span>')
     .replace(/\n/g, "<br>");
 }
 
@@ -160,9 +199,9 @@ function validateAdForm({
 
 function formatPublishedAt(value) {
   if (!value) return "";
-  const match = String(value).match(/^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}:\d{2})$/);
-  if (!match) return value;
-  return `${match[1]}.${match[2]}.${match[3]}, ${match[4]}`;
+  const match = String(value).trim().match(/^(\d{2}\.\d{2}\.\d{4})/);
+  if (!match) return String(value);
+  return match[1];
 }
 
 function showToast(message, variant = "info") {
@@ -207,6 +246,7 @@ function setUnauthorizedMode(enabled) {
     closeErrorModal();
     closeCommentsOverviewModal();
     closeStatsModal();
+    closeExpiredAdsModal();
     closeFeedbackModal();
   }
 }

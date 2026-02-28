@@ -24,5 +24,7 @@ const state = {
   unauthorized: false,
   isAdmin: false,
   statsSummary: null,
+  expiredAds: [],
+  adminDrafts: [],
   sentAppOpenEvent: false,
 };

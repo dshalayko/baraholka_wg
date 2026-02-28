@@ -1,3 +1,5 @@
+import json
+from datetime import timedelta
 from typing import Any, Dict
 
 import aiosqlite
@@ -5,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from telegram.error import TelegramError
 
 from config import DB_PATH, DSHALAYKO_ID, PRIVATE_CHANNEL_ID, SLONSKI_ID
-from utils import get_serbia_time
+from utils import get_private_channel_post_link, get_serbia_time, parse_timestamp
 from webserver.auth import get_user_from_request
 from webserver.telegram_client import bot, normalize_chat_id
 
@@ -140,3 +142,96 @@ async def stats_summary(user: Dict[str, Any] = Depends(get_user_from_request)) -
         },
         "ads": ads,
     }
+
+
+@router.get("/api/stats/expired-ads")
+async def expired_ads(user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
+    await _ensure_admin(user)
+    now = parse_timestamp(get_serbia_time())
+    if now is None:
+        return {"items": [], "draft_items": []}
+
+    channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
+    items = []
+    draft_items = []
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            SELECT id, user_id, username, description, timestamp, message_ids
+            FROM announcements
+            WHERE message_ids IS NOT NULL AND message_ids != '[]'
+            ORDER BY id DESC
+            """
+        )
+        rows = await cursor.fetchall()
+
+    for ann_id, user_id, username, description, timestamp, message_ids_raw in rows:
+        published_at = parse_timestamp(timestamp)
+        if published_at is None:
+            continue
+        age_delta = now - published_at
+        if age_delta <= timedelta(days=30):
+            continue
+        post_link = None
+        try:
+            message_ids = json.loads(message_ids_raw) if message_ids_raw else []
+            root_message_id = message_ids[0] if message_ids else None
+            if channel_id is not None and root_message_id:
+                post_link = get_private_channel_post_link(channel_id, root_message_id)
+        except Exception:
+            post_link = None
+        items.append(
+            {
+                "id": ann_id,
+                "user_id": user_id,
+                "username": username or "",
+                "description": description or "",
+                "published_at": timestamp,
+                "age_days": int(age_delta.days),
+                "post_link": post_link,
+            }
+        )
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        drafts_cursor = await db.execute(
+            """
+            SELECT id, user_id, username, description, updated_at, timestamp
+            FROM announcements
+            WHERE message_ids IS NULL OR message_ids = '[]'
+            ORDER BY id DESC
+            """
+        )
+        draft_rows = await drafts_cursor.fetchall()
+
+    for ann_id, user_id, username, description, updated_at, timestamp in draft_rows:
+        draft_items.append(
+            {
+                "id": ann_id,
+                "user_id": user_id,
+                "username": username or "",
+                "description": description or "",
+                "updated_at": updated_at or timestamp,
+            }
+        )
+
+    return {"items": items, "draft_items": draft_items}
+
+
+@router.delete("/api/stats/drafts/{ann_id}")
+async def delete_admin_draft(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
+    await _ensure_admin(user)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT message_ids FROM announcements WHERE id = ?", (ann_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Draft not found")
+        message_ids_raw = row[0]
+        if message_ids_raw and str(message_ids_raw).strip() != "[]":
+            raise HTTPException(status_code=400, detail="Only drafts can be deleted")
+
+        await db.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
+        await db.commit()
+
+    return {"status": "deleted", "id": ann_id}

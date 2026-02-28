@@ -119,11 +119,37 @@ async function refreshAdminStats() {
   renderStatsSummary();
 }
 
+async function refreshAdminExpiredAds() {
+  try {
+    const data = await apiFetch("/api/stats/expired-ads");
+    state.isAdmin = true;
+    state.expiredAds = Array.isArray(data?.items) ? data.items : [];
+    state.adminDrafts = Array.isArray(data?.draft_items) ? data.draft_items : [];
+    elements.statsToggle.hidden = false;
+  } catch (err) {
+    if (err?.status === 401 || err?.status === 403) {
+      state.isAdmin = false;
+      state.expiredAds = [];
+      state.adminDrafts = [];
+      elements.statsToggle.hidden = true;
+      renderExpiredAdsList();
+      return;
+    }
+    throw err;
+  }
+  renderExpiredAdsList();
+}
+
+async function deleteAdminDraft(id) {
+  if (!id) return;
+  return apiFetch(`/api/stats/drafts/${id}`, { method: "DELETE" });
+}
+
 async function refreshAds() {
   setBusy(true, t("busyLoading"));
   try {
     const data = await apiFetch("/api/announcements");
-    state.ads = (data.items || []).slice().sort((a, b) => (b.id || 0) - (a.id || 0));
+    state.ads = (data.items || []).slice();
     renderAds();
   } catch (err) {
     if (err?.status === 401) {

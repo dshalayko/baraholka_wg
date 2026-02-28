@@ -10,6 +10,25 @@ function buildUploadHeaders() {
   return headers;
 }
 
+async function parseUploadErrorMessage(response) {
+  const fallback = `HTTP ${response.status}`;
+  const text = await response.text();
+  if (!text) return fallback;
+  try {
+    const data = JSON.parse(text);
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+    if (detail && typeof detail === "object" && typeof detail.message === "string" && detail.message.trim()) {
+      return detail.message;
+    }
+  } catch (err) {
+    // keep raw text as fallback
+  }
+  return text;
+}
+
 async function uploadFilesSequentially(files) {
   const fileIds = [];
   const headers = buildUploadHeaders();
@@ -25,8 +44,7 @@ async function uploadFilesSequentially(files) {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      const base = text || `HTTP ${response.status}`;
+      const base = await parseUploadErrorMessage(response);
       throw new Error(`${base} (file ${index + 1}/${files.length})`);
     }
 

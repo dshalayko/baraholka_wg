@@ -230,11 +230,16 @@
 .ad-header {
   position: absolute;
   top: 10px;
+  left: 10px;
   right: 10px;
   z-index: 4;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.ad-date-tag,
 .ad-status-tag {
   display: inline-flex;
   align-items: center;
@@ -246,6 +251,15 @@
   letter-spacing: 0.2px;
   backdrop-filter: blur(8px);
   background: rgba(16, 20, 28, 0.58);
+}
+
+.ad-status-tag {
+  margin-left: auto;
+}
+
+.ad-date-tag {
+  color: var(--ink);
+  background: rgba(120, 130, 150, 0.18);
 }
 
 .ad-status-tag.is-draft {
@@ -263,6 +277,11 @@
   background: rgba(82, 148, 220, 0.16);
 }
 
+.ad-status-tag.is-removed {
+  color: #ffb0b0;
+  background: rgba(201, 61, 61, 0.22);
+}
+
 :root[data-theme="light"] .ad-status-tag.is-draft {
   color: #9d5d09;
   background: rgba(255, 181, 70, 0.18);
@@ -276,6 +295,16 @@
 :root[data-theme="light"] .ad-status-tag.is-updated {
   color: #0b5ea1;
   background: rgba(67, 130, 210, 0.16);
+}
+
+:root[data-theme="light"] .ad-status-tag.is-removed {
+  color: #a11f1f;
+  background: rgba(214, 84, 84, 0.17);
+}
+
+:root[data-theme="light"] .ad-date-tag {
+  color: #2f3b49;
+  background: rgba(96, 110, 130, 0.14);
 }
 
 .ad-card h3 {
@@ -299,12 +328,53 @@
   word-break: break-word;
 }
 
+.ad-description blockquote {
+  margin: 6px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+
+.ad-description code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ad-description .spoiler-text {
+  border-radius: 4px;
+  padding: 0 3px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  color: transparent;
+}
+
 .ad-meta {
   display: flex;
   justify-content: space-between;
   color: var(--meta-text);
   font-size: 12px;
   margin-bottom: 10px;
+}
+
+.ad-card-expired {
+  border-color: rgba(201, 61, 61, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(201, 61, 61, 0.3);
+}
+
+.ad-removed-note {
+  margin: 0 0 10px;
+  color: #ffb0b0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+:root[data-theme="light"] .ad-card-expired {
+  border-color: rgba(184, 60, 60, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(184, 60, 60, 0.22);
+}
+
+:root[data-theme="light"] .ad-removed-note {
+  color: #a11f1f;
 }
 
 .ad-price {
@@ -673,6 +743,96 @@
   color: var(--ink);
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.expired-ads-body {
+  display: grid;
+  gap: 8px;
+}
+
+.expired-ads-empty {
+  color: var(--meta-text);
+  font-size: 13px;
+}
+
+.expired-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+.expired-ad-row {
+  border: 1px solid rgba(201, 61, 61, 0.4);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(201, 61, 61, 0.1);
+}
+
+.draft-ad-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.expired-ad-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.expired-ad-owner {
+  font-size: 12px;
+  color: var(--meta-text);
+}
+
+.expired-ad-age {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffb0b0;
+}
+
+.expired-ad-desc {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  margin-bottom: 6px;
+}
+
+.expired-ad-date {
+  font-size: 12px;
+  color: var(--meta-text);
+}
+
+.expired-ad-open {
+  margin-top: 8px;
+}
+
+.expired-draft-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.expired-ad-delete {
+  min-width: 96px;
+}
+
+:root[data-theme="light"] .expired-ad-row {
+  border-color: rgba(184, 60, 60, 0.35);
+  background: rgba(184, 60, 60, 0.08);
+}
+
+:root[data-theme="light"] .draft-ad-row {
+  background: rgba(15, 20, 26, 0.03);
+}
+
+:root[data-theme="light"] .expired-ad-age {
+  color: #a11f1f;
 }
 
 @keyframes modal-enter {

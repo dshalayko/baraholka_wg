@@ -77,6 +77,20 @@ function toShortDescription(value) {
   return `${raw.slice(0, 75).trim()}...`;
 }
 
+function isOlderThanDays(value, days) {
+  if (!value || !Number.isFinite(days) || days <= 0) return false;
+  const match = String(value).trim().match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+  if (!match) return false;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const published = new Date(year, month - 1, day);
+  if (Number.isNaN(published.getTime())) return false;
+  const now = new Date();
+  const threshold = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+  return published < threshold;
+}
+
 function renderCommentsOverview() {
   const commentedAds = getAdsWithComments();
   const totalComments = commentedAds.reduce((sum, ad) => sum + getAdCommentsCount(ad), 0);
@@ -131,9 +145,13 @@ function renderAds() {
   }
   elements.emptyState.hidden = true;
   state.ads.forEach((ad) => {
+    const isExpiredFromChannel = !!ad.is_published && isOlderThanDays(ad.published_at, 30);
     const card = document.createElement("div");
     card.className = "ad-card";
     card.style.position = "relative";
+    if (isExpiredFromChannel) {
+      card.classList.add("ad-card-expired");
+    }
 
     const photos = Array.isArray(ad.photo_file_ids) ? ad.photo_file_ids : [];
     if (photos.length) {
@@ -193,15 +211,19 @@ function renderAds() {
 
     const header = document.createElement("div");
     header.className = "ad-header";
-    header.style.position = "absolute";
-    header.style.top = "10px";
-    header.style.right = "10px";
-    header.style.zIndex = "4";
-    header.style.pointerEvents = "none";
+    if (ad.is_published && ad.published_at) {
+      const dateTag = document.createElement("span");
+      dateTag.className = "ad-date-tag";
+      dateTag.textContent = formatPublishedAt(ad.published_at);
+      header.appendChild(dateTag);
+    }
 
     const statusTag = document.createElement("span");
     statusTag.className = "ad-status-tag";
-    if (!ad.is_published) {
+    if (isExpiredFromChannel) {
+      statusTag.textContent = t("statusRemoved");
+      statusTag.classList.add("is-removed");
+    } else if (!ad.is_published) {
       statusTag.textContent = t("statusDraft");
       statusTag.classList.add("is-draft");
     } else if (ad.is_updated) {
@@ -230,15 +252,9 @@ function renderAds() {
 
     meta.append(priceLabel, priceValue);
 
-    const status = document.createElement("div");
-    status.className = "ad-meta ad-timestamp";
-    if (!ad.is_published) {
-      status.textContent = t("draft");
-    } else if (ad.is_updated) {
-      status.textContent = `${t("editedAt")} ${formatPublishedAt(ad.published_at)}`.trim();
-    } else {
-      status.textContent = `${t("publishedAt")} ${formatPublishedAt(ad.published_at)}`.trim();
-    }
+    const removedNote = document.createElement("div");
+    removedNote.className = "ad-removed-note";
+    removedNote.textContent = t("removedFromChannel");
 
     const actions = document.createElement("div");
     actions.className = "ad-actions";
@@ -271,7 +287,7 @@ function renderAds() {
       actions.appendChild(publishBtn);
     }
 
-    if (ad.post_link) {
+    if (ad.post_link && !isExpiredFromChannel) {
       const openBtn = document.createElement("button");
       openBtn.className = "ad-open ad-action ad-action-main";
       openBtn.type = "button";
@@ -281,7 +297,7 @@ function renderAds() {
     }
 
     const commentsCount = Number(ad.comments_count) || 0;
-    if (ad.is_published && ad.post_link && commentsCount > 0) {
+    if (ad.is_published && ad.post_link && commentsCount > 0 && !isExpiredFromChannel) {
       const commentsBtn = document.createElement("button");
       commentsBtn.className = "ghost ad-action ad-action-icon ad-action-comments";
       commentsBtn.type = "button";
@@ -316,7 +332,11 @@ function renderAds() {
     deleteBtn.onclick = () => openDeleteConfirm(ad.id);
     actions.appendChild(deleteBtn);
 
-    body.append(title, meta, status, actions);
+    if (isExpiredFromChannel) {
+      body.append(title, meta, removedNote, actions);
+    } else {
+      body.append(title, meta, actions);
+    }
     card.append(header, body);
     elements.adsList.appendChild(card);
   });

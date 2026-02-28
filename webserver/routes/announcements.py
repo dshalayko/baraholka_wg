@@ -1,6 +1,7 @@
 import json
 import mimetypes
 import uuid
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 import aiosqlite
@@ -11,7 +12,7 @@ from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 
 from comments_manager import forward_thread_replies, get_discussion_replies_counts
 from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
-from utils import get_private_channel_post_link, get_serbia_time, is_timestamp_older_than_days
+from utils import get_private_channel_post_link, get_serbia_time, is_timestamp_older_than_days, parse_timestamp
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, AnnouncementOut
 from webserver.routes.stats import increment_stat
@@ -29,7 +30,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, last_published_is_edit
+            SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit
             FROM announcements WHERE user_id = ?
             """,
             (user_id,),
@@ -40,7 +41,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
     pending_items = []
 
     for row in rows:
-        ann_id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, last_published_is_edit = row
+        ann_id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit = row
         photo_list = json.loads(photo_file_ids) if photo_file_ids else []
         message_list = json.loads(message_ids) if message_ids else []
         is_published = bool(message_list)
@@ -65,6 +66,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
                 "is_published": is_published,
                 "post_link": post_link,
                 "published_at": timestamp if is_published else None,
+                "updated_at": updated_at,
                 "is_updated": is_updated,
                 "_root_message_id": root_message_id,
             }
@@ -75,6 +77,14 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
         root_message_id = item.pop("_root_message_id", None)
         item["comments_count"] = comments_counts.get(root_message_id, 0) if root_message_id else 0
         items.append(AnnouncementOut(**item).dict())
+    
+    def _sort_dt(raw: Dict[str, Any]) -> datetime:
+        return parse_timestamp(raw.get("updated_at")) or parse_timestamp(raw.get("published_at")) or datetime.min
+
+    items.sort(
+        key=lambda item: (_sort_dt(item), item.get("id", 0)),
+        reverse=True,
+    )
 
     return {"items": items}
 
@@ -106,8 +116,8 @@ async def create_announcement(
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -117,6 +127,7 @@ async def create_announcement(
                 1 if price_in_description else 0,
                 contact_info,
                 json.dumps(payload.photo_file_ids),
+                get_serbia_time(),
             ),
         )
         await db.commit()
@@ -159,7 +170,7 @@ async def update_announcement(
 
         await db.execute(
             """
-            UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?
+            UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -168,6 +179,7 @@ async def update_announcement(
                 1 if price_in_description else 0,
                 contact_info,
                 json.dumps(payload.photo_file_ids),
+                get_serbia_time(),
                 ann_id,
             ),
         )
@@ -379,12 +391,11 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
 
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
-                "UPDATE announcements SET message_ids = ?, timestamp = ?, last_published_is_edit = ? WHERE id = ?",
-                (json.dumps(new_message_ids), get_serbia_time(), 1 if show_updated_label else 0, ann_id),
+                "UPDATE announcements SET message_ids = ?, timestamp = ?, updated_at = ?, last_published_is_edit = ? WHERE id = ?",
+                (json.dumps(new_message_ids), get_serbia_time(), get_serbia_time(), 1 if show_updated_label else 0, ann_id),
             )
             await db.commit()
 
-        not_deleted_ids: list[int] = []
         delete_failures: list[str] = []
         if is_editing and old_message_ids:
             transfer_success = await forward_thread_replies(old_message_ids[0], new_message_ids[0])
@@ -400,7 +411,6 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 try:
                     await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
                 except Exception as exc:
-                    not_deleted_ids.append(message_id)
                     link = get_private_channel_post_link(private_channel_id, message_id)
                     delete_failures.append(f"{message_id} ({link}) -> {exc}")
                     logger.warning(
@@ -452,11 +462,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         post_link = get_private_channel_post_link(private_channel_id, new_message_ids[0])
         logger.info("ann:publish done ann_id=%s post_link=%s", ann_id, post_link)
         await increment_stat("publish_success")
-        response = {"post_link": post_link}
-        if not_deleted_ids:
-            response["warning"] = "Old post in channel could not be deleted."
-            response["not_deleted_message_ids"] = not_deleted_ids
-        return response
+        return {"post_link": post_link}
     except Exception:
         await increment_stat("publish_fail")
         raise

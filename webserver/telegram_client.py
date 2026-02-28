@@ -26,34 +26,66 @@ def normalize_chat_id(value: Optional[str]) -> Optional[int]:
         return None
 
 
+def _escape_markdown_v2_code(text: str) -> str:
+    if text is None:
+        return ""
+    return text.replace("\\", "\\\\").replace("`", "\\`")
+
+
 def _escape_description_with_styles(text: str) -> str:
     if not text:
         return ""
 
     placeholders: list[str] = []
+    token_template = "\x00STYLE{idx}\x00"
+
+    def _stash_token(rendered: str) -> str:
+        idx = len(placeholders)
+        placeholders.append(rendered)
+        return token_template.format(idx=idx)
 
     def _stash(match: re.Match[str], marker: str) -> str:
         inner = match.group(1).strip()
         if not inner:
             return match.group(0)
-        escaped_inner = escape_markdown_v2(inner)
+        if marker == "code":
+            escaped_inner = _escape_markdown_v2_code(inner)
+        else:
+            escaped_inner = escape_markdown_v2(inner)
         if marker == "bold":
             rendered = f"*{escaped_inner}*"
+        elif marker == "underline":
+            rendered = f"__{escaped_inner}__"
         elif marker == "italic":
             rendered = f"_{escaped_inner}_"
+        elif marker == "spoiler":
+            rendered = f"||{escaped_inner}||"
+        elif marker == "code":
+            rendered = f"`{escaped_inner}`"
         else:
             rendered = f"~{escaped_inner}~"
-        idx = len(placeholders)
-        placeholders.append(rendered)
-        return f"\x00STYLE{idx}\x00"
+        return _stash_token(rendered)
 
-    processed = re.sub(r"\*\*(.+?)\*\*", lambda m: _stash(m, "bold"), text, flags=re.DOTALL)
-    processed = re.sub(r"_(.+?)_", lambda m: _stash(m, "italic"), processed, flags=re.DOTALL)
+    processed = re.sub(r"`([^`\n]+?)`", lambda m: _stash(m, "code"), text)
+    processed = re.sub(r"\*\*(.+?)\*\*", lambda m: _stash(m, "bold"), processed, flags=re.DOTALL)
+    processed = re.sub(r"__(.+?)__", lambda m: _stash(m, "underline"), processed, flags=re.DOTALL)
+    processed = re.sub(r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)", lambda m: _stash(m, "italic"), processed, flags=re.DOTALL)
     processed = re.sub(r"~~(.+?)~~", lambda m: _stash(m, "strike"), processed, flags=re.DOTALL)
+    processed = re.sub(r"\|\|(.+?)\|\|", lambda m: _stash(m, "spoiler"), processed, flags=re.DOTALL)
+
+    quoted_lines: list[str] = []
+    for line in processed.split("\n"):
+        if re.match(r"^\s*>\s?", line):
+            body = re.sub(r"^\s*>\s?", "", line, count=1)
+            quoted_lines.append(_stash_token(f"> {escape_markdown_v2(body)}" if body else ">"))
+            continue
+        quoted_lines.append(line)
+    processed = "\n".join(quoted_lines)
+
     escaped = escape_markdown_v2(processed)
 
-    for idx, rendered in enumerate(placeholders):
-        escaped = escaped.replace(f"\x00STYLE{idx}\x00", rendered)
+    for idx in reversed(range(len(placeholders))):
+        escaped = escaped.replace(token_template.format(idx=idx), placeholders[idx])
     return escaped
 
 

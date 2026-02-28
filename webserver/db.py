@@ -20,6 +20,7 @@ async def ensure_db() -> None:
                 photo_file_ids TEXT,
                 message_ids TEXT,
                 timestamp TEXT,
+                updated_at TEXT,
                 last_published_is_edit INTEGER DEFAULT 0
             )
             """
@@ -41,4 +42,7 @@ async def ensure_db() -> None:
             await db.execute("ALTER TABLE announcements ADD COLUMN price_in_description INTEGER DEFAULT 0")
         if "contact_info" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN contact_info TEXT")
+        if "updated_at" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN updated_at TEXT")
+            await db.execute("UPDATE announcements SET updated_at = timestamp WHERE updated_at IS NULL AND timestamp IS NOT NULL")
         await db.commit()

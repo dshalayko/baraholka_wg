@@ -7,6 +7,7 @@ from typing import Dict, Iterable
 from pyrogram import Client, enums
 from pyrogram.enums import ChatType
 from pyrogram.errors import FloodWait
+from pyrogram.types import InputMediaPhoto
 
 from logger import logger
 from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID, PRIVATE_CHANNEL_ID
@@ -78,6 +79,99 @@ def _format_transfer_body(text: str | None, full_name: str, username: str) -> st
         return safe_text
     return ""
 
+
+def _comment_sender_key(comment) -> str:
+    user = getattr(comment, "from_user", None)
+    if user and getattr(user, "id", None) is not None:
+        return f"user:{user.id}"
+    sender_chat = getattr(comment, "sender_chat", None)
+    if sender_chat and getattr(sender_chat, "id", None) is not None:
+        return f"chat:{sender_chat.id}"
+    return "unknown"
+
+
+def _build_album_caption(author_line: str, comments, full_name: str, username: str) -> str:
+    caption_parts = []
+    for item in comments:
+        body = _format_transfer_body(getattr(item, "caption", None), full_name, username)
+        if body:
+            caption_parts.append(body)
+    if not caption_parts:
+        return author_line
+    body = "\n\n".join(caption_parts)
+    caption = f"{author_line}\n{body}"
+    if len(caption) <= 1024:
+        return caption
+    first = caption_parts[0]
+    compact = f"{author_line}\n{first}"
+    if len(compact) <= 1024:
+        return compact
+    return author_line
+
+
+async def _send_photo_comments(
+    app: Client,
+    chat_id: int,
+    reply_to_message_id: int,
+    photo_comments,
+    author_line: str,
+    full_name: str,
+    username: str,
+) -> None:
+    if not photo_comments:
+        return
+
+    if len(photo_comments) == 1:
+        comment = photo_comments[0]
+        body = _format_transfer_body(comment.caption, full_name, username)
+        caption = f"{author_line}\n{body}" if body else author_line
+        await app.send_photo(
+            chat_id=chat_id,
+            photo=comment.photo.file_id,
+            caption=caption,
+            parse_mode=enums.ParseMode.HTML,
+            reply_to_message_id=reply_to_message_id,
+        )
+        logger.info(f"📸 Отправлена фотография ID {comment.id}")
+        return
+
+    media = []
+    album_caption = _build_album_caption(author_line, photo_comments, full_name, username)
+    for index, comment in enumerate(photo_comments):
+        media.append(
+            InputMediaPhoto(
+                media=comment.photo.file_id,
+                caption=album_caption if index == 0 else None,
+                parse_mode=enums.ParseMode.HTML if index == 0 else None,
+            )
+        )
+
+    try:
+        await app.send_media_group(
+            chat_id=chat_id,
+            media=media,
+            reply_to_message_id=reply_to_message_id,
+        )
+        ids = ", ".join(str(item.id) for item in photo_comments)
+        logger.info(f"🖼️ Отправлена галерея фотографий IDs [{ids}]")
+    except Exception as exc:
+        logger.warning(
+            "⚠️ Не удалось отправить галерею (size=%s), отправляем по одной. error=%s",
+            len(photo_comments),
+            exc,
+        )
+        for comment in photo_comments:
+            body = _format_transfer_body(comment.caption, full_name, username)
+            caption = f"{author_line}\n{body}" if body else author_line
+            await app.send_photo(
+                chat_id=chat_id,
+                photo=comment.photo.file_id,
+                caption=caption,
+                parse_mode=enums.ParseMode.HTML,
+                reply_to_message_id=reply_to_message_id,
+            )
+            logger.info(f"📸 Отправлена фотография ID {comment.id}")
+
 async def _forward_thread_replies_once(old_thread_id, new_thread_id):
     logger.info(f"🚀 [forward_thread_replies] Запуск функции с old_thread_id={old_thread_id}, new_thread_id={new_thread_id}")
     app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH)
@@ -132,8 +226,48 @@ async def _forward_thread_replies_once(old_thread_id, new_thread_id):
                 comments.append(message)
 
         logger.info(f"🔄 Отправляем {len(comments)} комментариев в обратном порядке.")
-        for comment in reversed(comments):
+        ordered_comments = list(reversed(comments))
+        photo_batch = []
+        photo_batch_sender = None
+        photo_batch_author = None
+
+        async def flush_photo_batch():
+            nonlocal photo_batch, photo_batch_sender, photo_batch_author
+            if not photo_batch:
+                return
+            author_line, full_name, username = photo_batch_author
+            await _send_photo_comments(
+                app=app,
+                chat_id=chat_id,
+                reply_to_message_id=new_message_id,
+                photo_comments=photo_batch,
+                author_line=author_line,
+                full_name=full_name,
+                username=username,
+            )
+            photo_batch = []
+            photo_batch_sender = None
+            photo_batch_author = None
+
+        for comment in ordered_comments:
             try:
+                sender_key = _comment_sender_key(comment)
+                if comment.photo:
+                    if not photo_batch:
+                        photo_batch = [comment]
+                        photo_batch_sender = sender_key
+                        photo_batch_author = _comment_author_meta(comment)
+                        continue
+                    if photo_batch_sender == sender_key and len(photo_batch) < 10:
+                        photo_batch.append(comment)
+                        continue
+                    await flush_photo_batch()
+                    photo_batch = [comment]
+                    photo_batch_sender = sender_key
+                    photo_batch_author = _comment_author_meta(comment)
+                    continue
+
+                await flush_photo_batch()
                 author_line, full_name, username = _comment_author_meta(comment)
 
                 if comment.text:
@@ -148,18 +282,6 @@ async def _forward_thread_replies_once(old_thread_id, new_thread_id):
                     )
                     logger.info(f"📩 Отправлен текстовый комментарий ID {comment.id}")
 
-                elif comment.photo:
-                    body = _format_transfer_body(comment.caption, full_name, username)
-                    caption = f"{author_line}\n{body}" if body else author_line
-                    await app.send_photo(
-                        chat_id=chat_id,
-                        photo=comment.photo.file_id,
-                        caption=caption,
-                        parse_mode=enums.ParseMode.HTML,
-                        reply_to_message_id=new_message_id,
-                    )
-                    logger.info(f"📸 Отправлена фотография ID {comment.id}")
-
                 elif comment.sticker:
                     await app.send_sticker(chat_id=chat_id, sticker=comment.sticker.file_id, reply_to_message_id=new_message_id)
                     logger.info(f"🎨 Отправлен стикер ID {comment.id}")
@@ -169,6 +291,14 @@ async def _forward_thread_replies_once(old_thread_id, new_thread_id):
 
             except Exception as e:
                 logger.error(f"❌ [forward_thread_replies] Ошибка при отправке комментария ID {comment.id}: {e}")
+
+        try:
+            await flush_photo_batch()
+        except Exception as e:
+            if photo_batch:
+                logger.error(f"❌ [forward_thread_replies] Ошибка при отправке фотогруппы, последний ID {photo_batch[-1].id}: {e}")
+            else:
+                logger.error(f"❌ [forward_thread_replies] Ошибка при финальной отправке фотогруппы: {e}")
 
         await app.stop()
         logger.info(f"✅ [forward_thread_replies] Перенос комментариев завершен успешно.")

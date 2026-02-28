@@ -22,4 +22,5 @@ class AnnouncementOut(BaseModel):
     post_link: Optional[str] = None
     comments_count: int = 0
     published_at: Optional[str] = None
+    updated_at: Optional[str] = None
     is_updated: bool = False
