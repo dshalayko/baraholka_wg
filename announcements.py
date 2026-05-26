@@ -25,6 +25,7 @@ from utils import (
     escape_markdown_v2_url,
     get_texts,
     get_user_language_code,
+    is_timestamp_older_than_days,
 )
 from database import (get_user_announcements,
                       )
@@ -145,7 +146,7 @@ async def ask_photo_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton(texts.ASK_PHOTO_ACTION_SKIP, callback_data=f'cancel_photo_{ann_id}')]
     ])
 
-    message_text = texts.HAS_PHOTOS
+    message_text = escape_markdown_v2(texts.HAS_PHOTOS)
 
     # Отправляем сообщение с кнопками
     sent_message = await (query.message.reply_text(message_text, reply_markup=keyboard, parse_mode='MarkdownV2') if query else message.reply_text(message_text, reply_markup=keyboard, parse_mode='MarkdownV2'))
@@ -377,7 +378,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
 
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            'SELECT description, price, username, photo_file_ids, message_ids FROM announcements WHERE id = ?',
+            'SELECT description, price, username, photo_file_ids, message_ids, timestamp FROM announcements WHERE id = ?',
             (ann_id,))
         row = await cursor.fetchone()
 
@@ -385,11 +386,12 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.error(f"❌ [publish_announcement] Ошибка: объявление {ann_id} не найдено в базе.")
             return None
 
-        description, price, username, photo_file_ids, message_ids_json = row
+        description, price, username, photo_file_ids, message_ids_json, previous_timestamp = row
         photos = json.loads(photo_file_ids) if photo_file_ids else []
         old_message_ids = json.loads(message_ids_json) if message_ids_json else []
 
         is_editing = bool(old_message_ids)
+        show_updated_label = is_editing and is_timestamp_older_than_days(previous_timestamp, 2)
 
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     logger.info(f"📢 [publish_announcement] Публикация объявления {ann_id}, is_editing={is_editing}")
@@ -398,7 +400,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"🔔 [publish_announcement] disable_notification={disable_notification}")
 
     message = await format_announcement_text(update, description, price, username, ann_id=ann_id,
-                                             is_updated=is_editing, message_ids=old_message_ids,
+                                             is_updated=show_updated_label, message_ids=old_message_ids,
                                              timestamp=current_timestamp)
 
     if photos:

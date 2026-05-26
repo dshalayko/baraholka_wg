@@ -1,3 +1,5 @@
+import json
+
 import aiosqlite
 from telegram.ext import ContextTypes
 from telegram.helpers import escape_markdown
@@ -7,7 +9,7 @@ from config import PRIVATE_CHANNEL_ID, INVITE_LINK, DB_PATH
 import texts as texts_ru
 import texts_en
 from logger import logger
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import pytz
 
@@ -90,6 +92,36 @@ def get_serbia_time():
 
     return formatted_time
 
+
+def parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    formats = (
+        "%d.%m.%Y в %H:%M",
+        "%d.%m.%Y %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+    )
+    for fmt in formats:
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def is_timestamp_older_than_days(value: str | None, days: int) -> bool:
+    if days <= 0:
+        return True
+    published_at = parse_timestamp(value)
+    now_at = parse_timestamp(get_serbia_time())
+    if not published_at or not now_at:
+        return False
+    return (now_at - published_at) >= timedelta(days=days)
+
 def get_private_channel_post_link(channel_id, message_id):
     channel_id_str = str(channel_id)
     if channel_id_str.startswith('-100'):
@@ -116,7 +148,17 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
                 logger.warning(f"⚠️ [notify_owner_about_comment] У объявления {ann_id} отсутствуют message_ids, пропускаем.")
                 continue
 
-            message_ids_list = eval(message_ids) if isinstance(message_ids, str) else message_ids
+            if isinstance(message_ids, str):
+                try:
+                    message_ids_list = json.loads(message_ids)
+                except Exception:
+                    logger.warning(
+                        "⚠️ [notify_owner_about_comment] Некорректный формат message_ids для объявления %s",
+                        ann_id,
+                    )
+                    message_ids_list = []
+            else:
+                message_ids_list = message_ids or []
             if message_id in message_ids_list:
                 announcement = (ann_id, owner_id)
                 logger.info(f"✅ [notify_owner_about_comment] Найдено соответствующее объявление: ID {ann_id}, владелец {owner_id}")
@@ -151,21 +193,6 @@ async def notify_owner_about_comment(context, message_id, user_id, text):
 
     except Exception as e:
         logger.error(f"❌ [notify_owner_about_comment] Ошибка: {e}")
-
-def escape_markdown_custom(text: str) -> str:
-    special_chars = r'[*\-~`_\[\]\(\)]'
-    pattern = r'([*\-~`_\[\]\(\)])'
-    text = re.sub(pattern, r'\\\1', text)
-
-    def check_unclosed_tags(symbol: str, text: str) -> str:
-        if text.count(symbol) % 2 != 0:
-            return text + symbol  # Добавляем закрывающий тег
-        return text
-
-    for symbol in ['*', '_', '~', '`']:
-        text = check_unclosed_tags(symbol, text)
-
-    return text
 
 def escape_markdown_v2(text: str) -> str:
     if text is None:

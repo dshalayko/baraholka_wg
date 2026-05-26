@@ -14,22 +14,13 @@ def _texts_for_language(language_code: str | None):
 
 def get_main_markup(language_code: str | None):
     texts = _texts_for_language(language_code)
-    webapp_url = os.getenv("WEBAPP_URL")
-    webapp_row = [KeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))] if webapp_url else None
-    reply_keyboard = [
-        [texts.NEW_AD_CHOICE, texts.MY_ADS_CHOICE],
-    ]
-    if webapp_row:
-        reply_keyboard.append(webapp_row)
+    reply_keyboard = [[texts.NEW_AD_CHOICE, texts.MY_ADS_CHOICE]]
     return ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
 
 def get_add_advertisement_keyboard(language_code: str | None):
     texts = _texts_for_language(language_code)
-    webapp_url = os.getenv("WEBAPP_URL")
     reply_keyboard = [[texts.NEW_AD_CHOICE]]
-    if webapp_url:
-        reply_keyboard.append([KeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))])
     return ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
 
@@ -63,4 +54,12 @@ def get_finish_photo_markup_no_menu(language_code: str | None):
         [[texts.FINISH_PHOTO_UPLOAD]],
         one_time_keyboard=True,
         resize_keyboard=True
+    )
+
+
+def get_miniapp_keyboard(language_code: str | None, webapp_url: str):
+    texts = _texts_for_language(language_code)
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))]],
+        resize_keyboard=True,
     )

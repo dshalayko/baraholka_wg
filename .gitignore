@@ -1,2 +1,7 @@
 .env
 announcements.db
+__pycache__/
+*.pyc
+.idea/
+data/*.session
+data/*.db

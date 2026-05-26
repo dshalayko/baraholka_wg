@@ -1,0 +1,115 @@
+@media (max-width: 640px) {
+  #app {
+    padding: 14px;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .tabs {
+    top: 8px;
+    padding: 5px;
+  }
+
+  .settings-menu {
+    width: 200px;
+  }
+
+  .settings-wrap {
+    gap: 6px;
+  }
+
+  .tab {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .ad-gallery,
+  .ad-photo {
+    height: 200px;
+    max-height: 200px;
+  }
+
+  .modal {
+    width: min(96vw, 420px);
+    padding: 16px;
+  }
+
+  .modal-body {
+    max-height: 64vh;
+  }
+}
+
+@media (max-width: 420px) {
+  #app {
+    padding: 12px;
+  }
+
+  .app-title {
+    font-size: 16px;
+  }
+
+  .tabs {
+    gap: 6px;
+  }
+
+  .tab {
+    font-size: 12px;
+    padding: 9px 6px;
+  }
+
+  .tab-icon {
+    flex-basis: 38px;
+    width: 38px;
+  }
+
+  .settings-toggle {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+
+  .settings-menu {
+    width: min(86vw, 190px);
+    right: -2px;
+  }
+
+  .comments-overview-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .comments-overview-open {
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-body {
+    padding: 14px;
+  }
+
+  .ad-body {
+    padding: 12px;
+  }
+
+  .ad-gallery,
+  .ad-photo {
+    height: 176px;
+    max-height: 176px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+}

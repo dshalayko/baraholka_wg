@@ -7,9 +7,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from keyboards import get_main_markup, get_add_advertisement_keyboard
 from utils import is_subscribed, show_menu, check_subscription_message, get_user_language_code, get_texts, escape_markdown_v2_url
-from database import (
-    has_user_ads,
-)
 from announcements import *
 import logging
 import aiosqlite
@@ -17,6 +14,29 @@ import aiosqlite
 from logger import logger
 
 logger = logging.getLogger(__name__)
+
+async def _user_owns_announcement(user_id: int, ann_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT id FROM announcements WHERE id = ? AND user_id = ?",
+            (ann_id, user_id),
+        )
+        return await cursor.fetchone() is not None
+
+
+async def _send_miniapp_prompt(update: Update):
+    texts = get_texts(update)
+    webapp_url = os.getenv("WEBAPP_URL")
+    if not webapp_url:
+        return await update.effective_chat.send_message("WEBAPP_URL не задан.")
+    keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))]]
+    )
+    return await update.effective_chat.send_message(
+        texts.START_MINIAPP_MESSAGE,
+        reply_markup=keyboard,
+    )
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает команду /start, отправляет приветственное сообщение и удаляет команду пользователя."""
@@ -30,16 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, reply_markup=keyboard)
         return CHECK_SUBSCRIPTION
 
-    if await has_user_ads(user_id):
-        welcome_message = await update.message.reply_text(
-            texts.WELCOME_NEW_USER,
-            reply_markup=get_main_markup(language_code)
-        )
-    else:
-        welcome_message = await update.message.reply_text(
-            texts.WELCOME_NEW_USER,
-            reply_markup=get_add_advertisement_keyboard(language_code)
-        )
+    welcome_message = await _send_miniapp_prompt(update)
 
     context.user_data["welcome_message_id"] = welcome_message.message_id
     logger.info(f"✅ [start] Сохранен message_id приветствия: {welcome_message.message_id}")
@@ -61,16 +72,7 @@ async def lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(texts.LANG_UNKNOWN)
 
 async def open_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    texts = get_texts(update)
-    webapp_url = os.getenv("WEBAPP_URL")
-    if not webapp_url:
-        await update.message.reply_text("WEBAPP_URL не задан.")
-        return
-
-    keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton(texts.OPEN_WEBAPP_BUTTON, web_app=WebAppInfo(webapp_url))]]
-    )
-    await update.message.reply_text(texts.OPEN_WEBAPP_BUTTON, reply_markup=keyboard)
+    await _send_miniapp_prompt(update)
 
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -115,11 +117,15 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"⚠️ [handle_choice] Не удалось удалить WELCOME_NEW_USER (message_id={bot_message_id})")
 
     if choice in (texts_ru.NEW_AD_CHOICE, texts_en.NEW_AD_CHOICE):
-        context.user_data.clear()
-        return await create_announcement(update, context)
+        await _send_miniapp_prompt(update)
+        return CHOOSING
+    if choice in (texts_ru.OPEN_WEBAPP_BUTTON, texts_en.OPEN_WEBAPP_BUTTON):
+        await _send_miniapp_prompt(update)
+        return CHOOSING
 
     elif choice in (texts_ru.MY_ADS_CHOICE, texts_en.MY_ADS_CHOICE):
-        return await show_user_announcements(update, context)
+        await _send_miniapp_prompt(update)
+        return CHOOSING
 
     else:
         texts = get_texts(update)
@@ -132,6 +138,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = query.from_user.id
     await query.answer()
     texts = get_texts(update)
 
@@ -149,13 +156,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(texts.ERROR_ANN_ID_NOT_FOUND)
         return CHOOSING
 
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute('SELECT id FROM announcements WHERE id = ?', (ann_id,))
-        row = await cursor.fetchone()
-        if not row:
-            logger.error(f"❌ Ошибка: объявление {ann_id} не найдено в БД.")
-            await query.message.reply_text(texts.ERROR_ANNOUNCEMENT_NOT_FOUND)
-            return CHOOSING
+    if not await _user_owns_announcement(user_id, ann_id):
+        logger.warning("⚠️ [button_handler] Нет доступа к объявлению ann_id=%s user_id=%s", ann_id, user_id)
+        await query.message.reply_text(texts.ERROR_ANNOUNCEMENT_NOT_FOUND)
+        return CHOOSING
 
     context.user_data['ann_id'] = ann_id
     context.user_data['is_editing'] = True
@@ -198,11 +202,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         post_link = await publish_announcement(update, context, ann_id)
 
         if post_link:
-            escaped_link = escape_markdown_custom(post_link, entity_type="url")
             await query.message.reply_text(
                 texts.POST_SUCCESS_MESSAGE.format(link=escape_markdown_v2_url(post_link)),
                 reply_markup=get_main_markup(get_user_language_code(update)),
-                                           parse_mode='MarkdownV2')
+                parse_mode='MarkdownV2')
         else:
             await query.message.reply_text(
                 texts.POST_FAILURE_MESSAGE,
@@ -214,10 +217,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def edit_announcement_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = query.from_user.id
     await query.answer()
     texts = get_texts(update)
 
     ann_id = int(query.data.split("_")[1])
+    if not await _user_owns_announcement(user_id, ann_id):
+        logger.warning(
+            "⚠️ [edit_announcement_handler] Нет доступа к объявлению ann_id=%s user_id=%s",
+            ann_id,
+            user_id,
+        )
+        await query.message.reply_text(texts.ERROR_ANNOUNCEMENT_NOT_FOUND)
+        return CHOOSING
     context.user_data["ann_id"] = ann_id
 
     logger.info(f"✏️ [edit_announcement_handler] Открыто меню редактирования для объявления ID: {ann_id}")

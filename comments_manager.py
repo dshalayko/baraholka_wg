@@ -1,15 +1,29 @@
 import asyncio
 import html
 import os
+import time
+from typing import Dict, Iterable
 
 from pyrogram import Client
 from pyrogram.enums import MessageEntityType, ParseMode
 
 from logger import logger
-from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID
+from config import API_ID, API_HASH, CHAT_NAME, CHAT_ID, PRIVATE_CHANNEL_ID
 
 BASE_DIR = os.path.dirname(__file__)
-SESSION_PATH = os.path.join(BASE_DIR, "my_session")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+SESSION_PATH = os.path.join(DATA_DIR, "my_session")
+_forward_lock = asyncio.Lock()
+_comments_count_cache: Dict[int, tuple[int, float]] = {}
+_COMMENTS_CACHE_TTL_SECONDS = 30.0
+
+
+def _normalize_int_chat_id(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 AUTHOR_ENTITY_TYPES = {
@@ -188,7 +202,30 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
                 comments.append(message)
 
         logger.info(f"🔄 Отправляем {len(comments)} комментариев в обратном порядке.")
-        for comment in reversed(comments):
+        ordered_comments = list(reversed(comments))
+        photo_batch = []
+        photo_batch_sender = None
+        photo_batch_author = None
+
+        async def flush_photo_batch():
+            nonlocal photo_batch, photo_batch_sender, photo_batch_author
+            if not photo_batch:
+                return
+            author_line, full_name, username = photo_batch_author
+            await _send_photo_comments(
+                app=app,
+                chat_id=chat_id,
+                reply_to_message_id=new_message_id,
+                photo_comments=photo_batch,
+                author_line=author_line,
+                full_name=full_name,
+                username=username,
+            )
+            photo_batch = []
+            photo_batch_sender = None
+            photo_batch_author = None
+
+        for comment in ordered_comments:
             try:
                 if comment.text:
                     formatted_text = _format_transferred_comment(comment, current_user_id)
@@ -221,6 +258,14 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
             except Exception as e:
                 logger.error(f"❌ [forward_thread_replies] Ошибка при отправке комментария ID {comment.id}: {e}")
 
+        try:
+            await flush_photo_batch()
+        except Exception as e:
+            if photo_batch:
+                logger.error(f"❌ [forward_thread_replies] Ошибка при отправке фотогруппы, последний ID {photo_batch[-1].id}: {e}")
+            else:
+                logger.error(f"❌ [forward_thread_replies] Ошибка при финальной отправке фотогруппы: {e}")
+
         await app.stop()
         logger.info(f"✅ [forward_thread_replies] Перенос комментариев завершен успешно.")
         return True
@@ -228,7 +273,20 @@ async def forward_thread_replies(old_thread_id, new_thread_id):
     except Exception as e:
         logger.error(f"❌ Общая ошибка при переносе комментариев: {e}")
         await app.stop()
-        return False
+        raise
+
+
+async def forward_thread_replies(old_thread_id, new_thread_id):
+    async with _forward_lock:
+        for attempt in range(3):
+            try:
+                return await _forward_thread_replies_once(old_thread_id, new_thread_id)
+            except Exception as e:
+                err_text = str(e).lower()
+                if "database is locked" in err_text and attempt < 2:
+                    await asyncio.sleep(2 + attempt * 2)
+                    continue
+                return False
 
 async def get_message_id_by_thread_id(thread_id):
     """Ищет сообщение, у которого message_id == thread_id, и возвращает его. Логирует ВСЕ сообщения в группе."""
