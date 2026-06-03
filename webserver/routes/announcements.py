@@ -22,6 +22,47 @@ from webserver.telegram_client import bot, format_announcement_text, normalize_c
 router = APIRouter()
 
 
+async def send_bug_report(
+    *,
+    action: str,
+    user: Dict[str, Any],
+    ann_id: Optional[int],
+    status: str,
+    message: str,
+    detail: Optional[str],
+    post_link: Optional[str] = None,
+    error_id: Optional[str] = None,
+) -> None:
+    bug_chat_id = normalize_chat_id(BUG_CHAT_ID)
+    if bug_chat_id is None:
+        return
+
+    user_id = user.get("id")
+    try:
+        await bot.send_message(
+            chat_id=bug_chat_id,
+            text=(
+                "BUG REPORT\n"
+                f"Time: {get_serbia_time()}\n"
+                f"User ID: {user_id}\n"
+                f"Username: {user.get('username') or 'None'}\n"
+                f"Name: {' '.join(filter(None, [user.get('first_name'), user.get('last_name')])).strip() or 'None'}\n"
+                f"Action: {action}\n"
+                f"Ad ID: {ann_id}\n"
+                f"Status: {status}\n"
+                f"Error ID: {error_id}\n"
+                f"Message: {message}\n"
+                f"Detail: {detail}\n"
+                f"Post link: {post_link}\n"
+                "Client time: None\n"
+                "Language: None\n"
+                "User-Agent: None\n"
+            ),
+        )
+    except Exception:
+        logger.exception("bug-report auto send failed action=%s ann_id=%s user_id=%s", action, ann_id, user_id)
+
+
 @router.get("/api/announcements")
 async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
     user_id = user.get("id")
@@ -30,7 +71,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit
+            SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit, is_reserved
             FROM announcements WHERE user_id = ?
             """,
             (user_id,),
@@ -41,7 +82,19 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
     pending_items = []
 
     for row in rows:
-        ann_id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit = row
+        (
+            ann_id,
+            description,
+            price,
+            price_in_description,
+            contact_info,
+            photo_file_ids,
+            message_ids,
+            timestamp,
+            updated_at,
+            last_published_is_edit,
+            is_reserved,
+        ) = row
         photo_list = json.loads(photo_file_ids) if photo_file_ids else []
         message_list = json.loads(message_ids) if message_ids else []
         is_published = bool(message_list)
@@ -68,6 +121,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
                 "published_at": timestamp if is_published else None,
                 "updated_at": updated_at,
                 "is_updated": is_updated,
+                "is_reserved": bool(is_reserved),
                 "_root_message_id": root_message_id,
             }
         )
@@ -333,7 +387,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute(
                 """
-                SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp
+                SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp, is_reserved
                 FROM announcements WHERE id = ? AND user_id = ?
                 """,
                 (ann_id, user_id),
@@ -352,6 +406,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 photo_file_ids,
                 message_ids_json,
                 previous_timestamp,
+                is_reserved,
             ) = row
             photos = json.loads(photo_file_ids) if photo_file_ids else []
             old_message_ids = json.loads(message_ids_json) if message_ids_json else []
@@ -369,6 +424,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
             contact_info,
             display_name,
             is_updated=show_updated_label,
+            is_reserved=bool(is_reserved),
         )
 
         if photos:
@@ -470,6 +526,157 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
     except Exception:
         await increment_stat("publish_fail")
         raise
+
+
+@router.post("/api/announcements/{ann_id}/reserve")
+async def reserve_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
+    user_id = user.get("id")
+    private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
+    logger.info("ann:reserve user_id=%s ann_id=%s", user_id, ann_id)
+
+    if private_channel_id is None:
+        raise HTTPException(status_code=500, detail="PRIVATE_CHANNEL_ID is not set")
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, is_reserved
+            FROM announcements WHERE id = ? AND user_id = ?
+            """,
+            (ann_id, user_id),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Announcement not found")
+
+        (
+            description,
+            price,
+            price_in_description,
+            username,
+            contact_info,
+            photo_file_ids,
+            message_ids_json,
+            is_reserved,
+        ) = row
+        message_ids = json.loads(message_ids_json) if message_ids_json else []
+        if not message_ids:
+            raise HTTPException(status_code=400, detail="Only published announcements can be reserved")
+        photos = json.loads(photo_file_ids) if photo_file_ids else []
+        new_is_reserved = not bool(is_reserved)
+
+    display_name = " ".join(
+        filter(None, [user.get("first_name"), user.get("last_name")])
+    ).strip() or None
+    message = format_announcement_text(
+        description,
+        price,
+        bool(price_in_description),
+        username,
+        contact_info,
+        display_name,
+        is_updated=False,
+        is_reserved=new_is_reserved,
+    )
+
+    try:
+        if photos:
+            await bot.edit_message_caption(
+                chat_id=private_channel_id,
+                message_id=message_ids[0],
+                caption=message,
+                parse_mode="MarkdownV2",
+            )
+        else:
+            await bot.edit_message_text(
+                chat_id=private_channel_id,
+                message_id=message_ids[0],
+                text=message,
+                parse_mode="MarkdownV2",
+            )
+    except (TimedOut, NetworkError) as exc:
+        error_id = uuid.uuid4().hex[:8]
+        post_link = get_private_channel_post_link(private_channel_id, message_ids[0])
+        logger.warning("ann:reserve telegram_timeout ann_id=%s user_id=%s error=%s", ann_id, user_id, exc)
+        await send_bug_report(
+            action="reserve_ad",
+            user=user,
+            ann_id=ann_id,
+            status="error",
+            error_id=error_id,
+            message="Telegram timeout while updating reservation.",
+            detail=str(exc),
+            post_link=post_link,
+        )
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "message": "Не удалось обновить бронь в Telegram. Попробуйте позже.",
+                "error_id": error_id,
+                "error_detail": str(exc),
+                "post_link": post_link,
+            },
+        )
+    except BadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            error_id = uuid.uuid4().hex[:8]
+            post_link = get_private_channel_post_link(private_channel_id, message_ids[0])
+            logger.exception("ann:reserve telegram_bad_request ann_id=%s user_id=%s error=%s", ann_id, user_id, exc)
+            await send_bug_report(
+                action="reserve_ad",
+                user=user,
+                ann_id=ann_id,
+                status="error",
+                error_id=error_id,
+                message="Telegram reservation update failed.",
+                detail=str(exc),
+                post_link=post_link,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "Не удалось обновить бронь в Telegram. Возможно, Telegram уже не разрешает редактировать этот пост.",
+                    "error_id": error_id,
+                    "error_detail": str(exc),
+                    "post_link": post_link,
+                },
+            )
+        logger.warning("ann:reserve message already matches state ann_id=%s user_id=%s", ann_id, user_id)
+    except TelegramError as exc:
+        error_id = uuid.uuid4().hex[:8]
+        post_link = get_private_channel_post_link(private_channel_id, message_ids[0])
+        logger.exception("ann:reserve telegram_error ann_id=%s user_id=%s error=%s", ann_id, user_id, exc)
+        await send_bug_report(
+            action="reserve_ad",
+            user=user,
+            ann_id=ann_id,
+            status="error",
+            error_id=error_id,
+            message="Telegram reservation update failed.",
+            detail=str(exc),
+            post_link=post_link,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Не удалось обновить бронь в Telegram.",
+                "error_id": error_id,
+                "error_detail": str(exc),
+                "post_link": post_link,
+            },
+        )
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE announcements SET is_reserved = ?, updated_at = ? WHERE id = ?",
+            (1 if new_is_reserved else 0, get_serbia_time(), ann_id),
+        )
+        await db.commit()
+
+    return {
+        "post_link": get_private_channel_post_link(private_channel_id, message_ids[0]),
+        "is_reserved": new_is_reserved,
+    }
 
 
 @router.get("/api/announcements/{ann_id}/photo")

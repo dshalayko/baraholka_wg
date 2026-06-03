@@ -24,3 +24,4 @@ class AnnouncementOut(BaseModel):
     published_at: Optional[str] = None
     updated_at: Optional[str] = None
     is_updated: bool = False
+    is_reserved: bool = False

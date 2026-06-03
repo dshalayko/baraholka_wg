@@ -235,7 +235,6 @@ function applyFormatToolLabels(buttons) {
 function applyTranslations() {
   document.documentElement.lang = state.languageCode?.startsWith("ru") ? "ru" : "en";
   elements.appTitleText.textContent = t("appTitle");
-  elements.appBadgeText.textContent = t("beta");
   elements.tabMyAds.textContent = t("myAds");
   elements.tabCreate.textContent = t("create");
   elements.settingsToggle.setAttribute("aria-label", t("settings"));

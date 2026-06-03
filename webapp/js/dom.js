@@ -16,7 +16,6 @@ const elements = {
   languageRuBtn: document.getElementById("languageRuBtn"),
   languageEnBtn: document.getElementById("languageEnBtn"),
   appTitleText: document.getElementById("appTitleText"),
-  appBadgeText: document.getElementById("appBadgeText"),
   tabMyAds: document.getElementById("tabMyAds"),
   tabCreate: document.getElementById("tabCreate"),
   listPanel: document.getElementById("listPanel"),

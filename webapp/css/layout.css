@@ -129,20 +129,6 @@
   border-color: rgba(82, 148, 220, 0.45);
 }
 
-.app-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  background: var(--glass-strong);
-  border: 1px solid var(--border);
-  color: var(--ink);
-}
-
 h2 {
   margin: 0;
   font-size: 18px;

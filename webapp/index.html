@@ -33,7 +33,6 @@
         <header class="app-header">
           <div class="app-title">
             <span id="appTitleText">WG Black Market</span>
-            <span class="app-badge" id="appBadgeText">beta</span>
           </div>
           <div class="settings-wrap">
             <button class="settings-toggle stats-toggle" id="statsToggle" aria-label="Stats" hidden>
@@ -143,7 +142,7 @@
               <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
             </label>
             <div class="form-actions">
-              <button class="ghost" id="cancelFormBtn">Cancel</button>
+              <button class="ghost cancel-action" id="cancelFormBtn">Cancel</button>
               <button class="ghost" id="saveAdBtn">Save draft</button>
             </div>
             <button class="primary publish-wide" id="publishBtn">Publish</button>
@@ -214,7 +213,7 @@
           </label>
         </div>
         <div class="modal-actions modal-actions-wide">
-          <button class="ghost" id="editCancelBtn">Отмена</button>
+          <button class="ghost cancel-action" id="editCancelBtn">Отмена</button>
           <button class="primary" id="editPublishBtn">Опубликовать</button>
         </div>
       </div>
@@ -225,7 +224,7 @@
         <div class="modal-title" id="confirmTitle">Подтверждение</div>
         <div class="modal-text" id="confirmText">Вы уверены, что хотите удалить объявление?</div>
         <div class="modal-actions">
-          <button class="ghost" id="confirmNoBtn">Отмена</button>
+          <button class="ghost cancel-action" id="confirmNoBtn">Отмена</button>
           <button class="danger" id="confirmYesBtn">Да, удалить</button>
         </div>
       </div>
@@ -237,7 +236,7 @@
         <div class="modal-text" id="errorText"></div>
         <div class="modal-text modal-text-muted" id="errorDetails" hidden></div>
         <div class="modal-actions">
-          <button class="ghost" id="errorCloseBtn">Закрыть</button>
+          <button class="ghost cancel-action" id="errorCloseBtn">Закрыть</button>
           <button class="primary" id="errorReportBtn">Сообщить об ошибке</button>
         </div>
       </div>
@@ -253,7 +252,7 @@
         <div class="modal-title" id="commentsOverviewTitle">Комментарии к объявлениям</div>
         <div class="modal-body comments-overview-body" id="commentsOverviewList"></div>
         <div class="modal-actions comments-overview-actions">
-          <button class="ghost" id="commentsOverviewCloseBtn">Закрыть</button>
+          <button class="ghost cancel-action" id="commentsOverviewCloseBtn">Закрыть</button>
         </div>
       </div>
     </div>
@@ -266,7 +265,7 @@
         </div>
         <div class="modal-actions">
           <button class="primary" id="statsExpiredBtn">Просроченные</button>
-          <button class="ghost" id="statsCloseBtn">Закрыть</button>
+          <button class="ghost cancel-action" id="statsCloseBtn">Закрыть</button>
         </div>
       </div>
     </div>
@@ -276,7 +275,7 @@
         <div class="modal-title" id="expiredAdsTitle">Просроченные объявления</div>
         <div class="modal-body expired-ads-body" id="expiredAdsList"></div>
         <div class="modal-actions">
-          <button class="ghost" id="expiredAdsCloseBtn">Закрыть</button>
+          <button class="ghost cancel-action" id="expiredAdsCloseBtn">Закрыть</button>
         </div>
       </div>
     </div>
@@ -296,7 +295,7 @@
           </label>
         </div>
         <div class="modal-actions">
-          <button class="ghost" id="feedbackCancelBtn">Отмена</button>
+          <button class="ghost cancel-action" id="feedbackCancelBtn">Отмена</button>
           <button class="primary" id="feedbackSendBtn">Отправить</button>
         </div>
       </div>

@@ -269,6 +269,37 @@ async function publishAd(id) {
   }
 }
 
+async function reserveAd(id, isReserved = false) {
+  setBusy(true, t("busyReserving"));
+  try {
+    await apiFetch(`/api/announcements/${id}/reserve`, { method: "POST" });
+    await refreshAds();
+    showToast(t(isReserved ? "unreservedToast" : "reservedToast"), "success");
+  } catch (err) {
+    console.error(err);
+    const errorId = err?.data?.error_id;
+    const detail = err?.data?.error_detail;
+    const postLink = err?.data?.post_link || null;
+    const message = errorId ? `${t("reserveFailed")} #${errorId}` : t("reserveFailed");
+    state.lastError = {
+      action: "reserve_ad",
+      ad_id: id,
+      status: err?.status,
+      message: err?.message || t("reserveFailed"),
+      error_id: errorId,
+      error_detail: detail,
+      post_link: postLink,
+      client_time: new Date().toISOString(),
+      language: state.languageCode,
+      user_agent: navigator.userAgent,
+    };
+    const modalDetail = [detail || err?.message, postLink ? `post_link: ${postLink}` : ""].filter(Boolean).join("\n");
+    openErrorModal(message, modalDetail);
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function reportBug(payload) {
   return apiFetch("/api/bug-report", {
     method: "POST",

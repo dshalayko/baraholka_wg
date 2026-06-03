@@ -47,6 +47,22 @@
   color: #fff;
 }
 
+.cancel-action {
+  background: rgba(255, 91, 91, 0.12);
+  border: 1px solid rgba(255, 91, 91, 0.42);
+  color: #ffb0b0;
+}
+
+:root[data-theme="light"] .cancel-action {
+  background: rgba(200, 45, 45, 0.08);
+  border-color: rgba(200, 45, 45, 0.32);
+  color: #b62828;
+}
+
+.cancel-action:hover {
+  background: rgba(255, 91, 91, 0.2);
+}
+
 .primary:hover,
 .ghost:hover,
 .danger:hover {
@@ -305,6 +321,11 @@
   background: rgba(82, 148, 220, 0.16);
 }
 
+.ad-status-tag.is-reserved {
+  color: #ffd28b;
+  background: rgba(255, 184, 95, 0.18);
+}
+
 .ad-status-tag.is-removed {
   color: #ffb0b0;
   background: rgba(201, 61, 61, 0.22);
@@ -323,6 +344,11 @@
 :root[data-theme="light"] .ad-status-tag.is-updated {
   color: #0b5ea1;
   background: rgba(67, 130, 210, 0.16);
+}
+
+:root[data-theme="light"] .ad-status-tag.is-reserved {
+  color: #8a5200;
+  background: rgba(224, 149, 43, 0.16);
 }
 
 :root[data-theme="light"] .ad-status-tag.is-removed {
@@ -442,6 +468,10 @@
   flex: 1 1 auto;
 }
 
+.ad-action-reserve {
+  min-width: 132px;
+}
+
 .ad-action-icon {
   flex: 0 0 38px;
   width: 38px;
@@ -558,6 +588,7 @@
   height: 100vh;
   height: 100dvh;
   max-width: none;
+  background: var(--bg);
   border-radius: 0;
   border: 0;
   box-sizing: border-box;

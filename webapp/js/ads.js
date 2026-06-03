@@ -226,6 +226,9 @@ function renderAds() {
     } else if (!ad.is_published) {
       statusTag.textContent = t("statusDraft");
       statusTag.classList.add("is-draft");
+    } else if (ad.is_reserved) {
+      statusTag.textContent = t("statusReserved");
+      statusTag.classList.add("is-reserved");
     } else if (ad.is_updated) {
       statusTag.textContent = t("statusUpdated");
       statusTag.classList.add("is-updated");
@@ -294,6 +297,15 @@ function renderAds() {
       openBtn.textContent = t("open");
       openBtn.onclick = () => tg?.openTelegramLink?.(ad.post_link);
       actions.appendChild(openBtn);
+    }
+
+    if (ad.is_published && !isExpiredFromChannel) {
+      const reserveBtn = document.createElement("button");
+      reserveBtn.className = "ghost ad-action ad-action-main ad-action-reserve";
+      reserveBtn.type = "button";
+      reserveBtn.textContent = t(ad.is_reserved ? "unreserve" : "reserve");
+      reserveBtn.onclick = () => reserveAd(ad.id, !!ad.is_reserved);
+      actions.appendChild(reserveBtn);
     }
 
     const commentsCount = Number(ad.comments_count) || 0;

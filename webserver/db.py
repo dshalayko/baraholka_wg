@@ -21,7 +21,8 @@ async def ensure_db() -> None:
                 message_ids TEXT,
                 timestamp TEXT,
                 updated_at TEXT,
-                last_published_is_edit INTEGER DEFAULT 0
+                last_published_is_edit INTEGER DEFAULT 0,
+                is_reserved INTEGER DEFAULT 0
             )
             """
         )
@@ -45,4 +46,6 @@ async def ensure_db() -> None:
         if "updated_at" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN updated_at TEXT")
             await db.execute("UPDATE announcements SET updated_at = timestamp WHERE updated_at IS NULL AND timestamp IS NOT NULL")
+        if "is_reserved" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN is_reserved INTEGER DEFAULT 0")
         await db.commit()

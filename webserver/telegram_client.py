@@ -104,8 +104,11 @@ def format_announcement_text(
     contact_info: Optional[str],
     user_display: Optional[str],
     is_updated: bool,
+    is_reserved: bool = False,
 ) -> str:
     description = _escape_description_with_styles(description)
+    if is_reserved:
+        description = f"ЗАБРОНИРОВАНО\n\n{description}"
     if username != "None":
         contact_info = f"{texts_ru.CONTACT_TEXT}\n@{escape_markdown_v2(username)}"
     else:
