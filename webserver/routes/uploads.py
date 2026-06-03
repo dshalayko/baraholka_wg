@@ -1,5 +1,4 @@
 import asyncio
-import io
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -43,7 +42,23 @@ async def upload_files(
     for upload in files:
         data = await upload.read()
         filename = upload.filename or "photo.jpg"
+        content_type = upload.content_type or "unknown"
+        size = len(data)
+        logger.info(
+            "upload:file user_id=%s filename=%s content_type=%s size=%s",
+            user.get("id"),
+            filename,
+            content_type,
+            size,
+        )
         if len(data) > MAX_TELEGRAM_PHOTO_SIZE_BYTES:
+            logger.warning(
+                "upload:reject_too_large user_id=%s filename=%s content_type=%s size=%s",
+                user.get("id"),
+                filename,
+                content_type,
+                size,
+            )
             raise HTTPException(status_code=400, detail=PHOTO_TOO_LARGE_MESSAGE)
         message = None
         last_error: Optional[Exception] = None
@@ -54,7 +69,23 @@ async def upload_files(
                 break
             except BadRequest as exc:
                 if _is_photo_too_large_error(exc):
+                    logger.warning(
+                        "upload:reject_too_large_telegram user_id=%s filename=%s content_type=%s size=%s error=%s",
+                        user.get("id"),
+                        filename,
+                        content_type,
+                        size,
+                        exc,
+                    )
                     raise HTTPException(status_code=400, detail=PHOTO_TOO_LARGE_MESSAGE)
+                logger.warning(
+                    "upload:telegram_bad_request user_id=%s filename=%s content_type=%s size=%s error=%s",
+                    user.get("id"),
+                    filename,
+                    content_type,
+                    size,
+                    exc,
+                )
                 raise HTTPException(status_code=400, detail=f"Failed to upload photo: {exc}")
             except RetryAfter as exc:
                 last_error = exc
@@ -114,19 +145,24 @@ async def upload_files(
                     )
             raise HTTPException(status_code=504, detail=f"Upload timeout: {last_error}")
         if not message.photo:
+            logger.warning(
+                "upload:no_photo user_id=%s filename=%s content_type=%s size=%s message_id=%s",
+                user.get("id"),
+                filename,
+                content_type,
+                size,
+                getattr(message, "message_id", None),
+            )
             raise HTTPException(status_code=400, detail="Failed to upload photo")
         file_id = message.photo[-1].file_id
         file_ids.append(file_id)
-        try:
-            await bot.delete_message(chat_id=storage_chat_id, message_id=message.message_id)
-        except TelegramError as exc:
-            logger.warning(
-                "upload:cleanup_failed user_id=%s chat_id=%s message_id=%s error=%s",
-                user.get("id"),
-                storage_chat_id,
-                message.message_id,
-                exc,
-            )
+        logger.info(
+            "upload:stored user_id=%s chat_id=%s message_id=%s file_id=%s",
+            user.get("id"),
+            storage_chat_id,
+            message.message_id,
+            file_id,
+        )
 
     logger.info("upload:done user_id=%s file_ids=%s", user.get("id"), len(file_ids))
     return {"file_ids": file_ids}

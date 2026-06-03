@@ -1,6 +1,6 @@
 @media (max-width: 640px) {
   #app {
-    padding: 14px;
+    padding: 8px 10px 24px;
   }
 
   .panel-header {
@@ -11,7 +11,8 @@
 
   .tabs {
     top: 8px;
-    padding: 5px;
+    margin-top: 6px;
+    padding: 4px;
   }
 
   .settings-menu {
@@ -23,7 +24,7 @@
   }
 
   .tab {
-    padding: 10px 8px;
+    padding: 8px 8px;
     font-size: 13px;
   }
 
@@ -45,7 +46,7 @@
 
 @media (max-width: 420px) {
   #app {
-    padding: 12px;
+    padding: 6px 8px 20px;
   }
 
   .app-title {
@@ -58,7 +59,7 @@
 
   .tab {
     font-size: 12px;
-    padding: 9px 6px;
+    padding: 8px 6px;
   }
 
   .tab-icon {

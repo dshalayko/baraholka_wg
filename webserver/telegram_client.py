@@ -1,4 +1,5 @@
 import io
+import os
 import re
 from typing import Optional
 
@@ -13,7 +14,13 @@ from webserver.settings import BOT_TOKEN
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set")
 
-request = HTTPXRequest(connect_timeout=20.0, read_timeout=60.0, write_timeout=60.0, pool_timeout=20.0)
+telegram_timeout = float(os.getenv("TELEGRAM_TIMEOUT_SECONDS", "180"))
+request = HTTPXRequest(
+    connect_timeout=20.0,
+    read_timeout=telegram_timeout,
+    write_timeout=telegram_timeout,
+    pool_timeout=20.0,
+)
 bot = Bot(BOT_TOKEN, request=request)
 
 

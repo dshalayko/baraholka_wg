@@ -205,6 +205,33 @@ function syncSettingsOptions() {
   elements.languageEnBtn.classList.toggle("active", !isRu);
 }
 
+function setToolButton(button, marker, label, tagName = "span") {
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.textContent = "";
+
+  const markerNode = document.createElement(tagName);
+  markerNode.className = "tool-btn-marker";
+  markerNode.textContent = marker;
+
+  const labelNode = document.createElement("span");
+  labelNode.className = "tool-btn-label";
+  labelNode.textContent = label;
+
+  button.appendChild(markerNode);
+  button.appendChild(labelNode);
+}
+
+function applyFormatToolLabels(buttons) {
+  setToolButton(buttons.bold, "B", t("formatBold"), "strong");
+  setToolButton(buttons.italic, "I", t("formatItalic"), "em");
+  setToolButton(buttons.underline, "U", t("formatUnderline"), "u");
+  setToolButton(buttons.strike, "S", t("formatStrike"), "s");
+  setToolButton(buttons.quote, ">", t("formatQuote"));
+  setToolButton(buttons.mono, "{ }", t("formatMono"), "code");
+  setToolButton(buttons.spoiler, "SP", t("formatSpoiler"));
+}
+
 function applyTranslations() {
   document.documentElement.lang = state.languageCode?.startsWith("ru") ? "ru" : "en";
   elements.appTitleText.textContent = t("appTitle");
@@ -223,21 +250,15 @@ function applyTranslations() {
   elements.languageEnBtn.textContent = t("languageEn");
   elements.cancelFormBtn.textContent = t("cancel");
   elements.descLabel.textContent = t("description");
-  elements.descBoldBtn.title = t("formatBold");
-  elements.descBoldBtn.setAttribute("aria-label", t("formatBold"));
-  elements.descItalicBtn.title = t("formatItalic");
-  elements.descItalicBtn.setAttribute("aria-label", t("formatItalic"));
-  elements.descUnderlineBtn.title = t("formatUnderline");
-  elements.descUnderlineBtn.setAttribute("aria-label", t("formatUnderline"));
-  elements.descStrikeBtn.title = t("formatStrike");
-  elements.descStrikeBtn.setAttribute("aria-label", t("formatStrike"));
-  elements.descQuoteBtn.title = t("formatQuote");
-  elements.descQuoteBtn.setAttribute("aria-label", t("formatQuote"));
-  elements.descMonoBtn.title = t("formatMono");
-  elements.descMonoBtn.setAttribute("aria-label", t("formatMono"));
-  elements.descSpoilerBtn.title = t("formatSpoiler");
-  elements.descSpoilerBtn.setAttribute("aria-label", t("formatSpoiler"));
-  elements.descToolsHint.textContent = t("formatToolsHint");
+  applyFormatToolLabels({
+    bold: elements.descBoldBtn,
+    italic: elements.descItalicBtn,
+    underline: elements.descUnderlineBtn,
+    strike: elements.descStrikeBtn,
+    quote: elements.descQuoteBtn,
+    mono: elements.descMonoBtn,
+    spoiler: elements.descSpoilerBtn,
+  });
   elements.contactLabel.textContent = t("contactLabel");
   elements.priceLabel.textContent = t("price");
   elements.priceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
@@ -252,21 +273,15 @@ function applyTranslations() {
   elements.addMorePhotosBtn.textContent = t("addMore");
   elements.editModalTitle.textContent = t("editTitle");
   elements.editDescLabel.textContent = t("description");
-  elements.editDescBoldBtn.title = t("formatBold");
-  elements.editDescBoldBtn.setAttribute("aria-label", t("formatBold"));
-  elements.editDescItalicBtn.title = t("formatItalic");
-  elements.editDescItalicBtn.setAttribute("aria-label", t("formatItalic"));
-  elements.editDescUnderlineBtn.title = t("formatUnderline");
-  elements.editDescUnderlineBtn.setAttribute("aria-label", t("formatUnderline"));
-  elements.editDescStrikeBtn.title = t("formatStrike");
-  elements.editDescStrikeBtn.setAttribute("aria-label", t("formatStrike"));
-  elements.editDescQuoteBtn.title = t("formatQuote");
-  elements.editDescQuoteBtn.setAttribute("aria-label", t("formatQuote"));
-  elements.editDescMonoBtn.title = t("formatMono");
-  elements.editDescMonoBtn.setAttribute("aria-label", t("formatMono"));
-  elements.editDescSpoilerBtn.title = t("formatSpoiler");
-  elements.editDescSpoilerBtn.setAttribute("aria-label", t("formatSpoiler"));
-  elements.editDescToolsHint.textContent = t("formatToolsHint");
+  applyFormatToolLabels({
+    bold: elements.editDescBoldBtn,
+    italic: elements.editDescItalicBtn,
+    underline: elements.editDescUnderlineBtn,
+    strike: elements.editDescStrikeBtn,
+    quote: elements.editDescQuoteBtn,
+    mono: elements.editDescMonoBtn,
+    spoiler: elements.editDescSpoilerBtn,
+  });
   elements.editContactLabel.textContent = t("contactLabel");
   elements.editPriceLabel.textContent = t("price");
   elements.editPriceInDescriptionLabel.textContent = t("priceInDescriptionLabel");
@@ -575,6 +590,7 @@ function bindEvents() {
       closeErrorModal();
     }
   });
+  elements.photoViewerCloseBtn.addEventListener("click", closePhotoViewer);
   elements.commentsOverviewCloseBtn.addEventListener("click", closeCommentsOverviewModal);
   elements.commentsOverviewModal.addEventListener("click", (event) => {
     if (event.target === elements.commentsOverviewModal) {
@@ -707,6 +723,7 @@ initTheme();
 closeDeleteConfirm();
 closeEditModal();
 closeErrorModal();
+closePhotoViewer();
 closeCommentsOverviewModal();
 closeStatsModal();
 closeExpiredAdsModal();

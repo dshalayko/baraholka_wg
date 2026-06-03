@@ -20,7 +20,13 @@
       <div class="busy-overlay" id="busyOverlay" hidden>
         <div class="busy-card">
           <div class="busy-spinner"></div>
-          <div class="busy-text" id="busyText">Загрузка...</div>
+          <div class="busy-content">
+            <div class="busy-text" id="busyText">Загрузка...</div>
+            <div class="busy-detail" id="busyDetail" hidden></div>
+            <div class="busy-progress" id="busyProgress" hidden>
+              <div class="busy-progress-bar" id="busyProgressBar"></div>
+            </div>
+          </div>
         </div>
       </div>
       <div id="authorizedContent">
@@ -87,19 +93,28 @@
 
         <section class="panel" id="formPanel" hidden>
           <div class="panel-body">
+            <div class="field">
+              <span id="photosLabel">Photos (max 10)</span>
+              <div class="photo-actions" id="photoActions">
+                <button class="ghost" id="addMorePhotosBtn">Add photos</button>
+              </div>
+              <input id="photos" type="file" accept="image/*" multiple hidden />
+              <div class="upload-row">
+                <div class="chips" id="photoChips"></div>
+                <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
+              </div>
+              <div class="photo-grid" id="photoGrid"></div>
+            </div>
             <label class="field">
               <span id="descLabel">Description</span>
               <div class="text-toolbar">
-                <button class="tool-btn" id="descBoldBtn" type="button" title="Bold"><strong>B</strong></button>
-                <button class="tool-btn" id="descItalicBtn" type="button" title="Italic"><em>I</em></button>
-                <button class="tool-btn" id="descUnderlineBtn" type="button" title="Underline"><u>U</u></button>
-                <button class="tool-btn" id="descStrikeBtn" type="button" title="Strikethrough"><s>S</s></button>
-                <button class="tool-btn" id="descQuoteBtn" type="button" title="Quote">&gt;</button>
-                <button class="tool-btn" id="descMonoBtn" type="button" title="Monospace"><code>{ }</code></button>
-                <button class="tool-btn" id="descSpoilerBtn" type="button" title="Spoiler">SP</button>
-              </div>
-              <div class="text-toolbar-hint" id="descToolsHint">
-                B — жирный, I — курсив, U — подчеркивание, S — зачеркнутый, &gt; — цитата, { } — моноширинный, SP — спойлер
+                <button class="tool-btn" id="descBoldBtn" type="button" title="Bold"></button>
+                <button class="tool-btn" id="descItalicBtn" type="button" title="Italic"></button>
+                <button class="tool-btn" id="descUnderlineBtn" type="button" title="Underline"></button>
+                <button class="tool-btn" id="descStrikeBtn" type="button" title="Strikethrough"></button>
+                <button class="tool-btn" id="descQuoteBtn" type="button" title="Quote"></button>
+                <button class="tool-btn" id="descMonoBtn" type="button" title="Monospace"></button>
+                <button class="tool-btn" id="descSpoilerBtn" type="button" title="Spoiler"></button>
               </div>
               <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
             </label>
@@ -127,18 +142,6 @@
               <span id="priceLabel">Price</span>
               <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
             </label>
-            <label class="field">
-              <span id="photosLabel">Photos (max 10)</span>
-              <div class="photo-actions" id="photoActions">
-                <button class="ghost" id="addMorePhotosBtn">Add photos</button>
-              </div>
-              <input id="photos" type="file" accept="image/*" multiple hidden />
-              <div class="upload-row">
-                <div class="chips" id="photoChips"></div>
-                <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
-              </div>
-              <div class="photo-grid" id="photoGrid"></div>
-            </label>
             <div class="form-actions">
               <button class="ghost" id="cancelFormBtn">Cancel</button>
               <button class="ghost" id="saveAdBtn">Save draft</button>
@@ -161,19 +164,27 @@
       <div class="modal modal-wide">
         <div class="modal-title" id="editModalTitle">Редактирование</div>
         <div class="modal-body">
+          <div class="field">
+            <span id="editPhotosLabel">Фотографии (максимум 10)</span>
+            <div class="photo-actions">
+              <button class="ghost" id="editAddMorePhotosBtn">Добавить фото</button>
+            </div>
+            <input id="editPhotos" type="file" accept="image/*" multiple hidden />
+            <div class="upload-row">
+              <div class="spinner" id="editUploadSpinner" aria-hidden="true"></div>
+            </div>
+            <div class="photo-grid" id="editPhotoGrid"></div>
+          </div>
           <label class="field">
             <span id="editDescLabel">Описание</span>
             <div class="text-toolbar">
-              <button class="tool-btn" id="editDescBoldBtn" type="button" title="Bold"><strong>B</strong></button>
-              <button class="tool-btn" id="editDescItalicBtn" type="button" title="Italic"><em>I</em></button>
-              <button class="tool-btn" id="editDescUnderlineBtn" type="button" title="Underline"><u>U</u></button>
-              <button class="tool-btn" id="editDescStrikeBtn" type="button" title="Strikethrough"><s>S</s></button>
-              <button class="tool-btn" id="editDescQuoteBtn" type="button" title="Quote">&gt;</button>
-              <button class="tool-btn" id="editDescMonoBtn" type="button" title="Monospace"><code>{ }</code></button>
-              <button class="tool-btn" id="editDescSpoilerBtn" type="button" title="Spoiler">SP</button>
-            </div>
-            <div class="text-toolbar-hint" id="editDescToolsHint">
-              B — жирный, I — курсив, U — подчеркивание, S — зачеркнутый, &gt; — цитата, { } — моноширинный, SP — спойлер
+              <button class="tool-btn" id="editDescBoldBtn" type="button" title="Bold"></button>
+              <button class="tool-btn" id="editDescItalicBtn" type="button" title="Italic"></button>
+              <button class="tool-btn" id="editDescUnderlineBtn" type="button" title="Underline"></button>
+              <button class="tool-btn" id="editDescStrikeBtn" type="button" title="Strikethrough"></button>
+              <button class="tool-btn" id="editDescQuoteBtn" type="button" title="Quote"></button>
+              <button class="tool-btn" id="editDescMonoBtn" type="button" title="Monospace"></button>
+              <button class="tool-btn" id="editDescSpoilerBtn" type="button" title="Spoiler"></button>
             </div>
             <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
           </label>
@@ -200,17 +211,6 @@
           <label class="field" id="editPriceField">
             <span id="editPriceLabel">Цена</span>
             <input id="editPrice" type="text" maxlength="130" placeholder="Например: 50 RSD" />
-          </label>
-          <label class="field">
-            <span id="editPhotosLabel">Фотографии (максимум 10)</span>
-            <div class="photo-actions">
-              <button class="ghost" id="editAddMorePhotosBtn">Добавить фото</button>
-            </div>
-            <input id="editPhotos" type="file" accept="image/*" multiple hidden />
-            <div class="upload-row">
-              <div class="spinner" id="editUploadSpinner" aria-hidden="true"></div>
-            </div>
-            <div class="photo-grid" id="editPhotoGrid"></div>
           </label>
         </div>
         <div class="modal-actions modal-actions-wide">
@@ -241,6 +241,11 @@
           <button class="primary" id="errorReportBtn">Сообщить об ошибке</button>
         </div>
       </div>
+    </div>
+
+    <div class="photo-viewer" id="photoViewer" hidden>
+      <button class="photo-viewer-close" id="photoViewerCloseBtn" type="button" aria-label="Close">×</button>
+      <img id="photoViewerImage" alt="photo" />
     </div>
 
     <div class="modal-backdrop" id="commentsOverviewModal" hidden>

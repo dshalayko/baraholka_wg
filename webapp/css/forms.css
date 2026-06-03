@@ -19,14 +19,21 @@
 }
 
 .tool-btn {
-  min-width: 34px;
-  height: 30px;
+  min-height: 30px;
+  min-width: 0;
+  padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-family: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -34,11 +41,24 @@
   background: rgba(255, 255, 255, 0.16);
 }
 
-.text-toolbar-hint {
-  margin: -2px 0 8px;
-  font-size: 11px;
-  line-height: 1.35;
+.tool-btn-marker {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tool-btn .tool-btn-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
   color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .field-checkbox {
@@ -256,6 +276,54 @@ input[type="text"]:focus {
 
 .photo-item {
   position: relative;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 150ms ease, transform 150ms ease, outline-color 150ms ease;
+}
+
+.photo-item.dragging {
+  cursor: grabbing;
+  opacity: 0.65;
+  transform: scale(0.98);
+}
+
+.photo-item.drop-target img {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
+}
+
+.photo-drag-handle {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 24px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.46);
+  color: #fff;
+  opacity: 0.72;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.photo-drag-handle::before {
+  content: "";
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor, 6px 0 0 currentColor, 6px 5px 0 currentColor,
+    6px 10px 0 currentColor;
+  transform: translate(-3px, -5px);
+}
+
+.photo-item:hover .photo-drag-handle,
+.photo-item.dragging .photo-drag-handle {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.62);
 }
 
 .photo-item img {

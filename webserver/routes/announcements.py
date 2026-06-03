@@ -463,6 +463,10 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         logger.info("ann:publish done ann_id=%s post_link=%s", ann_id, post_link)
         await increment_stat("publish_success")
         return {"post_link": post_link}
+    except (TimedOut, NetworkError) as exc:
+        await increment_stat("publish_fail")
+        logger.warning("ann:publish telegram_timeout ann_id=%s user_id=%s error=%s", ann_id, user.get("id"), exc)
+        raise HTTPException(status_code=504, detail=f"Telegram timeout while publishing photos: {exc}")
     except Exception:
         await increment_stat("publish_fail")
         raise

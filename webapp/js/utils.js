@@ -226,10 +226,30 @@ function setBusy(isBusy, text = "") {
   if (text) {
     elements.busyText.textContent = text;
   }
+  if (!active) {
+    setBusyProgress(null);
+  }
   document.querySelectorAll("button, input, textarea, select").forEach((el) => {
     if (el === elements.settingsToggle) return;
     el.disabled = active;
   });
+}
+
+function setBusyProgress(progress) {
+  if (!elements.busyDetail || !elements.busyProgress || !elements.busyProgressBar) return;
+  if (!progress) {
+    elements.busyDetail.hidden = true;
+    elements.busyProgress.hidden = true;
+    elements.busyDetail.textContent = "";
+    elements.busyProgressBar.style.width = "0%";
+    return;
+  }
+
+  const percent = Math.max(0, Math.min(100, Math.round(progress.percent || 0)));
+  elements.busyDetail.hidden = false;
+  elements.busyProgress.hidden = false;
+  elements.busyDetail.textContent = progress.detail || `${percent}%`;
+  elements.busyProgressBar.style.width = `${percent}%`;
 }
 
 function setUnauthorizedMode(enabled) {

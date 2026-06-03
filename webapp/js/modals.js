@@ -29,6 +29,19 @@ function closeErrorModal() {
   elements.errorModal.style.display = "none";
 }
 
+function openPhotoViewer(src) {
+  if (!src) return;
+  elements.photoViewerImage.src = src;
+  elements.photoViewer.hidden = false;
+  elements.photoViewer.style.display = "flex";
+}
+
+function closePhotoViewer() {
+  elements.photoViewer.hidden = true;
+  elements.photoViewer.style.display = "none";
+  elements.photoViewerImage.src = "";
+}
+
 function openCommentsOverviewModal() {
   elements.commentsOverviewModal.hidden = false;
   elements.commentsOverviewModal.style.display = "flex";
