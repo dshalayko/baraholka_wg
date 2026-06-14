@@ -152,10 +152,11 @@ async function refreshAds() {
     state.ads = (data.items || []).slice();
     renderAds();
   } catch (err) {
-    if (err?.status === 401) {
-      return;
+    if (err?.status === 401) return;
+    if (!state.ads.length) {
+      showToast(t("loadFailed"), "danger");
     }
-    throw err;
+    void silentBugReport({ action: "refresh_ads", status: err?.status, message: err?.message });
   } finally {
     setBusy(false);
   }
@@ -190,6 +191,7 @@ async function saveAd() {
   };
 
   setBusy(true, t("busySaving"));
+  let saved = false;
   try {
     if (state.editingId) {
       await apiFetch(`/api/announcements/${state.editingId}`, {
@@ -202,13 +204,30 @@ async function saveAd() {
         body: JSON.stringify(payload),
       });
     }
-
-    resetForm();
-    showTab("list");
-    await refreshAds();
+    saved = true;
+  } catch (err) {
+    const errorId = err?.data?.error_id;
+    const detail = err?.data?.error_detail;
+    const message = errorId ? `${t("saveFailed")} #${errorId}` : t("saveFailed");
+    state.lastError = {
+      action: "save_ad",
+      ad_id: state.editingId || null,
+      status: err?.status,
+      message: err?.message || t("saveFailed"),
+      error_id: errorId,
+      error_detail: detail,
+      client_time: new Date().toISOString(),
+      language: state.languageCode,
+      user_agent: navigator.userAgent,
+    };
+    openErrorModal(message, detail || err?.message);
   } finally {
     setBusy(false);
   }
+  if (!saved) return;
+  resetForm();
+  showTab("list");
+  await refreshAds();
 }
 
 async function deleteAd(id) {
@@ -218,25 +237,16 @@ async function deleteAd(id) {
     await refreshAds();
     if (result?.warning) {
       const ids = Array.isArray(result.not_deleted_message_ids) ? result.not_deleted_message_ids : [];
-      const detail = ids.length ? `message_ids: ${ids.join(", ")}` : "";
       const postLink = result.post_link || null;
-      state.lastError = {
+      void silentBugReport({
         action: "delete_ad_warning",
         ad_id: id,
         status: 200,
         message: result.warning,
-        error_id: null,
-        error_detail: detail,
-        post_link: postLink,
-        client_time: new Date().toISOString(),
-        language: state.languageCode,
-        user_agent: navigator.userAgent,
-      };
-      const modalDetail = [detail, postLink ? `post_link: ${postLink}` : ""].filter(Boolean).join("\n");
-      openErrorModal(t("deletedWithWarning"), modalDetail);
-    } else {
-      showToast(t("deletedToast"), "danger");
+        error_detail: [ids.length ? `message_ids: ${ids.join(", ")}` : "", postLink ? `post_link: ${postLink}` : ""].filter(Boolean).join("\n"),
+      });
     }
+    showToast(t("deletedToast"), "danger");
   } catch (err) {
     console.error(err);
     const errorId = err?.data?.error_id;
@@ -263,7 +273,24 @@ async function publishAd(id) {
   setBusy(true, t("busyPublishing"));
   try {
     await apiFetch(`/api/announcements/${id}/publish`, { method: "POST" });
+    showToast(t("publishedToast"), "success");
     await refreshAds();
+  } catch (err) {
+    const errorId = err?.data?.error_id;
+    const detail = err?.data?.error_detail;
+    const message = errorId ? `${t("publishFailed")} #${errorId}` : t("publishFailed");
+    state.lastError = {
+      action: "publish_ad",
+      ad_id: id,
+      status: err?.status,
+      message: err?.message || t("publishFailed"),
+      error_id: errorId,
+      error_detail: detail,
+      client_time: new Date().toISOString(),
+      language: state.languageCode,
+      user_agent: navigator.userAgent,
+    };
+    openErrorModal(message, detail || err?.message);
   } finally {
     setBusy(false);
   }
@@ -305,4 +332,17 @@ async function reportBug(payload) {
     method: "POST",
     body: JSON.stringify(payload || {}),
   });
+}
+
+async function silentBugReport(payload) {
+  try {
+    await reportBug({
+      ...payload,
+      client_time: new Date().toISOString(),
+      language: state.languageCode,
+      user_agent: navigator.userAgent,
+    });
+  } catch (_) {
+    // ignore — silent report, never surface to user
+  }
 }

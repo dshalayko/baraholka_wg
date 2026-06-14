@@ -317,7 +317,7 @@ function renderAds() {
       publishBtn.className = "primary ad-action ad-action-main";
       publishBtn.type = "button";
       publishBtn.textContent = t("publish");
-      publishBtn.onclick = () => { haptic("medium"); publishAd(ad.id); };
+      publishBtn.onclick = () => { haptic("medium"); void publishAd(ad.id); };
       actions.appendChild(publishBtn);
     }
 

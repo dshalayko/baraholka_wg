@@ -363,48 +363,59 @@ function bindEvents() {
       priceError: elements.priceError,
       contactError: elements.contactError,
     });
-    if (!isValid) {
-      return;
-    }
+    if (!isValid) return;
     haptic("medium");
     setBusy(true, t("busyPublishing"));
+    const payload = {
+      description,
+      price,
+      price_in_description: priceInDescription,
+      contact_info: contactInfo,
+      photo_file_ids: state.photoFileIds,
+    };
+    let publishSucceeded = false;
     try {
       if (!state.editingId) {
         const created = await apiFetch("/api/announcements", {
           method: "POST",
-          body: JSON.stringify({
-            description,
-            price,
-            price_in_description: priceInDescription,
-            contact_info: contactInfo,
-            photo_file_ids: state.photoFileIds,
-          }),
+          body: JSON.stringify(payload),
         });
-        if (created && created.id) {
-          await publishAd(created.id);
-          haptic("success");
-          showToast(t("publishedToast"), "success");
+        if (created?.id) {
+          await apiFetch(`/api/announcements/${created.id}/publish`, { method: "POST" });
         }
       } else {
         await apiFetch(`/api/announcements/${state.editingId}`, {
           method: "PUT",
-          body: JSON.stringify({
-            description,
-            price,
-            price_in_description: priceInDescription,
-            contact_info: contactInfo,
-            photo_file_ids: state.photoFileIds,
-          }),
+          body: JSON.stringify(payload),
         });
-        await publishAd(state.editingId);
-        haptic("success");
-        showToast(t("publishedToast"), "success");
+        await apiFetch(`/api/announcements/${state.editingId}/publish`, { method: "POST" });
       }
-      await refreshAds();
-      showTab("list");
+      publishSucceeded = true;
+    } catch (err) {
+      const errorId = err?.data?.error_id;
+      const detail = err?.data?.error_detail;
+      const message = errorId ? `${t("publishFailed")} #${errorId}` : t("publishFailed");
+      state.lastError = {
+        action: "publish_ad",
+        ad_id: state.editingId || null,
+        status: err?.status,
+        message: err?.message || t("publishFailed"),
+        error_id: errorId,
+        error_detail: detail,
+        client_time: new Date().toISOString(),
+        language: state.languageCode,
+        user_agent: navigator.userAgent,
+      };
+      openErrorModal(message, detail || err?.message);
     } finally {
       setBusy(false);
     }
+    if (!publishSucceeded) return;
+    haptic("success");
+    showToast(t("publishedToast"), "success");
+    resetForm();
+    showTab("list");
+    await refreshAds();
   });
   elements.description.addEventListener("input", () => {
     updateCounts();
@@ -467,6 +478,8 @@ function bindEvents() {
     try {
       await refreshAdminExpiredAds();
       openExpiredAdsModal();
+    } catch (err) {
+      showToast(err?.message || t("loadFailed"), "danger");
     } finally {
       setBusy(false);
     }
@@ -587,15 +600,14 @@ function bindEvents() {
       priceError: elements.editPriceError,
       contactError: elements.editContactError,
     });
-    if (!isValid) {
-      return;
-    }
+    if (!isValid) return;
     if (!state.editModal.id) {
       closeEditModal();
       return;
     }
     haptic("medium");
     setBusy(true, t("busyPublishing"));
+    let publishSucceeded = false;
     try {
       await apiFetch(`/api/announcements/${state.editModal.id}`, {
         method: "PUT",
@@ -607,13 +619,32 @@ function bindEvents() {
           photo_file_ids: state.editModal.photoFileIds,
         }),
       });
-      await publishAd(state.editModal.id);
-      closeEditModal();
-      haptic("success");
-      showToast(t("editedPublished"), "success");
+      await apiFetch(`/api/announcements/${state.editModal.id}/publish`, { method: "POST" });
+      publishSucceeded = true;
+    } catch (err) {
+      const errorId = err?.data?.error_id;
+      const detail = err?.data?.error_detail;
+      const message = errorId ? `${t("publishFailed")} #${errorId}` : t("publishFailed");
+      state.lastError = {
+        action: "edit_publish_ad",
+        ad_id: state.editModal.id,
+        status: err?.status,
+        message: err?.message || t("publishFailed"),
+        error_id: errorId,
+        error_detail: detail,
+        client_time: new Date().toISOString(),
+        language: state.languageCode,
+        user_agent: navigator.userAgent,
+      };
+      openErrorModal(message, detail || err?.message);
     } finally {
       setBusy(false);
     }
+    if (!publishSucceeded) return;
+    closeEditModal();
+    haptic("success");
+    showToast(t("editedPublished"), "success");
+    await refreshAds();
   });
   elements.confirmNoBtn.addEventListener("click", closeDeleteConfirm);
   elements.confirmModal.addEventListener("click", (event) => {
@@ -667,7 +698,11 @@ function bindEvents() {
         .then(async () => {
           showToast(t("statsDraftDeleted"), "success");
           await refreshAdminStats();
-          await refreshAdminExpiredAds();
+          try {
+            await refreshAdminExpiredAds();
+          } catch (err) {
+            void silentBugReport({ action: "refresh_expired_after_admin_delete", status: err?.status, message: err?.message });
+          }
         })
         .catch((err) => {
           console.error(err);
