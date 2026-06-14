@@ -42,6 +42,20 @@
   background: var(--secondary-bg);
 }
 
+.tool-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(106, 179, 243, 0.42);
+}
+
+:root[data-theme="light"] .tool-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(38, 120, 182, 0.35);
+}
+
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .tool-btn-marker {
   display: inline-flex;
   align-items: center;
@@ -65,12 +79,14 @@
 .field-checkbox {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: -4px;
 }
 
-.field-checkbox span {
+.field-checkbox > span {
   margin-bottom: 0;
+  flex: 1 1 180px;
 }
 
 .field-checkbox input[type="checkbox"] {
@@ -305,6 +321,16 @@ input[type="text"]:focus {
   background: rgba(0, 0, 0, 0.62);
 }
 
+:root[data-theme="light"] .photo-drag-handle {
+  background: rgba(255, 255, 255, 0.82);
+  color: #1a1a1a;
+}
+
+:root[data-theme="light"] .photo-item:hover .photo-drag-handle,
+:root[data-theme="light"] .photo-item.dragging .photo-drag-handle {
+  background: rgba(255, 255, 255, 0.95);
+}
+
 .photo-item img {
   width: 100%;
   height: 80px;
@@ -327,29 +353,6 @@ input[type="text"]:focus {
   cursor: pointer;
   font-size: 12px;
   z-index: 2;
-}
-
-.form-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.form-actions .ghost {
-  flex: 1;
-}
-
-.form-actions .ghost:first-child {
-  flex: 1;
-}
-
-.form-actions .ghost:last-child {
-  flex: 1;
-}
-
-.publish-wide {
-  width: 100%;
-  margin-top: 10px;
 }
 
 .char-counter {
@@ -535,7 +538,8 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 10px;
 }
 
@@ -544,22 +548,16 @@ input[type="text"]:focus {
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 0;
+  flex: 1 1 180px;
 }
 
 /* Form action bar */
 .form-action-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.form-action-bar .cancel-action {
-  flex: 0 0 auto;
-}
-
-.form-action-bar #saveAdBtn {
-  flex: 0 0 auto;
-}
-
 .form-publish-btn {
-  flex: 1;
+  grid-column: 1 / -1;
 }

@@ -113,4 +113,20 @@
   .modal-actions button {
     width: 100%;
   }
+
+  /* Shrink icon-only action buttons to free up space for text buttons */
+  .ad-action-icon {
+    flex: 0 0 34px;
+    width: 34px;
+    min-width: 34px;
+  }
+
+  /* Form sections: tighter padding on very small screens */
+  .form-section {
+    padding: 12px;
+  }
+
+  .photo-upload-zone {
+    padding: 20px 12px;
+  }
 }
