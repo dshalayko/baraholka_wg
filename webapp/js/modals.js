@@ -105,6 +105,7 @@ function resetEditModal() {
   elements.editPhotos.value = "";
   elements.editPhotoGrid.innerHTML = "";
   renderEditPhotoPreviews();
+  updateCharCounter(elements.editDescription, elements.editDescCounter, 800);
 }
 
 function openEditModal(ad) {
@@ -124,6 +125,7 @@ function openEditModal(ad) {
   elements.editPriceInDescription.checked = !!ad.price_in_description;
   applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
   renderEditPhotoPreviews();
+  updateCharCounter(elements.editDescription, elements.editDescCounter, 800);
   elements.editModal.hidden = false;
   elements.editModal.style.display = "flex";
   requestAnimationFrame(() => {

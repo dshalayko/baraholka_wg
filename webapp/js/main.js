@@ -235,8 +235,8 @@ function applyFormatToolLabels(buttons) {
 function applyTranslations() {
   document.documentElement.lang = state.languageCode?.startsWith("ru") ? "ru" : "en";
   elements.appTitleText.textContent = t("appTitle");
-  elements.tabMyAds.textContent = t("myAds");
-  elements.tabCreate.textContent = t("create");
+  if (elements.tabMyAdsText) elements.tabMyAdsText.textContent = t("myAds");
+  if (elements.tabCreateText) elements.tabCreateText.textContent = t("create");
   elements.settingsToggle.setAttribute("aria-label", t("settings"));
   elements.statsToggle.setAttribute("aria-label", t("stats"));
   elements.commentsToggle.setAttribute("aria-label", t("comments"));
@@ -264,12 +264,15 @@ function applyTranslations() {
   elements.priceInDescriptionYesLabel.textContent = t("priceToggleYes");
   elements.priceInDescriptionNoLabel.textContent = t("priceToggleNo");
   elements.photosLabel.textContent = t("photos");
-  elements.emptyState.textContent = t("noAds");
+  if (elements.emptyStateText) elements.emptyStateText.textContent = t("noAds");
+  if (elements.emptyStateBtn) elements.emptyStateBtn.textContent = t("createFirstAd");
   elements.description.placeholder = t("descPlaceholder");
   elements.price.placeholder = t("pricePlaceholder");
   elements.saveAdBtn.textContent = t("saveDraft");
   elements.publishBtn.textContent = t("publishNow");
   elements.addMorePhotosBtn.textContent = t("addMore");
+  if (elements.photoUploadText) elements.photoUploadText.textContent = t("addMore");
+  if (elements.photoUploadHint) elements.photoUploadHint.textContent = t("photoHint");
   elements.editModalTitle.textContent = t("editTitle");
   elements.editDescLabel.textContent = t("description");
   applyFormatToolLabels({
@@ -331,6 +334,11 @@ function bindEvents() {
     showTab("form");
   });
 
+  elements.emptyStateBtn?.addEventListener("click", () => {
+    resetForm();
+    showTab("form");
+  });
+
   elements.cancelFormBtn.addEventListener("click", () => {
     resetForm();
     showTab("list");
@@ -351,11 +359,14 @@ function bindEvents() {
       descriptionInput: elements.description,
       priceInput: elements.price,
       contactInput: elements.contactInfo,
+      descriptionError: elements.descError,
+      priceError: elements.priceError,
+      contactError: elements.contactError,
     });
     if (!isValid) {
-      tg?.showAlert?.(t("required"));
       return;
     }
+    haptic("medium");
     setBusy(true, t("busyPublishing"));
     try {
       if (!state.editingId) {
@@ -371,6 +382,7 @@ function bindEvents() {
         });
         if (created && created.id) {
           await publishAd(created.id);
+          haptic("success");
           showToast(t("publishedToast"), "success");
         }
       } else {
@@ -385,6 +397,7 @@ function bindEvents() {
           }),
         });
         await publishAd(state.editingId);
+        haptic("success");
         showToast(t("publishedToast"), "success");
       }
       await refreshAds();
@@ -397,22 +410,39 @@ function bindEvents() {
     updateCounts();
     autoResizeDescription();
     setFieldInvalid(elements.description, false);
+    setFieldError(elements.descError, "");
+    updateCharCounter(elements.description, elements.descCounter, 800);
   });
   elements.contactInfo.addEventListener("input", () => {
     setFieldInvalid(elements.contactInfo, false);
+    setFieldError(elements.contactError, "");
   });
   elements.price.addEventListener("input", () => {
     updateCounts();
     setFieldInvalid(elements.price, false);
+    setFieldError(elements.priceError, "");
   });
   elements.priceInDescription.addEventListener("change", () => {
     applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
     updateCounts();
   });
+  elements.photoUploadZone?.addEventListener("click", () => {
+    elements.photos.click();
+  });
   elements.addMorePhotosBtn.addEventListener("click", (event) => {
     event.preventDefault();
     elements.photos.click();
   });
+  elements.formatToggleBtn?.addEventListener("click", () => {
+    const willShow = elements.descToolbar.hidden;
+    elements.descToolbar.hidden = !willShow;
+    elements.formatToggleBtn.classList.toggle("active", willShow);
+  });
+  new MutationObserver(() => {
+    const hasPhotos = elements.photoGrid.children.length > 0;
+    if (elements.photoUploadZone) elements.photoUploadZone.hidden = hasPhotos;
+    elements.addMorePhotosBtn.hidden = !hasPhotos;
+  }).observe(elements.photoGrid, { childList: true });
   elements.photos.addEventListener("change", handlePhotoInput);
   elements.descBoldBtn.addEventListener("click", () => wrapSelection(elements.description, "**"));
   elements.descItalicBtn.addEventListener("click", () => wrapSelection(elements.description, "_"));
@@ -485,6 +515,8 @@ function bindEvents() {
   elements.editDescription.addEventListener("input", () => {
     autoResizeTextarea(elements.editDescription);
     setFieldInvalid(elements.editDescription, false);
+    setFieldError(elements.editDescError, "");
+    updateCharCounter(elements.editDescription, elements.editDescCounter, 800);
   });
   elements.editDescBoldBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "**"));
   elements.editDescItalicBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "_"));
@@ -495,9 +527,11 @@ function bindEvents() {
   elements.editDescSpoilerBtn.addEventListener("click", () => wrapSelection(elements.editDescription, "||"));
   elements.editContactInfo.addEventListener("input", () => {
     setFieldInvalid(elements.editContactInfo, false);
+    setFieldError(elements.editContactError, "");
   });
   elements.editPrice.addEventListener("input", () => {
     setFieldInvalid(elements.editPrice, false);
+    setFieldError(elements.editPriceError, "");
   });
   elements.editPriceInDescription.addEventListener("change", () => {
     applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
@@ -549,15 +583,18 @@ function bindEvents() {
       descriptionInput: elements.editDescription,
       priceInput: elements.editPrice,
       contactInput: elements.editContactInfo,
+      descriptionError: elements.editDescError,
+      priceError: elements.editPriceError,
+      contactError: elements.editContactError,
     });
     if (!isValid) {
-      tg?.showAlert?.(t("required"));
       return;
     }
     if (!state.editModal.id) {
       closeEditModal();
       return;
     }
+    haptic("medium");
     setBusy(true, t("busyPublishing"));
     try {
       await apiFetch(`/api/announcements/${state.editModal.id}`, {
@@ -572,6 +609,7 @@ function bindEvents() {
       });
       await publishAd(state.editModal.id);
       closeEditModal();
+      haptic("success");
       showToast(t("editedPublished"), "success");
     } finally {
       setBusy(false);
@@ -712,6 +750,7 @@ applyContactFieldVisibility();
 bindEvents();
 updateCounts();
 showTab("list");
+showAdsSkeleton();
 refreshAds();
 refreshAdminStats();
 if (!state.sentAppOpenEvent) {

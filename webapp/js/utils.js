@@ -45,8 +45,42 @@ function applyTelegramTheme() {
 
 function autoResizeTextarea(textarea) {
   if (!textarea) return;
-  textarea.style.height = "auto";
-  textarea.style.height = `${textarea.scrollHeight}px`;
+  const style = window.getComputedStyle(textarea);
+  const minH = parseFloat(style.minHeight) || 120;
+  textarea.style.height = `${minH}px`;
+  textarea.style.height = `${Math.max(textarea.scrollHeight, minH)}px`;
+}
+
+function updateCharCounter(textarea, counterEl, max) {
+  if (!counterEl) return;
+  const len = (textarea?.value || "").length;
+  counterEl.textContent = `${len}/${max}`;
+  counterEl.classList.toggle("char-counter-warn", len >= Math.floor(max * 0.85));
+  counterEl.classList.toggle("char-counter-danger", len >= Math.floor(max * 0.97));
+}
+
+function haptic(type) {
+  if (!tg?.HapticFeedback) return;
+  if (type === "success") {
+    tg.HapticFeedback.notificationOccurred("success");
+  } else if (type === "error") {
+    tg.HapticFeedback.notificationOccurred("error");
+  } else if (type === "warning") {
+    tg.HapticFeedback.notificationOccurred("warning");
+  } else {
+    tg.HapticFeedback.impactOccurred(type || "light");
+  }
+}
+
+function setFieldError(el, message) {
+  if (!el) return;
+  if (message) {
+    el.textContent = message;
+    el.hidden = false;
+  } else {
+    el.textContent = "";
+    el.hidden = true;
+  }
 }
 
 function autoResizeDescription() {
@@ -187,6 +221,9 @@ function validateAdForm({
   descriptionInput,
   priceInput,
   contactInput,
+  descriptionError,
+  priceError,
+  contactError,
 }) {
   const hasDescription = !!description.trim();
   const hasPrice = priceInDescription || !!price.trim();
@@ -194,6 +231,9 @@ function validateAdForm({
   setFieldInvalid(descriptionInput, !hasDescription);
   setFieldInvalid(priceInput, !hasPrice && !priceInDescription);
   setFieldInvalid(contactInput, !hasContact);
+  setFieldError(descriptionError, !hasDescription ? t("fieldRequired") : "");
+  setFieldError(priceError, !hasPrice && !priceInDescription ? t("fieldRequired") : "");
+  setFieldError(contactError, !hasContact ? t("fieldRequired") : "");
   return hasDescription && hasPrice && hasContact;
 }
 

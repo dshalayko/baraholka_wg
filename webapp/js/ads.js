@@ -1,3 +1,22 @@
+function showAdsSkeleton() {
+  elements.adsList.innerHTML = "";
+  for (let i = 0; i < 3; i++) {
+    const card = document.createElement("div");
+    card.className = "skeleton-card";
+    const photo = document.createElement("div");
+    photo.className = "skeleton-photo";
+    const body = document.createElement("div");
+    body.className = "skeleton-body";
+    body.innerHTML = `
+      <div class="skeleton-line skeleton-line-full"></div>
+      <div class="skeleton-line skeleton-line-mid"></div>
+      <div class="skeleton-line skeleton-line-short"></div>
+    `;
+    card.append(photo, body);
+    elements.adsList.appendChild(card);
+  }
+}
+
 function showTab(tab) {
   const isList = tab === "list";
   elements.listPanel.hidden = !isList;
@@ -30,9 +49,12 @@ function resetForm() {
   elements.photos.value = "";
   elements.photoChips.innerHTML = "";
   elements.photoGrid.innerHTML = "";
+  if (elements.descToolbar) elements.descToolbar.hidden = true;
+  if (elements.formatToggleBtn) elements.formatToggleBtn.classList.remove("active");
   elements.saveAdBtn.hidden = false;
   updateCounts();
   autoResizeDescription();
+  updateCharCounter(elements.description, elements.descCounter, 800);
 }
 
 function updatePreview() {}
@@ -197,6 +219,13 @@ function renderAds() {
           bottom.appendChild(img);
         });
 
+        if (total > 3) {
+          const badge = document.createElement("div");
+          badge.className = "ad-gallery-count-badge";
+          badge.textContent = `+${total - 3}`;
+          bottom.appendChild(badge);
+        }
+
         gallery.appendChild(top);
         gallery.appendChild(bottom);
         card.appendChild(gallery);
@@ -205,9 +234,6 @@ function renderAds() {
 
     const body = document.createElement("div");
     body.className = "ad-body";
-    if (!photos.length) {
-      body.style.paddingTop = "44px";
-    }
 
     const header = document.createElement("div");
     header.className = "ad-header";
@@ -240,6 +266,10 @@ function renderAds() {
 
     const title = document.createElement("h3");
     title.className = "ad-description";
+    const isLongDesc = (ad.description || "").length > 220;
+    if (isLongDesc) {
+      title.classList.add("ad-description-clamped");
+    }
     title.innerHTML = renderStyledText(ad.description || t("noAds"));
 
     const meta = document.createElement("div");
@@ -273,6 +303,7 @@ function renderAds() {
       </svg>
     `;
     editBtn.onclick = () => {
+      haptic("light");
       if (ad.is_published) {
         openEditModal(ad);
       } else {
@@ -286,7 +317,7 @@ function renderAds() {
       publishBtn.className = "primary ad-action ad-action-main";
       publishBtn.type = "button";
       publishBtn.textContent = t("publish");
-      publishBtn.onclick = () => publishAd(ad.id);
+      publishBtn.onclick = () => { haptic("medium"); publishAd(ad.id); };
       actions.appendChild(publishBtn);
     }
 
@@ -304,7 +335,7 @@ function renderAds() {
       reserveBtn.className = "ghost ad-action ad-action-main ad-action-reserve";
       reserveBtn.type = "button";
       reserveBtn.textContent = t(ad.is_reserved ? "unreserve" : "reserve");
-      reserveBtn.onclick = () => reserveAd(ad.id, !!ad.is_reserved);
+      reserveBtn.onclick = () => { haptic("light"); reserveAd(ad.id, !!ad.is_reserved); };
       actions.appendChild(reserveBtn);
     }
 
@@ -341,13 +372,26 @@ function renderAds() {
         <path d="M6 8h12l-1 12H7L6 8z"></path>
       </svg>
     `;
-    deleteBtn.onclick = () => openDeleteConfirm(ad.id);
+    deleteBtn.onclick = () => { haptic("light"); openDeleteConfirm(ad.id); };
     actions.appendChild(deleteBtn);
 
+    let readMoreBtn = null;
+    if (isLongDesc) {
+      readMoreBtn = document.createElement("button");
+      readMoreBtn.className = "ad-read-more-btn";
+      readMoreBtn.type = "button";
+      readMoreBtn.textContent = t("readMore");
+      readMoreBtn.onclick = () => {
+        const isExpanded = !title.classList.contains("ad-description-clamped");
+        title.classList.toggle("ad-description-clamped", isExpanded);
+        readMoreBtn.textContent = isExpanded ? t("readMore") : t("readLess");
+      };
+    }
+
     if (isExpiredFromChannel) {
-      body.append(title, meta, removedNote, actions);
+      body.append(title, ...(readMoreBtn ? [readMoreBtn] : []), meta, removedNote, actions);
     } else {
-      body.append(title, meta, actions);
+      body.append(title, ...(readMoreBtn ? [readMoreBtn] : []), meta, actions);
     }
     card.append(header, body);
     elements.adsList.appendChild(card);
@@ -373,6 +417,7 @@ function startEdit(ad) {
   applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
   elements.saveAdBtn.hidden = !!ad.is_published;
   renderPhotoPreviews();
+  updateCharCounter(elements.description, elements.descCounter, 800);
   showTab("form");
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {

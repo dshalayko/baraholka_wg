@@ -80,53 +80,80 @@
           </div>
         </header>
         <nav class="tabs">
-          <button class="tab active" id="tabMyAds">My ads</button>
-          <button class="tab" id="tabCreate">Create ad</button>
+          <button class="tab active" id="tabMyAds">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01"/>
+            </svg>
+            <span id="tabMyAdsText">My ads</span>
+          </button>
+          <button class="tab" id="tabCreate">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            <span id="tabCreateText">Create ad</span>
+          </button>
         </nav>
 
         <section class="panel panel-list" id="listPanel">
           <div class="list-shell" id="adsList">
-            <div class="empty" id="emptyState">No ads yet</div>
+            <div class="empty" id="emptyState">
+              <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <path d="M14 2v6h6"/><path d="M12 18v-6M9 15h6"/>
+              </svg>
+              <span class="empty-state-text" id="emptyStateText">No ads yet</span>
+              <button class="primary empty-state-cta" id="emptyStateBtn" type="button">Create ad</button>
+            </div>
           </div>
         </section>
 
-        <section class="panel" id="formPanel" hidden>
-          <div class="panel-body">
-            <div class="field">
-              <span id="photosLabel">Photos (max 10)</span>
-              <div class="photo-actions" id="photoActions">
-                <button class="ghost" id="addMorePhotosBtn">Add photos</button>
-              </div>
-              <input id="photos" type="file" accept="image/*" multiple hidden />
-              <div class="upload-row">
-                <div class="chips" id="photoChips"></div>
-                <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
-              </div>
-              <div class="photo-grid" id="photoGrid"></div>
+        <section class="form-panel" id="formPanel" hidden>
+
+          <div class="form-section">
+            <div class="form-section-title" id="photosLabel">Фото</div>
+            <input id="photos" type="file" accept="image/*" multiple hidden />
+            <button class="photo-upload-zone" id="photoUploadZone" type="button">
+              <svg class="photo-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span class="photo-upload-text" id="photoUploadText">Добавить фото</span>
+              <span class="photo-upload-hint" id="photoUploadHint">до 10 фото</span>
+            </button>
+            <div class="photo-grid" id="photoGrid"></div>
+            <div class="photo-grid-footer">
+              <div class="spinner" id="uploadSpinner" aria-hidden="true"></div>
+              <div class="chips" id="photoChips"></div>
+              <button class="ghost photo-add-more-btn" id="addMorePhotosBtn" type="button" hidden>Добавить фото</button>
             </div>
-            <label class="field">
-              <span id="descLabel">Description</span>
-              <div class="text-toolbar">
-                <button class="tool-btn" id="descBoldBtn" type="button" title="Bold"></button>
-                <button class="tool-btn" id="descItalicBtn" type="button" title="Italic"></button>
-                <button class="tool-btn" id="descUnderlineBtn" type="button" title="Underline"></button>
-                <button class="tool-btn" id="descStrikeBtn" type="button" title="Strikethrough"></button>
-                <button class="tool-btn" id="descQuoteBtn" type="button" title="Quote"></button>
-                <button class="tool-btn" id="descMonoBtn" type="button" title="Monospace"></button>
-                <button class="tool-btn" id="descSpoilerBtn" type="button" title="Spoiler"></button>
-              </div>
-              <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..."></textarea>
-            </label>
-            <label class="field" id="contactField">
-              <span id="contactLabel">Как связаться</span>
-              <input
-                id="contactInfo"
-                type="text"
-                maxlength="200"
-                placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
-              />
-            </label>
-            <div class="field field-checkbox field-checkbox-glass">
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title" id="descLabel">Описание</div>
+            <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..." aria-label="Description"></textarea>
+            <div class="desc-footer">
+              <button class="format-toggle-btn" id="formatToggleBtn" type="button" title="Форматирование">Aa</button>
+              <div class="char-counter" id="descCounter">0/800</div>
+            </div>
+            <div class="text-toolbar" id="descToolbar" hidden>
+              <button class="tool-btn" id="descBoldBtn" type="button" title="Bold"></button>
+              <button class="tool-btn" id="descItalicBtn" type="button" title="Italic"></button>
+              <button class="tool-btn" id="descUnderlineBtn" type="button" title="Underline"></button>
+              <button class="tool-btn" id="descStrikeBtn" type="button" title="Strikethrough"></button>
+              <button class="tool-btn" id="descQuoteBtn" type="button" title="Quote"></button>
+              <button class="tool-btn" id="descMonoBtn" type="button" title="Monospace"></button>
+              <button class="tool-btn" id="descSpoilerBtn" type="button" title="Spoiler"></button>
+            </div>
+            <div class="field-error" id="descError" hidden></div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title" id="priceLabel">Цена</div>
+            <div id="priceField">
+              <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
+              <div class="field-error" id="priceError" hidden></div>
+            </div>
+            <div class="price-toggle-row">
               <span id="priceInDescriptionLabel" class="glass-toggle-title">Цена написана в описании?</span>
               <label class="glass-toggle">
                 <input id="priceInDescription" type="checkbox" />
@@ -137,16 +164,25 @@
                 <span id="priceInDescriptionYesLabel" class="glass-toggle-side glass-toggle-yes">Да</span>
               </label>
             </div>
-            <label class="field" id="priceField">
-              <span id="priceLabel">Price</span>
-              <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
-            </label>
-            <div class="form-actions">
-              <button class="ghost cancel-action" id="cancelFormBtn">Cancel</button>
-              <button class="ghost" id="saveAdBtn">Save draft</button>
-            </div>
-            <button class="primary publish-wide" id="publishBtn">Publish</button>
           </div>
+
+          <div class="form-section" id="contactField">
+            <div class="form-section-title" id="contactLabel">Как связаться</div>
+            <input
+              id="contactInfo"
+              type="text"
+              maxlength="200"
+              placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
+            />
+            <div class="field-error" id="contactError" hidden></div>
+          </div>
+
+          <div class="form-action-bar">
+            <button class="ghost cancel-action" id="cancelFormBtn">Отмена</button>
+            <button class="ghost" id="saveAdBtn">Черновик</button>
+            <button class="primary form-publish-btn" id="publishBtn">Опубликовать</button>
+          </div>
+
         </section>
       </div>
       <section class="unauthorized-state" id="unauthorizedState" hidden>
@@ -186,6 +222,8 @@
               <button class="tool-btn" id="editDescSpoilerBtn" type="button" title="Spoiler"></button>
             </div>
             <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
+            <div class="char-counter" id="editDescCounter">0/800</div>
+            <div class="field-error" id="editDescError" hidden></div>
           </label>
           <label class="field" id="editContactField">
             <span id="editContactLabel">Как связаться</span>
@@ -195,6 +233,7 @@
               maxlength="200"
               placeholder="Например: @username, Instagram, Teams или пишите в комментариях"
             />
+            <div class="field-error" id="editContactError" hidden></div>
           </label>
           <div class="field field-checkbox field-checkbox-glass">
             <span id="editPriceInDescriptionLabel" class="glass-toggle-title">Цена написана в описании?</span>
@@ -210,6 +249,7 @@
           <label class="field" id="editPriceField">
             <span id="editPriceLabel">Цена</span>
             <input id="editPrice" type="text" maxlength="130" placeholder="Например: 50 RSD" />
+            <div class="field-error" id="editPriceError" hidden></div>
           </label>
         </div>
         <div class="modal-actions modal-actions-wide">

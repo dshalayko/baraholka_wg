@@ -1,51 +1,51 @@
 :root {
-  --bg: #15181d;
-  --secondary-bg: rgba(255, 255, 255, 0.06);
-  --ink: #f4f5f7;
-  --muted: rgba(244, 245, 247, 0.78);
-  --meta-text: rgba(240, 242, 245, 0.9);
-  --link: #84b7ff;
-  --button: rgba(120, 180, 255, 0.2);
-  --button-text: #eef6ff;
-  --border: rgba(255, 255, 255, 0.12);
-  --danger: rgba(255, 99, 99, 0.75);
-  --chip-bg: rgba(236, 199, 124, 0.2);
-  --chip-ink: #f4ddb1;
-  --radius: 18px;
-  --radius-lg: 22px;
-  --radius-sm: 12px;
-  --glass: rgba(255, 255, 255, 0.08);
-  --glass-strong: rgba(255, 255, 255, 0.14);
-  --glass-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
-  --blur: 24px;
-  --page-bg: radial-gradient(circle at 12% 8%, rgba(86, 92, 108, 0.35), transparent 40%),
-    radial-gradient(circle at 90% 15%, rgba(70, 76, 92, 0.4), transparent 45%),
-    linear-gradient(180deg, #171b21 0%, #13161b 100%);
+  --bg: #1c2228;
+  --secondary-bg: #232d38;
+  --ink: #e8edf2;
+  --muted: rgba(200, 215, 230, 0.56);
+  --meta-text: rgba(200, 215, 230, 0.72);
+  --link: #6ab3f3;
+  --button: #2b6cb0;
+  --button-text: #ffffff;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --danger: #e05454;
+  --chip-bg: rgba(106, 179, 243, 0.14);
+  --chip-ink: #6ab3f3;
+  --radius: 12px;
+  --radius-lg: 14px;
+  --radius-sm: 8px;
+  --glass: var(--secondary-bg);
+  --glass-strong: var(--secondary-bg);
+  --glass-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
+  --blur: 0px;
+  --page-bg: var(--bg);
+  --divider: rgba(255, 255, 255, 0.06);
 }
 
 :root[data-theme="light"] {
-  --bg: #f2f3f6;
-  --secondary-bg: rgba(255, 255, 255, 0.7);
-  --ink: #0f1216;
-  --muted: rgba(15, 18, 22, 0.72);
-  --meta-text: rgba(15, 18, 22, 0.86);
-  --link: #1d66d6;
-  --button: rgba(60, 120, 210, 0.16);
-  --button-text: #0f1216;
-  --border: rgba(15, 18, 22, 0.1);
-  --danger: rgba(228, 71, 79, 0.75);
-  --chip-bg: rgba(153, 112, 35, 0.16);
-  --chip-ink: #4b3314;
-  --radius: 18px;
-  --radius-lg: 22px;
-  --radius-sm: 12px;
-  --glass: rgba(255, 255, 255, 0.78);
-  --glass-strong: rgba(255, 255, 255, 0.92);
-  --glass-shadow: 0 16px 32px rgba(28, 32, 40, 0.12);
-  --blur: 20px;
-  --page-bg: radial-gradient(circle at 12% 10%, rgba(230, 234, 242, 0.9), transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(214, 220, 232, 0.7), transparent 45%),
-    linear-gradient(180deg, #f6f7f9 0%, #edf0f4 100%);
+  --bg: #efeff3;
+  --secondary-bg: #ffffff;
+  --ink: #000000;
+  --muted: rgba(0, 0, 0, 0.44);
+  --meta-text: rgba(0, 0, 0, 0.54);
+  --link: #2678b6;
+  --button: #2678b6;
+  --button-text: #ffffff;
+  --border: rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --danger: #e53e3e;
+  --chip-bg: rgba(38, 120, 182, 0.1);
+  --chip-ink: #1a6da8;
+  --radius: 12px;
+  --radius-lg: 14px;
+  --radius-sm: 8px;
+  --glass: #ffffff;
+  --glass-strong: #ffffff;
+  --glass-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  --blur: 0px;
+  --page-bg: var(--bg);
+  --divider: rgba(0, 0, 0, 0.06);
 }
 
 * {
@@ -65,13 +65,13 @@ body {
 }
 
 button,
- a,
- .tab {
+a,
+.tab {
   -webkit-tap-highlight-color: transparent;
 }
 
 #app {
   max-width: 920px;
   margin: 0 auto;
-  padding: 20px 20px 40px;
+  padding: 16px 16px 40px;
 }
