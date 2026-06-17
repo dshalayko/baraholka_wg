@@ -73,3 +73,28 @@ ACCEPTED_PRICE_PROMPT = "Got it! Now enter the price."
 NOT_SUBSCRIBED_SHORT = "You are not subscribed to the channel yet."
 
 ANONYMOUS_NAME = "Anonymous"
+
+# --- Auction (channel post) ---
+AUCTION_HEADER = "💰 AUCTION"
+AUCTION_FINISHED_HEADER = "✅ AUCTION ENDED"
+AUCTION_START_PRICE = "Starting price"
+AUCTION_CURRENT_BID = "Current bid"
+AUCTION_NO_BIDS_YET = "No bids yet"
+AUCTION_MIN_STEP = "Minimum step"
+AUCTION_END_AT = "Auction until"
+AUCTION_FINAL_PRICE = "Final price"
+AUCTION_WINNER = "Winner"
+AUCTION_NO_BIDS_PLACED = "No bids were placed"
+AUCTION_BID_LINK_LABEL = "👉 PLACE A BID 👈"
+
+# --- Auction (owner notification about a new bid) ---
+AUCTION_NEW_BID_TITLE = "🔨 New bid on your auction!"
+AUCTION_NEW_BID_AMOUNT = "Bid"
+AUCTION_NEW_BID_FROM = "From"
+AUCTION_NEW_BID_TOTAL = "Total bids"
+AUCTION_VIEW_BIDS_BUTTON = "📊 View bids"
+
+# --- Auction (finish) ---
+AUCTION_SELLER_FINISHED_WIN = "Auction ended!\nWinner: {winner}\nFinal price: {price}\nListing: {link}"
+AUCTION_SELLER_FINISHED_NOBIDS = "Auction ended.\nNo bids were placed.\nListing: {link}"
+AUCTION_WINNER_FINISHED = "You won the auction!\nYour bid: {price}\nContact the seller: {seller_contact}\nListing: {link}"

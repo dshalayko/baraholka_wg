@@ -109,6 +109,14 @@
 
         <section class="form-panel" id="formPanel" hidden>
 
+          <div class="form-section" id="adTypeSection">
+            <div class="form-section-title" id="adTypeSectionTitle">Тип объявления</div>
+            <div class="ad-type-toggle">
+              <button class="ad-type-btn active" id="adTypeFixedBtn" type="button">Продажа</button>
+              <button class="ad-type-btn" id="adTypeAuctionBtn" type="button">Аукцион</button>
+            </div>
+          </div>
+
           <div class="form-section">
             <div class="form-section-title" id="photosLabel">Фото</div>
             <input id="photos" type="file" accept="image/*" multiple hidden />
@@ -147,22 +155,49 @@
             <div class="field-error" id="descError" hidden></div>
           </div>
 
-          <div class="form-section">
-            <div class="form-section-title" id="priceLabel">Цена</div>
-            <div id="priceField">
-              <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
-              <div class="field-error" id="priceError" hidden></div>
+          <div id="priceSectionWrap">
+            <div class="form-section">
+              <div class="form-section-title" id="priceLabel">Цена</div>
+              <div id="priceField">
+                <input id="price" type="text" maxlength="130" placeholder="e.g. 50 BYN" />
+                <div class="field-error" id="priceError" hidden></div>
+              </div>
+              <div class="price-toggle-row">
+                <span id="priceInDescriptionLabel" class="glass-toggle-title">Цена написана в описании?</span>
+                <label class="glass-toggle">
+                  <input id="priceInDescription" type="checkbox" />
+                  <span id="priceInDescriptionNoLabel" class="glass-toggle-side glass-toggle-no">Нет</span>
+                  <span class="glass-switch-track">
+                    <span class="glass-switch-thumb"></span>
+                  </span>
+                  <span id="priceInDescriptionYesLabel" class="glass-toggle-side glass-toggle-yes">Да</span>
+                </label>
+              </div>
             </div>
-            <div class="price-toggle-row">
-              <span id="priceInDescriptionLabel" class="glass-toggle-title">Цена написана в описании?</span>
-              <label class="glass-toggle">
-                <input id="priceInDescription" type="checkbox" />
-                <span id="priceInDescriptionNoLabel" class="glass-toggle-side glass-toggle-no">Нет</span>
-                <span class="glass-switch-track">
-                  <span class="glass-switch-thumb"></span>
-                </span>
-                <span id="priceInDescriptionYesLabel" class="glass-toggle-side glass-toggle-yes">Да</span>
-              </label>
+          </div>
+
+          <div class="form-section" id="auctionSection" hidden>
+            <div class="form-section-title" id="auctionSectionTitle">Параметры аукциона</div>
+            <div class="auction-field">
+              <label class="auction-field-label" id="auctionStartPriceLabel">Стартовая цена</label>
+              <input id="auctionStartPrice" type="number" min="1" placeholder="Например: 100" />
+              <div class="field-error" id="auctionStartPriceError" hidden></div>
+            </div>
+            <div class="auction-field">
+              <label class="auction-field-label" id="auctionMinStepLabel">Минимальный шаг</label>
+              <input id="auctionMinStep" type="number" min="1" placeholder="Например: 10" />
+              <div class="field-error" id="auctionMinStepError" hidden></div>
+            </div>
+            <div class="auction-field">
+              <label class="auction-field-label" id="auctionDurationLabel">Длительность</label>
+              <select id="auctionDuration">
+                <option value="1">1 час</option>
+                <option value="3">3 часа</option>
+                <option value="6">6 часов</option>
+                <option value="12">12 часов</option>
+                <option value="24" selected>24 часа</option>
+                <option value="48">2 дня</option>
+              </select>
             </div>
           </div>
 
@@ -185,6 +220,48 @@
 
         </section>
       </div>
+      <div class="bid-screen" id="bidScreen" hidden>
+        <div class="bid-screen-header">
+          <button class="bid-screen-back" id="bidScreenBackBtn" type="button" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7"/>
+            </svg>
+          </button>
+          <span id="bidScreenHeaderTitle">Аукцион</span>
+        </div>
+        <div class="bid-screen-body">
+          <div class="bid-auction-info" id="bidAuctionInfo"></div>
+          <div class="bid-form-section">
+            <div class="form-section-title" id="bidAmountLabel">Ваша ставка</div>
+            <input id="bidAmount" type="number" min="1" placeholder="Введите сумму" />
+            <div class="field-error" id="bidAmountError" hidden></div>
+          </div>
+          <div class="bid-form-actions">
+            <button class="primary bid-submit-btn" id="bidSubmitBtn" type="button">
+              <span id="bidSubmitText">Поставить ставку</span>
+            </button>
+            <button class="bid-back-to-post-btn" id="bidBackToPostBtn" type="button" hidden>
+              <span id="bidBackToPostText">Вернуться к объявлению</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bid-screen" id="bidsScreen" hidden>
+        <div class="bid-screen-header">
+          <button class="bid-screen-back" id="bidsScreenBackBtn" type="button" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7"/>
+            </svg>
+          </button>
+          <span id="bidsScreenHeaderTitle">Ставки по объявлению</span>
+        </div>
+        <div class="bid-screen-body">
+          <div class="bid-auction-info" id="bidsAuctionInfo"></div>
+          <div class="bids-list" id="bidsList"></div>
+        </div>
+      </div>
+
       <section class="unauthorized-state" id="unauthorizedState" hidden>
         <div class="unauthorized-card">
           <h2 class="unauthorized-title" id="unauthorizedTitle">Приложение доступно только в Telegram</h2>

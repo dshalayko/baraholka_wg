@@ -318,6 +318,28 @@ function applyTranslations() {
   elements.feedbackSendBtn.textContent = t("feedbackSend");
   elements.unauthorizedTitle.textContent = t("unauthorizedTitle");
   elements.unauthorizedText.textContent = t("unauthorizedText");
+  if (elements.adTypeSectionTitle) elements.adTypeSectionTitle.textContent = t("adTypeSectionTitle");
+  if (elements.adTypeFixedBtn) elements.adTypeFixedBtn.textContent = t("adTypeFixed");
+  if (elements.adTypeAuctionBtn) elements.adTypeAuctionBtn.textContent = t("adTypeAuction");
+  if (elements.auctionSectionTitle) elements.auctionSectionTitle.textContent = t("auctionParams");
+  if (elements.auctionStartPriceLabel) elements.auctionStartPriceLabel.textContent = t("auctionStartPrice");
+  if (elements.auctionMinStepLabel) elements.auctionMinStepLabel.textContent = t("auctionMinStep");
+  if (elements.auctionDurationLabel) elements.auctionDurationLabel.textContent = t("auctionDuration");
+  if (elements.auctionStartPrice) elements.auctionStartPrice.placeholder = t("auctionStartPricePlaceholder");
+  if (elements.auctionMinStep) elements.auctionMinStep.placeholder = t("auctionMinStepPlaceholder");
+  if (elements.auctionDuration) {
+    const durationOptions = elements.auctionDuration.options;
+    const durationKeys = ["duration1h", "duration3h", "duration6h", "duration12h", "duration24h", "duration48h"];
+    for (let i = 0; i < durationOptions.length && i < durationKeys.length; i++) {
+      durationOptions[i].textContent = t(durationKeys[i]);
+    }
+  }
+  if (elements.bidScreenHeaderTitle) elements.bidScreenHeaderTitle.textContent = t("bidScreenTitle");
+  if (elements.bidAmountLabel) elements.bidAmountLabel.textContent = t("bidAmountLabel");
+  if (elements.bidAmount) elements.bidAmount.placeholder = t("bidAmountPlaceholder");
+  if (elements.bidSubmitText) elements.bidSubmitText.textContent = t("bidSubmit");
+  if (elements.bidBackToPostText) elements.bidBackToPostText.textContent = t("bidBackToPost");
+  if (elements.bidsScreenHeaderTitle) elements.bidsScreenHeaderTitle.textContent = t("bidsScreenTitle");
   renderCommentsOverview();
   renderStatsSummary();
   renderExpiredAdsList();
@@ -346,33 +368,64 @@ function bindEvents() {
 
   elements.saveAdBtn.addEventListener("click", saveAd);
   elements.publishBtn.addEventListener("click", async () => {
+    const isAuction = state.adType === "auction";
     const description = elements.description.value.trim();
-    const priceInDescription = elements.priceInDescription.checked;
-    const price = priceInDescription ? "" : elements.price.value.trim();
     const contactInfo = elements.contactInfo.value.trim();
-    const isValid = validateAdForm({
-      description,
-      price,
-      priceInDescription,
-      contactInfo,
-      requireContact: !state.hasUsername,
-      descriptionInput: elements.description,
-      priceInput: elements.price,
-      contactInput: elements.contactInfo,
-      descriptionError: elements.descError,
-      priceError: elements.priceError,
-      contactError: elements.contactError,
-    });
-    if (!isValid) return;
+
+    let payload;
+    if (isAuction) {
+      const descValid = validateAdForm({
+        description,
+        price: "",
+        priceInDescription: true,
+        contactInfo,
+        requireContact: !state.hasUsername,
+        descriptionInput: elements.description,
+        priceInput: elements.price,
+        contactInput: elements.contactInfo,
+        descriptionError: elements.descError,
+        priceError: elements.priceError,
+        contactError: elements.contactError,
+      });
+      const auctionValid = validateAuctionFields();
+      if (!descValid || !auctionValid) return;
+      payload = {
+        description,
+        price: "",
+        price_in_description: false,
+        contact_info: contactInfo,
+        photo_file_ids: state.photoFileIds,
+        ...getAuctionPayloadFields(),
+      };
+    } else {
+      const priceInDescription = elements.priceInDescription.checked;
+      const price = priceInDescription ? "" : elements.price.value.trim();
+      const isValid = validateAdForm({
+        description,
+        price,
+        priceInDescription,
+        contactInfo,
+        requireContact: !state.hasUsername,
+        descriptionInput: elements.description,
+        priceInput: elements.price,
+        contactInput: elements.contactInfo,
+        descriptionError: elements.descError,
+        priceError: elements.priceError,
+        contactError: elements.contactError,
+      });
+      if (!isValid) return;
+      payload = {
+        description,
+        price,
+        price_in_description: priceInDescription,
+        contact_info: contactInfo,
+        photo_file_ids: state.photoFileIds,
+        ad_type: "fixed",
+      };
+    }
+
     haptic("medium");
     setBusy(true, t("busyPublishing"));
-    const payload = {
-      description,
-      price,
-      price_in_description: priceInDescription,
-      contact_info: contactInfo,
-      photo_file_ids: state.photoFileIds,
-    };
     let publishSucceeded = false;
     try {
       if (!state.editingId) {
@@ -780,18 +833,305 @@ function bindEvents() {
   });
 }
 
+function getAuctionPayloadFields() {
+  return {
+    ad_type: "auction",
+    start_price: parseInt(elements.auctionStartPrice?.value, 10) || null,
+    min_step: parseInt(elements.auctionMinStep?.value, 10) || null,
+    auction_duration_hours: parseInt(elements.auctionDuration?.value, 10) || 24,
+  };
+}
+
+function validateAuctionFields() {
+  const startPrice = parseInt(elements.auctionStartPrice?.value, 10);
+  const minStep = parseInt(elements.auctionMinStep?.value, 10);
+  let valid = true;
+  if (!startPrice || startPrice <= 0) {
+    if (elements.auctionStartPriceError) {
+      setFieldError(elements.auctionStartPriceError, t("auctionStartPriceMin"));
+      setFieldInvalid(elements.auctionStartPrice, true);
+    }
+    valid = false;
+  }
+  if (!minStep || minStep <= 0) {
+    if (elements.auctionMinStepError) {
+      setFieldError(elements.auctionMinStepError, t("auctionMinStepMin"));
+      setFieldInvalid(elements.auctionMinStep, true);
+    }
+    valid = false;
+  }
+  return valid;
+}
+
+function renderBidScreen(data) {
+  if (!elements.bidAuctionInfo) return;
+  elements.bidAuctionInfo.innerHTML = "";
+
+  const addRow = (label, value, cls) => {
+    const row = document.createElement("div");
+    row.className = "bid-info-row";
+    const lbl = document.createElement("span");
+    lbl.className = "bid-info-label";
+    lbl.textContent = label;
+    const val = document.createElement("span");
+    val.className = "bid-info-value" + (cls ? ` ${cls}` : "");
+    val.textContent = value;
+    row.append(lbl, val);
+    elements.bidAuctionInfo.appendChild(row);
+  };
+
+  const photos = Array.isArray(data.photo_file_ids) ? data.photo_file_ids : [];
+  if (photos.length && tg?.initData) {
+    const initData = encodeURIComponent(tg.initData);
+    const gallery = document.createElement("div");
+    gallery.className = "bid-photos";
+    photos.forEach((fileId) => {
+      const img = document.createElement("img");
+      img.className = "bid-photo";
+      img.loading = "lazy";
+      img.src = `/api/auctions/${data.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+      img.alt = data.description || "photo";
+      img.addEventListener("click", () => openPhotoViewer(img.src));
+      gallery.appendChild(img);
+    });
+    elements.bidAuctionInfo.appendChild(gallery);
+  }
+
+  const descEl = document.createElement("div");
+  descEl.className = "bid-info-desc";
+  descEl.textContent = data.description || "";
+  elements.bidAuctionInfo.appendChild(descEl);
+
+  if (data.start_price != null) {
+    addRow(`${t("auctionStartPrice")}:`, `${data.start_price}`);
+  }
+
+  if (data.current_price != null) {
+    addRow(`${t("auctionLastBid")}:`, `${data.current_price}`, "bid-current-price");
+    if (data.winner_username) {
+      addRow(`${t("auctionLastBidder")}:`, data.winner_username);
+    }
+  } else {
+    addRow(`${t("auctionLastBid")}:`, t("auctionNoBids"));
+  }
+
+  // First bid must be at least start_price + step; later bids at least current + step.
+  const minRequired = data.current_price != null
+    ? data.current_price + (data.min_step || 0)
+    : (data.start_price || 0) + (data.min_step || 0);
+  state.bidMinRequired = minRequired || null;
+  if (minRequired) {
+    addRow(`${t("bidMinRequired")}:`, `${minRequired}`);
+  }
+  if (elements.bidAmount && minRequired) {
+    elements.bidAmount.min = String(minRequired);
+  }
+
+  if (data.auction_end_at) {
+    addRow(`${t("auctionEndAt")}:`, data.auction_end_at);
+  }
+
+  if (data.bids_count > 0) {
+    addRow(`${t("auctionBidsCount")}:`, String(data.bids_count));
+  }
+}
+
+function updateBackToPostBtn(postLink) {
+  state.bidPostLink = postLink || null;
+  if (elements.bidBackToPostBtn) elements.bidBackToPostBtn.hidden = !postLink;
+}
+
+async function openBidScreen(annId) {
+  state.bidScreenAnnId = annId;
+  if (elements.bidScreen) elements.bidScreen.hidden = false;
+  if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-loading">${t("busyLoading")}</div>`;
+  if (elements.bidAmount) elements.bidAmount.value = "";
+  if (elements.bidAmountError) setFieldError(elements.bidAmountError, "");
+  if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = false;
+  updateBackToPostBtn(null);
+
+  try {
+    const data = await getAuctionInfo(annId);
+    updateBackToPostBtn(data.post_link);
+    if (data.auction_status === "finished") {
+      if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-ended">${t("bidAuctionEnded")}</div>`;
+      if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = true;
+      return;
+    }
+    renderBidScreen(data);
+  } catch (err) {
+    if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-error">${err?.message || t("loadFailed")}</div>`;
+  }
+}
+
+function closeBidScreen() {
+  state.bidScreenAnnId = null;
+  if (elements.bidScreen) elements.bidScreen.hidden = true;
+}
+
+function renderBidsScreen(data) {
+  if (elements.bidsAuctionInfo) {
+    elements.bidsAuctionInfo.innerHTML = "";
+    const descEl = document.createElement("div");
+    descEl.className = "bid-info-desc";
+    descEl.textContent = data.description || "";
+    elements.bidsAuctionInfo.appendChild(descEl);
+
+    const addRow = (label, value, cls) => {
+      const row = document.createElement("div");
+      row.className = "bid-info-row";
+      const lbl = document.createElement("span");
+      lbl.className = "bid-info-label";
+      lbl.textContent = label;
+      const val = document.createElement("span");
+      val.className = "bid-info-value" + (cls ? ` ${cls}` : "");
+      val.textContent = value;
+      row.append(lbl, val);
+      elements.bidsAuctionInfo.appendChild(row);
+    };
+    if (data.start_price != null) addRow(`${t("auctionStartPrice")}:`, `${data.start_price}`);
+    if (data.current_price != null) addRow(`${t("auctionCurrentBid")}:`, `${data.current_price}`, "bid-current-price");
+    addRow(`${t("auctionBidsCount")}:`, String((data.bids || []).length));
+  }
+
+  if (!elements.bidsList) return;
+  elements.bidsList.innerHTML = "";
+  const bids = Array.isArray(data.bids) ? data.bids : [];
+  if (!bids.length) {
+    const empty = document.createElement("div");
+    empty.className = "bids-empty";
+    empty.textContent = t("auctionNoBids");
+    elements.bidsList.appendChild(empty);
+    return;
+  }
+  bids.forEach((bid, idx) => {
+    const item = document.createElement("div");
+    item.className = "bids-item" + (idx === 0 ? " bids-item-top" : "");
+    const left = document.createElement("div");
+    left.className = "bids-item-left";
+    const who = document.createElement("div");
+    who.className = "bids-item-user";
+    who.textContent = bid.username || "—";
+    const when = document.createElement("div");
+    when.className = "bids-item-time";
+    when.textContent = bid.created_at || "";
+    left.append(who, when);
+    const amount = document.createElement("div");
+    amount.className = "bids-item-amount";
+    amount.textContent = `${bid.amount}`;
+    item.append(left, amount);
+    elements.bidsList.appendChild(item);
+  });
+}
+
+async function openBidsScreen(annId) {
+  if (elements.bidsScreen) elements.bidsScreen.hidden = false;
+  if (elements.bidsAuctionInfo) elements.bidsAuctionInfo.innerHTML = `<div class="bid-info-loading">${t("busyLoading")}</div>`;
+  if (elements.bidsList) elements.bidsList.innerHTML = "";
+
+  try {
+    const data = await getAuctionBids(annId);
+    renderBidsScreen(data);
+  } catch (err) {
+    if (elements.bidsAuctionInfo) elements.bidsAuctionInfo.innerHTML = `<div class="bid-info-error">${err?.message || t("loadFailed")}</div>`;
+  }
+}
+
+function bindAuctionEvents() {
+  elements.adTypeFixedBtn?.addEventListener("click", () => {
+    haptic("light");
+    setAdType("fixed");
+  });
+  elements.adTypeAuctionBtn?.addEventListener("click", () => {
+    haptic("light");
+    setAdType("auction");
+  });
+  elements.auctionStartPrice?.addEventListener("input", () => {
+    setFieldInvalid(elements.auctionStartPrice, false);
+    if (elements.auctionStartPriceError) setFieldError(elements.auctionStartPriceError, "");
+  });
+  elements.auctionMinStep?.addEventListener("input", () => {
+    setFieldInvalid(elements.auctionMinStep, false);
+    if (elements.auctionMinStepError) setFieldError(elements.auctionMinStepError, "");
+  });
+  const goToAuctionPost = () => {
+    const link = state.bidPostLink;
+    if (!link) return;
+    haptic("light");
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(link);
+    } else {
+      window.open(link, "_blank");
+    }
+  };
+  // The bid screen is only reached via a deep link from the channel, so "back"
+  // returns to the Telegram chat by closing the Mini App.
+  elements.bidScreenBackBtn?.addEventListener("click", () => {
+    haptic("light");
+    if (tg?.close) {
+      tg.close();
+    } else {
+      closeBidScreen();
+    }
+  });
+  elements.bidBackToPostBtn?.addEventListener("click", goToAuctionPost);
+  // The bids screen belongs to the owner, so "back" returns to their listings
+  // (loading them if the screen was opened directly from the notification).
+  elements.bidsScreenBackBtn?.addEventListener("click", () => {
+    haptic("light");
+    if (elements.bidsScreen) elements.bidsScreen.hidden = true;
+    showTab("list");
+    if (!state.ads.length) {
+      refreshAds();
+      refreshAdminStats();
+    }
+  });
+  elements.bidSubmitBtn?.addEventListener("click", async () => {
+    const annId = state.bidScreenAnnId;
+    if (!annId) return;
+    const rawAmount = elements.bidAmount?.value;
+    const amount = parseInt(rawAmount, 10);
+    if (!amount || amount <= 0) {
+      if (elements.bidAmountError) setFieldError(elements.bidAmountError, t("auctionStartPriceMin"));
+      setFieldInvalid(elements.bidAmount, true);
+      return;
+    }
+    const minRequired = state.bidMinRequired;
+    if (minRequired && amount < minRequired) {
+      if (elements.bidAmountError) setFieldError(elements.bidAmountError, `${t("bidMinRequired")}: ${minRequired}`);
+      setFieldInvalid(elements.bidAmount, true);
+      return;
+    }
+    setFieldInvalid(elements.bidAmount, false);
+    if (elements.bidAmountError) setFieldError(elements.bidAmountError, "");
+    setBusy(true, t("busyBidding"));
+    try {
+      await placeBid(annId, amount);
+      if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = true;
+      showToast(t("bidSuccess"), "success");
+      await openBidScreen(annId);
+    } catch (err) {
+      if (err?.status === 401) {
+        if (elements.bidAmountError) setFieldError(elements.bidAmountError, t("bidOpenInTelegram"));
+        setFieldInvalid(elements.bidAmount, true);
+      } else {
+        const msg = err?.message || t("bidFailed");
+        if (elements.bidAmountError) setFieldError(elements.bidAmountError, msg);
+        setFieldInvalid(elements.bidAmount, true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  });
+}
+
 applyTranslations();
 applyContactFieldVisibility();
 bindEvents();
+bindAuctionEvents();
 updateCounts();
 showTab("list");
 showAdsSkeleton();
-refreshAds();
-refreshAdminStats();
-if (!state.sentAppOpenEvent) {
-  state.sentAppOpenEvent = true;
-  void trackEvent("app_open");
-}
 initTheme();
 closeDeleteConfirm();
 closeEditModal();
@@ -801,3 +1141,42 @@ closeCommentsOverviewModal();
 closeStatsModal();
 closeExpiredAdsModal();
 closeFeedbackModal();
+
+// Detect bid mode before any API calls.
+// GET /api/auctions/{id} is public — bid screen loads even in browser.
+// In bid mode, skip refreshAds/refreshAdminStats (not needed for bidding).
+(function () {
+  const startParam = tg?.initDataUnsafe?.start_param || "";
+  const params = new URLSearchParams(window.location.search);
+
+  // Owner bids-overview mode (opened from the new-bid notification button).
+  let bidsAnnId = 0;
+  if (startParam.startsWith("bids_")) {
+    bidsAnnId = parseInt(startParam.slice(5), 10);
+  }
+  if (!bidsAnnId) {
+    bidsAnnId = parseInt(params.get("bids") || "0", 10);
+  }
+
+  // Bidder mode (opened from the channel post bid link).
+  let annId = 0;
+  if (startParam.startsWith("bid_")) {
+    annId = parseInt(startParam.slice(4), 10);
+  }
+  if (!annId) {
+    annId = parseInt(params.get("bid") || "0", 10);
+  }
+
+  if (bidsAnnId > 0) {
+    void openBidsScreen(bidsAnnId);
+  } else if (annId > 0) {
+    void openBidScreen(annId);
+  } else {
+    refreshAds();
+    refreshAdminStats();
+  }
+  if (!state.sentAppOpenEvent) {
+    state.sentAppOpenEvent = true;
+    void trackEvent("app_open");
+  }
+})();

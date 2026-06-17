@@ -1,10 +1,11 @@
 import json
 import mimetypes
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 import aiosqlite
+import pytz
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from telegram import InputMediaPhoto
@@ -16,10 +17,13 @@ from utils import get_private_channel_post_link, get_serbia_time, is_timestamp_o
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, AnnouncementOut
 from webserver.routes.stats import increment_stat
-from webserver.settings import BUG_CHAT_ID, logger
-from webserver.telegram_client import bot, format_announcement_text, normalize_chat_id
+from webserver.settings import BUG_CHAT_ID, WEBAPP_URL, logger
+from webserver.telegram_client import bot, format_announcement_text, format_auction_text, make_bid_link_md, normalize_chat_id
 
 router = APIRouter()
+
+# An auction may last at most 2 days minus 10 minutes (safety margin under 48h).
+MAX_AUCTION_DURATION = timedelta(days=2) - timedelta(minutes=10)
 
 
 async def send_bug_report(
@@ -71,7 +75,9 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit, is_reserved
+            SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit, is_reserved,
+                   COALESCE(ad_type,'fixed'), auction_status, start_price, current_price, min_step, auction_end_at, winner_username, auction_duration_hours,
+                   (SELECT COUNT(*) FROM auction_bids WHERE announcement_id = announcements.id) as bids_count
             FROM announcements WHERE user_id = ?
             """,
             (user_id,),
@@ -94,6 +100,15 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
             updated_at,
             last_published_is_edit,
             is_reserved,
+            ad_type,
+            auction_status,
+            start_price,
+            current_price,
+            min_step,
+            auction_end_at,
+            winner_username,
+            auction_duration_hours,
+            bids_count,
         ) = row
         photo_list = json.loads(photo_file_ids) if photo_file_ids else []
         message_list = json.loads(message_ids) if message_ids else []
@@ -122,6 +137,15 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
                 "updated_at": updated_at,
                 "is_updated": is_updated,
                 "is_reserved": bool(is_reserved),
+                "ad_type": ad_type or "fixed",
+                "auction_status": auction_status,
+                "start_price": start_price,
+                "current_price": current_price,
+                "min_step": min_step,
+                "auction_end_at": auction_end_at,
+                "winner_username": winner_username,
+                "auction_duration_hours": auction_duration_hours,
+                "bids_count": bids_count or 0,
                 "_root_message_id": root_message_id,
             }
         )
@@ -154,7 +178,7 @@ async def create_announcement(
     contact_info = (payload.contact_info or "").strip()
     if username == "None" and not contact_info:
         raise HTTPException(status_code=422, detail="Contact info is required when username is missing")
-    if not price_in_description and not price.strip():
+    if not price_in_description and not price.strip() and payload.ad_type != "auction":
         raise HTTPException(status_code=422, detail="Price is required unless price_in_description is true")
     logger.info(
         "ann:create user_id=%s username=%s desc_len=%s price_len=%s price_in_desc=%s contact_len=%s photos=%s",
@@ -167,11 +191,16 @@ async def create_announcement(
         len(payload.photo_file_ids),
     )
 
+    # For auctions only the duration is stored on create; the actual end time is
+    # computed at publish, so a saved draft doesn't expire before it goes live.
+    ad_type = payload.ad_type or "fixed"
+    auction_duration_hours = payload.auction_duration_hours if ad_type == "auction" else None
+
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids, updated_at, ad_type, start_price, min_step, auction_duration_hours, owner_language_code)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -182,6 +211,11 @@ async def create_announcement(
                 contact_info,
                 json.dumps(payload.photo_file_ids),
                 get_serbia_time(),
+                ad_type,
+                payload.start_price if ad_type == "auction" else None,
+                payload.min_step if ad_type == "auction" else None,
+                auction_duration_hours,
+                user.get("language_code"),
             ),
         )
         await db.commit()
@@ -201,7 +235,7 @@ async def update_announcement(
     username = user.get("username") or "None"
     if username == "None" and not contact_info:
         raise HTTPException(status_code=422, detail="Contact info is required when username is missing")
-    if not price_in_description and not price.strip():
+    if not price_in_description and not price.strip() and payload.ad_type != "auction":
         raise HTTPException(status_code=422, detail="Price is required unless price_in_description is true")
     logger.info(
         "ann:update user_id=%s ann_id=%s desc_len=%s price_len=%s price_in_desc=%s contact_len=%s photos=%s",
@@ -222,9 +256,14 @@ async def update_announcement(
         if not row:
             raise HTTPException(status_code=404, detail="Announcement not found")
 
+        # Auctions store the duration; the end time is finalized at publish.
+        update_ad_type = payload.ad_type or "fixed"
+        update_duration = payload.auction_duration_hours if update_ad_type == "auction" else None
+
         await db.execute(
             """
-            UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?
+            UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?,
+                ad_type = ?, start_price = ?, min_step = ?, auction_duration_hours = COALESCE(?, auction_duration_hours)
             WHERE id = ?
             """,
             (
@@ -234,6 +273,10 @@ async def update_announcement(
                 contact_info,
                 json.dumps(payload.photo_file_ids),
                 get_serbia_time(),
+                update_ad_type,
+                payload.start_price if update_ad_type == "auction" else None,
+                payload.min_step if update_ad_type == "auction" else None,
+                update_duration,
                 ann_id,
             ),
         )
@@ -387,7 +430,8 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute(
                 """
-                SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp, is_reserved
+                SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp, is_reserved,
+                       COALESCE(ad_type,'fixed'), auction_status, start_price, min_step, auction_end_at, auction_duration_hours
                 FROM announcements WHERE id = ? AND user_id = ?
                 """,
                 (ann_id, user_id),
@@ -407,50 +451,123 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 message_ids_json,
                 previous_timestamp,
                 is_reserved,
+                pub_ad_type,
+                pub_auction_status,
+                pub_start_price,
+                pub_min_step,
+                pub_auction_end_at,
+                pub_auction_duration_hours,
             ) = row
             photos = json.loads(photo_file_ids) if photo_file_ids else []
             old_message_ids = json.loads(message_ids_json) if message_ids_json else []
 
         is_editing = bool(old_message_ids)
+        # Finalize the auction end time at publish: compute from the stored
+        # duration for a first publish; keep the existing end on republish so
+        # editing a live auction doesn't extend it.
+        if pub_ad_type == "auction" and (not is_editing or not pub_auction_end_at):
+            belgrade_tz = pytz.timezone("Europe/Belgrade")
+            now = datetime.now(pytz.utc).astimezone(belgrade_tz)
+            duration_hours = pub_auction_duration_hours or 24
+            end_dt = min(now + timedelta(hours=duration_hours), now + MAX_AUCTION_DURATION)
+            pub_auction_end_at = end_dt.strftime("%Y-%m-%d %H:%M:%S")
         show_updated_label = is_editing and is_timestamp_older_than_days(previous_timestamp, 2)
         display_name = " ".join(
             filter(None, [user.get("first_name"), user.get("last_name")])
         ).strip() or None
-        message = format_announcement_text(
-            description,
-            price,
-            bool(price_in_description),
-            username,
-            contact_info,
-            display_name,
-            is_updated=show_updated_label,
-            is_reserved=bool(is_reserved),
+
+        is_auction = pub_ad_type == "auction"
+        logger.info(
+            "ann:publish type=%s is_auction=%s photos=%s start_price=%s min_step=%s end_at=%s webapp_url=%s",
+            pub_ad_type, is_auction, len(photos), pub_start_price, pub_min_step, pub_auction_end_at, WEBAPP_URL,
         )
 
-        if photos:
-            media = [
-                InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="MarkdownV2")
-                for idx, photo_id in enumerate(photos)
-            ]
-            sent_messages = await bot.send_media_group(
-                chat_id=private_channel_id, media=media, disable_notification=is_editing
+        if is_auction:
+            # The publisher is the owner — the post is localized to their language.
+            owner_language_code = user.get("language_code")
+            logger.info("ann:publish auction step=format_text ann_id=%s lang=%s", ann_id, owner_language_code)
+            message = format_auction_text(
+                description=description,
+                username=username,
+                contact_info=contact_info,
+                user_display=display_name,
+                start_price=pub_start_price,
+                current_price=None,
+                min_step=pub_min_step,
+                auction_end_at=pub_auction_end_at,
+                winner_username=None,
+                auction_status="active",
+                language_code=owner_language_code,
             )
-            new_message_ids = [msg.message_id for msg in sent_messages]
-        else:
-            sent_message = await bot.send_message(
-                chat_id=private_channel_id,
-                text=message,
-                parse_mode="MarkdownV2",
-                disable_notification=is_editing,
-            )
-            new_message_ids = [sent_message.message_id]
+            # Telegram does not allow inline buttons on media groups (albums), so the
+            # bid action is a clickable link inside the caption. This keeps everything
+            # — all photos + text + bid link — in a single message.
+            logger.info("ann:publish auction bid_link ann_id=%s", ann_id)
+            message = message + "\n\n" + make_bid_link_md(ann_id, owner_language_code)
+            if photos:
+                logger.info("ann:publish auction step=send_media_group ann_id=%s photos=%s", ann_id, len(photos))
+                media = [
+                    InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="MarkdownV2")
+                    for idx, photo_id in enumerate(photos)
+                ]
+                sent_media = await bot.send_media_group(
+                    chat_id=private_channel_id, media=media, disable_notification=is_editing
+                )
+                new_message_ids = [msg.message_id for msg in sent_media]
+            else:
+                logger.info("ann:publish auction step=send_text_only ann_id=%s", ann_id)
+                sent_message = await bot.send_message(
+                    chat_id=private_channel_id,
+                    text=message,
+                    parse_mode="MarkdownV2",
+                    disable_notification=is_editing,
+                )
+                new_message_ids = [sent_message.message_id]
 
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE announcements SET message_ids = ?, timestamp = ?, updated_at = ?, last_published_is_edit = ? WHERE id = ?",
-                (json.dumps(new_message_ids), get_serbia_time(), get_serbia_time(), 1 if show_updated_label else 0, ann_id),
+            logger.info("ann:publish auction step=db_update ann_id=%s message_ids=%s", ann_id, new_message_ids)
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute(
+                    "UPDATE announcements SET message_ids = ?, timestamp = ?, updated_at = ?, last_published_is_edit = 0, auction_status = 'active', owner_language_code = ?, auction_end_at = ? WHERE id = ?",
+                    (json.dumps(new_message_ids), get_serbia_time(), get_serbia_time(), owner_language_code, pub_auction_end_at, ann_id),
+                )
+                await db.commit()
+            logger.info("ann:publish auction step=done ann_id=%s", ann_id)
+        else:
+            message = format_announcement_text(
+                description,
+                price,
+                bool(price_in_description),
+                username,
+                contact_info,
+                display_name,
+                is_updated=show_updated_label,
+                is_reserved=bool(is_reserved),
             )
-            await db.commit()
+
+            if photos:
+                media = [
+                    InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="MarkdownV2")
+                    for idx, photo_id in enumerate(photos)
+                ]
+                sent_messages = await bot.send_media_group(
+                    chat_id=private_channel_id, media=media, disable_notification=is_editing
+                )
+                new_message_ids = [msg.message_id for msg in sent_messages]
+            else:
+                sent_message = await bot.send_message(
+                    chat_id=private_channel_id,
+                    text=message,
+                    parse_mode="MarkdownV2",
+                    disable_notification=is_editing,
+                )
+                new_message_ids = [sent_message.message_id]
+
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute(
+                    "UPDATE announcements SET message_ids = ?, timestamp = ?, updated_at = ?, last_published_is_edit = ? WHERE id = ?",
+                    (json.dumps(new_message_ids), get_serbia_time(), get_serbia_time(), 1 if show_updated_label else 0, ann_id),
+                )
+                await db.commit()
 
         delete_failures: list[str] = []
         if is_editing and old_message_ids:
@@ -522,10 +639,13 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
     except (TimedOut, NetworkError) as exc:
         await increment_stat("publish_fail")
         logger.warning("ann:publish telegram_timeout ann_id=%s user_id=%s error=%s", ann_id, user.get("id"), exc)
-        raise HTTPException(status_code=504, detail=f"Telegram timeout while publishing photos: {exc}")
-    except Exception:
-        await increment_stat("publish_fail")
+        raise HTTPException(status_code=504, detail=f"Telegram timeout while publishing: {exc}")
+    except HTTPException:
         raise
+    except Exception as exc:
+        await increment_stat("publish_fail")
+        logger.exception("ann:publish UNHANDLED EXCEPTION ann_id=%s user_id=%s error=%s", ann_id, user.get("id"), exc)
+        raise HTTPException(status_code=500, detail=f"Publish failed: {type(exc).__name__}: {exc}")
 
 
 @router.post("/api/announcements/{ann_id}/reserve")

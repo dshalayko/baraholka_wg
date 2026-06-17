@@ -51,7 +51,8 @@ async function apiFetch(path, options = {}) {
   if (initData) {
     headers["X-Telegram-Init-Data"] = initData;
   }
-  const response = await fetch(path, { ...options, headers });
+  const { noUnauthorizedMode, ...fetchOptions } = options;
+  const response = await fetch(path, { ...fetchOptions, headers });
   if (!response.ok) {
     if (!String(path || "").startsWith("/api/stats/")) {
       void trackEvent("api_errors");
@@ -68,7 +69,7 @@ async function apiFetch(path, options = {}) {
     const error = new Error(message);
     error.status = response.status;
     error.data = detail;
-    if (response.status === 401) {
+    if (response.status === 401 && !noUnauthorizedMode) {
       setUnauthorizedMode(true);
     }
     throw error;
@@ -163,32 +164,63 @@ async function refreshAds() {
 }
 
 async function saveAd() {
+  const isAuction = state.adType === "auction";
   const description = elements.description.value.trim();
-  const priceInDescription = elements.priceInDescription.checked;
-  const price = priceInDescription ? "" : elements.price.value.trim();
   const contactInfo = elements.contactInfo.value.trim();
-  const isValid = validateAdForm({
-    description,
-    price,
-    priceInDescription,
-    contactInfo,
-    requireContact: !state.hasUsername,
-    descriptionInput: elements.description,
-    priceInput: elements.price,
-    contactInput: elements.contactInfo,
-  });
-  if (!isValid) {
-    tg?.showAlert?.(t("required"));
-    return;
-  }
 
-  const payload = {
-    description,
-    price,
-    price_in_description: priceInDescription,
-    contact_info: contactInfo,
-    photo_file_ids: state.photoFileIds,
-  };
+  let payload;
+  if (isAuction) {
+    const descValid = validateAdForm({
+      description,
+      price: "",
+      priceInDescription: true,
+      contactInfo,
+      requireContact: !state.hasUsername,
+      descriptionInput: elements.description,
+      priceInput: elements.price,
+      contactInput: elements.contactInfo,
+    });
+    if (!descValid) {
+      tg?.showAlert?.(t("required"));
+      return;
+    }
+    payload = {
+      description,
+      price: "",
+      price_in_description: false,
+      contact_info: contactInfo,
+      photo_file_ids: state.photoFileIds,
+      ad_type: "auction",
+      start_price: parseInt(elements.auctionStartPrice?.value, 10) || null,
+      min_step: parseInt(elements.auctionMinStep?.value, 10) || null,
+      auction_duration_hours: parseInt(elements.auctionDuration?.value, 10) || 24,
+    };
+  } else {
+    const priceInDescription = elements.priceInDescription.checked;
+    const price = priceInDescription ? "" : elements.price.value.trim();
+    const isValid = validateAdForm({
+      description,
+      price,
+      priceInDescription,
+      contactInfo,
+      requireContact: !state.hasUsername,
+      descriptionInput: elements.description,
+      priceInput: elements.price,
+      contactInput: elements.contactInfo,
+    });
+    if (!isValid) {
+      tg?.showAlert?.(t("required"));
+      return;
+    }
+    payload = {
+      description,
+      price,
+      price_in_description: priceInDescription,
+      contact_info: contactInfo,
+      photo_file_ids: state.photoFileIds,
+      ad_type: "fixed",
+    };
+  }
 
   setBusy(true, t("busySaving"));
   let saved = false;
@@ -325,6 +357,26 @@ async function reserveAd(id, isReserved = false) {
   } finally {
     setBusy(false);
   }
+}
+
+async function getAuctionInfo(annId) {
+  return apiFetch(`/api/auctions/${annId}`);
+}
+
+async function getAuctionBids(annId) {
+  return apiFetch(`/api/auctions/${annId}/bids`);
+}
+
+async function stopAuction(annId) {
+  return apiFetch(`/api/auctions/${annId}/stop`, { method: "POST" });
+}
+
+async function placeBid(annId, amount) {
+  return apiFetch(`/api/auctions/${annId}/bid`, {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+    noUnauthorizedMode: true,
+  });
 }
 
 async function reportBug(payload) {

@@ -27,4 +27,8 @@ const state = {
   expiredAds: [],
   adminDrafts: [],
   sentAppOpenEvent: false,
+  adType: "fixed",
+  bidScreenAnnId: null,
+  bidPostLink: null,
+  bidMinRequired: null,
 };

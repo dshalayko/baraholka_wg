@@ -73,3 +73,28 @@ ACCEPTED_PRICE_PROMPT = "Принято! Теперь укажите цену."
 NOT_SUBSCRIBED_SHORT = "Вы еще не подписаны на канал."
 
 ANONYMOUS_NAME = "Аноним"
+
+# --- Аукцион (пост в канале) ---
+AUCTION_HEADER = "💰 АУКЦИОН"
+AUCTION_FINISHED_HEADER = "✅ АУКЦИОН ЗАВЕРШЁН"
+AUCTION_START_PRICE = "Стартовая цена"
+AUCTION_CURRENT_BID = "Текущая ставка"
+AUCTION_NO_BIDS_YET = "Ставок пока нет"
+AUCTION_MIN_STEP = "Минимальный шаг"
+AUCTION_END_AT = "Аукцион до"
+AUCTION_FINAL_PRICE = "Финальная цена"
+AUCTION_WINNER = "Победитель"
+AUCTION_NO_BIDS_PLACED = "Ставок не поступило"
+AUCTION_BID_LINK_LABEL = "👉 СДЕЛАТЬ СТАВКУ 👈"
+
+# --- Аукцион (уведомление владельцу о новой ставке) ---
+AUCTION_NEW_BID_TITLE = "🔨 Новая ставка по вашему аукциону!"
+AUCTION_NEW_BID_AMOUNT = "Ставка"
+AUCTION_NEW_BID_FROM = "От"
+AUCTION_NEW_BID_TOTAL = "Всего ставок"
+AUCTION_VIEW_BIDS_BUTTON = "📊 Посмотреть ставки"
+
+# --- Аукцион (завершение) ---
+AUCTION_SELLER_FINISHED_WIN = "Аукцион завершён!\nПобедитель: {winner}\nФинальная цена: {price}\nОбъявление: {link}"
+AUCTION_SELLER_FINISHED_NOBIDS = "Аукцион завершён.\nСтавок не поступило.\nОбъявление: {link}"
+AUCTION_WINNER_FINISHED = "Вы выиграли аукцион!\nВаша ставка: {price}\nДля связи с продавцом: {seller_contact}\nОбъявление: {link}"

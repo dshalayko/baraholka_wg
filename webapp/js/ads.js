@@ -32,8 +32,20 @@ function showTab(tab) {
   }
 }
 
+function setAdType(type) {
+  state.adType = type;
+  const isAuction = type === "auction";
+  if (elements.adTypeFixedBtn) elements.adTypeFixedBtn.classList.toggle("active", !isAuction);
+  if (elements.adTypeAuctionBtn) elements.adTypeAuctionBtn.classList.toggle("active", isAuction);
+  if (elements.priceSectionWrap) elements.priceSectionWrap.hidden = isAuction;
+  if (elements.auctionSection) elements.auctionSection.hidden = !isAuction;
+  // Drafts can be saved for auctions too — the end time is set at publish.
+  if (elements.saveAdBtn) elements.saveAdBtn.hidden = false;
+}
+
 function resetForm() {
   state.editingId = null;
+  state.adType = "fixed";
   state.photoFileIds = [];
   state.photoPreviews.forEach((item) => {
     if (item.source === "local") {
@@ -51,7 +63,10 @@ function resetForm() {
   elements.photoGrid.innerHTML = "";
   if (elements.descToolbar) elements.descToolbar.hidden = true;
   if (elements.formatToggleBtn) elements.formatToggleBtn.classList.remove("active");
-  elements.saveAdBtn.hidden = false;
+  if (elements.auctionStartPrice) elements.auctionStartPrice.value = "";
+  if (elements.auctionMinStep) elements.auctionMinStep.value = "";
+  if (elements.auctionDuration) elements.auctionDuration.value = "24";
+  setAdType("fixed");
   updateCounts();
   autoResizeDescription();
   updateCharCounter(elements.description, elements.descCounter, 800);
@@ -244,6 +259,7 @@ function renderAds() {
       header.appendChild(dateTag);
     }
 
+    const isAuction = ad.ad_type === "auction";
     const statusTag = document.createElement("span");
     statusTag.className = "ad-status-tag";
     if (isExpiredFromChannel) {
@@ -252,6 +268,12 @@ function renderAds() {
     } else if (!ad.is_published) {
       statusTag.textContent = t("statusDraft");
       statusTag.classList.add("is-draft");
+    } else if (isAuction && ad.auction_status === "finished") {
+      statusTag.textContent = `✅ ${t("statusAuctionFinished")}`;
+      statusTag.classList.add("is-auction-finished");
+    } else if (isAuction && ad.auction_status === "active") {
+      statusTag.textContent = `🔨 ${t("statusAuctionActive")}`;
+      statusTag.classList.add("is-auction-active");
     } else if (ad.is_reserved) {
       statusTag.textContent = t("statusReserved");
       statusTag.classList.add("is-reserved");
@@ -272,18 +294,64 @@ function renderAds() {
     }
     title.innerHTML = renderStyledText(ad.description || t("noAds"));
 
-    const meta = document.createElement("div");
-    meta.className = "ad-meta ad-price";
+    let meta;
+    if (isAuction) {
+      meta = document.createElement("div");
+      meta.className = "ad-auction-info";
 
-    const priceLabel = document.createElement("span");
-    priceLabel.className = "ad-price-label";
-    priceLabel.textContent = t("price");
+      const addBidRow = (label, value, valueClass) => {
+        const row = document.createElement("div");
+        row.className = "ad-auction-row";
+        const lbl = document.createElement("span");
+        lbl.className = "ad-auction-label";
+        lbl.textContent = label;
+        const val = document.createElement("span");
+        val.className = "ad-auction-value" + (valueClass ? ` ${valueClass}` : "");
+        val.textContent = value;
+        row.append(lbl, val);
+        meta.appendChild(row);
+      };
 
-    const priceValue = document.createElement("span");
-    priceValue.className = "ad-price-value";
-    priceValue.textContent = ad.price_in_description ? t("priceInDescriptionValue") : (ad.price || "");
+      if (ad.auction_status === "finished") {
+        if (ad.current_price != null) {
+          addBidRow(`${t("auctionCurrentBid")}:`, `${ad.current_price}`);
+        }
+        if (ad.winner_username) {
+          addBidRow(`${t("auctionWinner")}:`, ad.winner_username);
+        } else {
+          addBidRow("", t("auctionNoBids"), "ad-auction-no-bids");
+        }
+      } else {
+        if (ad.current_price != null) {
+          addBidRow(`${t("auctionCurrentBid")}:`, `${ad.current_price}`, "ad-auction-current");
+        } else {
+          addBidRow(`${t("auctionStartPrice") || "Старт"}:`, `${ad.start_price != null ? ad.start_price : "—"}`);
+          const noBids = document.createElement("div");
+          noBids.className = "ad-auction-nobids";
+          noBids.textContent = t("auctionNoBids");
+          meta.appendChild(noBids);
+        }
+        if (ad.bids_count > 0) {
+          addBidRow(`${t("auctionBidsCount")}:`, String(ad.bids_count));
+        }
+        if (ad.auction_end_at) {
+          addBidRow(`${t("auctionEndAt")}:`, ad.auction_end_at);
+        }
+      }
+    } else {
+      meta = document.createElement("div");
+      meta.className = "ad-meta ad-price";
 
-    meta.append(priceLabel, priceValue);
+      const priceLabel = document.createElement("span");
+      priceLabel.className = "ad-price-label";
+      priceLabel.textContent = t("price");
+
+      const priceValue = document.createElement("span");
+      priceValue.className = "ad-price-value";
+      priceValue.textContent = ad.price_in_description ? t("priceInDescriptionValue") : (ad.price || "");
+
+      meta.append(priceLabel, priceValue);
+    }
 
     const removedNote = document.createElement("div");
     removedNote.className = "ad-removed-note";
@@ -292,6 +360,7 @@ function renderAds() {
     const actions = document.createElement("div");
     actions.className = "ad-actions";
 
+    const canEdit = !isAuction || !ad.is_published;
     const editBtn = document.createElement("button");
     editBtn.className = "ghost ad-action ad-action-icon";
     editBtn.type = "button";
@@ -302,6 +371,7 @@ function renderAds() {
         <path d="M4 20h4l10.5-10.5a1.4 1.4 0 0 0 0-2L16.5 5.5a1.4 1.4 0 0 0-2 0L4 16v4zM13.8 7.2l3 3"></path>
       </svg>
     `;
+    editBtn.hidden = !canEdit;
     editBtn.onclick = () => {
       haptic("light");
       if (ad.is_published) {
@@ -330,13 +400,50 @@ function renderAds() {
       actions.appendChild(openBtn);
     }
 
-    if (ad.is_published && !isExpiredFromChannel) {
+    if (ad.is_published && !isExpiredFromChannel && !isAuction) {
       const reserveBtn = document.createElement("button");
       reserveBtn.className = "ghost ad-action ad-action-main ad-action-reserve";
       reserveBtn.type = "button";
       reserveBtn.textContent = t(ad.is_reserved ? "unreserve" : "reserve");
       reserveBtn.onclick = () => { haptic("light"); reserveAd(ad.id, !!ad.is_reserved); };
       actions.appendChild(reserveBtn);
+    }
+
+    if (ad.is_published && isAuction) {
+      const bidsBtn = document.createElement("button");
+      bidsBtn.className = "ghost ad-action ad-action-main";
+      bidsBtn.type = "button";
+      bidsBtn.textContent = t("viewBids");
+      bidsBtn.onclick = () => { haptic("light"); void openBidsScreen(ad.id); };
+      actions.appendChild(bidsBtn);
+    }
+
+    if (ad.is_published && isAuction && ad.auction_status === "active") {
+      const stopBtn = document.createElement("button");
+      stopBtn.className = "ghost ad-action ad-action-main ad-action-stop";
+      stopBtn.type = "button";
+      stopBtn.textContent = t("stopAuction");
+      stopBtn.onclick = () => {
+        haptic("light");
+        const doStop = async () => {
+          setBusy(true, t("busyStoppingAuction"));
+          try {
+            await stopAuction(ad.id);
+            showToast(t("auctionStoppedToast"), "success");
+            await refreshAds();
+          } catch (err) {
+            openErrorModal(err?.message || t("loadFailed"));
+          } finally {
+            setBusy(false);
+          }
+        };
+        if (tg?.showConfirm) {
+          tg.showConfirm(t("stopAuctionConfirm"), (ok) => { if (ok) void doStop(); });
+        } else if (window.confirm(t("stopAuctionConfirm"))) {
+          void doStop();
+        }
+      };
+      actions.appendChild(stopBtn);
     }
 
     const commentsCount = Number(ad.comments_count) || 0;
@@ -412,9 +519,22 @@ function startEdit(ad) {
   });
   elements.description.value = ad.description || "";
   elements.contactInfo.value = ad.contact_info || "";
-  elements.price.value = ad.price || "";
-  elements.priceInDescription.checked = !!ad.price_in_description;
-  applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
+
+  const isAuction = ad.ad_type === "auction";
+  setAdType(isAuction ? "auction" : "fixed");
+
+  if (isAuction) {
+    if (elements.auctionStartPrice) elements.auctionStartPrice.value = ad.start_price || "";
+    if (elements.auctionMinStep) elements.auctionMinStep.value = ad.min_step || "";
+    if (elements.auctionDuration && ad.auction_duration_hours) {
+      elements.auctionDuration.value = String(ad.auction_duration_hours);
+    }
+  } else {
+    elements.price.value = ad.price || "";
+    elements.priceInDescription.checked = !!ad.price_in_description;
+    applyPriceInDescriptionToggle(elements.priceInDescription, elements.price, elements.priceField);
+  }
+
   elements.saveAdBtn.hidden = !!ad.is_published;
   renderPhotoPreviews();
   updateCharCounter(elements.description, elements.descCounter, 800);

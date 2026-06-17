@@ -45,6 +45,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texts = get_texts(update)
     language_code = get_user_language_code(update)
 
+    # Обработка deep link для ставки: /start bid_8
+    if context.args and context.args[0].startswith("bid_"):
+        try:
+            ann_id = int(context.args[0][4:])
+        except ValueError:
+            ann_id = None
+        webapp_url = os.getenv("WEBAPP_URL", "").rstrip("/")
+        if ann_id and webapp_url:
+            markup = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🔨 Сделать ставку", web_app=WebAppInfo(f"{webapp_url}?bid={ann_id}"))]]
+            )
+            await update.message.reply_text("Нажмите кнопку ниже чтобы открыть аукцион:", reply_markup=markup)
+            return CHOOSING
+
     if not await is_subscribed(user_id, context):
         text, keyboard = await check_subscription_message(update)
         await update.message.reply_text(text, reply_markup=keyboard)

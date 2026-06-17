@@ -48,4 +48,38 @@ async def ensure_db() -> None:
             await db.execute("UPDATE announcements SET updated_at = timestamp WHERE updated_at IS NULL AND timestamp IS NOT NULL")
         if "is_reserved" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN is_reserved INTEGER DEFAULT 0")
+        if "ad_type" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN ad_type TEXT DEFAULT 'fixed'")
+        if "auction_status" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN auction_status TEXT")
+        if "start_price" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN start_price INTEGER")
+        if "current_price" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN current_price INTEGER")
+        if "min_step" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN min_step INTEGER")
+        if "auction_end_at" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN auction_end_at TEXT")
+        if "auction_duration_hours" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN auction_duration_hours INTEGER")
+        if "winner_user_id" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN winner_user_id INTEGER")
+        if "winner_username" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN winner_username TEXT")
+        if "owner_language_code" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN owner_language_code TEXT")
+        if "winner_language_code" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN winner_language_code TEXT")
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auction_bids (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                announcement_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                username TEXT,
+                amount INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
         await db.commit()
