@@ -178,8 +178,7 @@ def make_bid_link_md(ann_id: int, language_code=None) -> str:
     make it stand out as much as a caption link can."""
     url = make_bid_button_url(ann_id)
     label = texts_for(language_code).AUCTION_BID_LINK_LABEL
-    divider = "━━━━━━━━━━━━━"
-    return f"{divider}\n*[{label}]({url})*\n{divider}"
+    return f"*[{label}]({url})*"
 
 
 def format_auction_text(
