@@ -91,6 +91,7 @@ function closeFeedbackModal() {
 function resetEditModal() {
   state.editModal.id = null;
   state.editModal.photoFileIds = [];
+  state.editModal.originalPhotoFileIds = [];
   state.editModal.photoPreviews.forEach((item) => {
     if (item.source === "local") {
       URL.revokeObjectURL(item.url);
@@ -102,6 +103,12 @@ function resetEditModal() {
   elements.editPrice.value = "";
   elements.editPriceInDescription.checked = false;
   applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
+  state.editModal.adType = "fixed";
+  state.editModal.startPrice = null;
+  if (elements.editAuctionSection) elements.editAuctionSection.hidden = true;
+  if (elements.editAuctionMinStep) elements.editAuctionMinStep.value = "";
+  if (elements.editPriceField) elements.editPriceField.hidden = false;
+  if (elements.editPriceToggleField) elements.editPriceToggleField.hidden = false;
   elements.editPhotos.value = "";
   elements.editPhotoGrid.innerHTML = "";
   renderEditPhotoPreviews();
@@ -111,6 +118,7 @@ function resetEditModal() {
 function openEditModal(ad) {
   state.editModal.id = ad.id;
   state.editModal.photoFileIds = ad.photo_file_ids || [];
+  state.editModal.originalPhotoFileIds = [...(ad.photo_file_ids || [])];
   state.editModal.photoPreviews = (ad.photo_file_ids || []).map((fileId, idx) => {
     const initData = encodeURIComponent(tg?.initData || "");
     return {
@@ -121,9 +129,38 @@ function openEditModal(ad) {
   });
   elements.editDescription.value = ad.description || "";
   elements.editContactInfo.value = ad.contact_info || "";
-  elements.editPrice.value = ad.price || "";
-  elements.editPriceInDescription.checked = !!ad.price_in_description;
-  applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
+
+  const isAuction = ad.ad_type === "auction";
+  state.editModal.adType = isAuction ? "auction" : "fixed";
+  state.editModal.startPrice = ad.start_price ?? null;
+  if (isAuction) {
+    // Auction: edit min step + end time (duration from now). Start price and the
+    // price fields are not used.
+    if (elements.editAuctionSection) elements.editAuctionSection.hidden = false;
+    if (elements.editAuctionMinStepLabel) elements.editAuctionMinStepLabel.textContent = t("auctionMinStep");
+    if (elements.editAuctionDurationLabel) elements.editAuctionDurationLabel.textContent = t("auctionDurationFromNow");
+    if (elements.editAuctionMinStep) elements.editAuctionMinStep.value = ad.min_step ?? "";
+    if (elements.editAuctionDuration) {
+      const opts = elements.editAuctionDuration.options;
+      const durationKeys = ["duration1h", "duration3h", "duration6h", "duration12h", "duration24h", "duration48h"];
+      if (opts.length) opts[0].textContent = t("auctionKeepEnd"); // value="" — keep current end
+      for (let i = 1; i < opts.length; i += 1) {
+        const key = durationKeys[i - 1];
+        if (key) opts[i].textContent = t(key);
+      }
+      // Default to "keep current" so re-saving doesn't reset the deadline.
+      elements.editAuctionDuration.value = "";
+    }
+    if (elements.editPriceField) elements.editPriceField.hidden = true;
+    if (elements.editPriceToggleField) elements.editPriceToggleField.hidden = true;
+  } else {
+    if (elements.editAuctionSection) elements.editAuctionSection.hidden = true;
+    if (elements.editPriceField) elements.editPriceField.hidden = false;
+    if (elements.editPriceToggleField) elements.editPriceToggleField.hidden = false;
+    elements.editPrice.value = ad.price || "";
+    elements.editPriceInDescription.checked = !!ad.price_in_description;
+    applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
+  }
   renderEditPhotoPreviews();
   updateCharCounter(elements.editDescription, elements.editDescCounter, 800);
   elements.editModal.hidden = false;

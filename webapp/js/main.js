@@ -639,42 +639,93 @@ function bindEvents() {
   });
   elements.editPublishBtn.addEventListener("click", async () => {
     const description = elements.editDescription.value.trim();
-    const priceInDescription = elements.editPriceInDescription.checked;
-    const price = priceInDescription ? "" : elements.editPrice.value.trim();
     const contactInfo = elements.editContactInfo.value.trim();
-    const isValid = validateAdForm({
-      description,
-      price,
-      priceInDescription,
-      contactInfo,
-      requireContact: !state.hasUsername,
-      descriptionInput: elements.editDescription,
-      priceInput: elements.editPrice,
-      contactInput: elements.editContactInfo,
-      descriptionError: elements.editDescError,
-      priceError: elements.editPriceError,
-      contactError: elements.editContactError,
-    });
-    if (!isValid) return;
+    const isAuction = state.editModal.adType === "auction";
+
+    let payload;
+    if (isAuction) {
+      const descValid = validateAdForm({
+        description,
+        price: "",
+        priceInDescription: true,
+        contactInfo,
+        requireContact: !state.hasUsername,
+        descriptionInput: elements.editDescription,
+        priceInput: elements.editPrice,
+        contactInput: elements.editContactInfo,
+        descriptionError: elements.editDescError,
+        priceError: elements.editPriceError,
+        contactError: elements.editContactError,
+      });
+      const minStep = parseInt(elements.editAuctionMinStep?.value, 10);
+      let stepValid = true;
+      if (!minStep || minStep <= 0) {
+        stepValid = false;
+        if (elements.editAuctionMinStepError) setFieldError(elements.editAuctionMinStepError, t("auctionMinStepMin"));
+        setFieldInvalid(elements.editAuctionMinStep, true);
+      }
+      if (!descValid || !stepValid) return;
+      payload = {
+        description,
+        price: "",
+        price_in_description: false,
+        contact_info: contactInfo,
+        photo_file_ids: state.editModal.photoFileIds,
+        ad_type: "auction",
+        start_price: state.editModal.startPrice,
+        min_step: minStep,
+        // Empty = keep the current end time; a value sets end = now + duration.
+        auction_duration_hours: parseInt(elements.editAuctionDuration?.value, 10) || null,
+      };
+    } else {
+      const priceInDescription = elements.editPriceInDescription.checked;
+      const price = priceInDescription ? "" : elements.editPrice.value.trim();
+      const isValid = validateAdForm({
+        description,
+        price,
+        priceInDescription,
+        contactInfo,
+        requireContact: !state.hasUsername,
+        descriptionInput: elements.editDescription,
+        priceInput: elements.editPrice,
+        contactInput: elements.editContactInfo,
+        descriptionError: elements.editDescError,
+        priceError: elements.editPriceError,
+        contactError: elements.editContactError,
+      });
+      if (!isValid) return;
+      payload = {
+        description,
+        price,
+        price_in_description: priceInDescription,
+        contact_info: contactInfo,
+        photo_file_ids: state.editModal.photoFileIds,
+      };
+    }
     if (!state.editModal.id) {
       closeEditModal();
       return;
     }
+    // A running auction whose photos didn't change is edited in place (the same
+    // channel post is updated); otherwise (and for fixed ads) it's republished.
+    const photosUnchanged =
+      JSON.stringify(state.editModal.originalPhotoFileIds || []) ===
+      JSON.stringify(state.editModal.photoFileIds || []);
+    const editInPlace = isAuction && photosUnchanged;
+
     haptic("medium");
     setBusy(true, t("busyPublishing"));
     let publishSucceeded = false;
     try {
-      await apiFetch(`/api/announcements/${state.editModal.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          description,
-          price,
-          price_in_description: priceInDescription,
-          contact_info: contactInfo,
-          photo_file_ids: state.editModal.photoFileIds,
-        }),
-      });
-      await apiFetch(`/api/announcements/${state.editModal.id}/publish`, { method: "POST" });
+      if (editInPlace) {
+        await editAuctionInPlace(state.editModal.id, payload);
+      } else {
+        await apiFetch(`/api/announcements/${state.editModal.id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        await apiFetch(`/api/announcements/${state.editModal.id}/publish`, { method: "POST" });
+      }
       publishSucceeded = true;
     } catch (err) {
       const errorId = err?.data?.error_id;

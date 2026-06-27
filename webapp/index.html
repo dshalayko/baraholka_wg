@@ -312,7 +312,7 @@
             />
             <div class="field-error" id="editContactError" hidden></div>
           </label>
-          <div class="field field-checkbox field-checkbox-glass">
+          <div class="field field-checkbox field-checkbox-glass" id="editPriceToggleField">
             <span id="editPriceInDescriptionLabel" class="glass-toggle-title">Цена написана в описании?</span>
             <label class="glass-toggle">
               <input id="editPriceInDescription" type="checkbox" />
@@ -328,6 +328,25 @@
             <input id="editPrice" type="text" maxlength="130" placeholder="Например: 50 RSD" />
             <div class="field-error" id="editPriceError" hidden></div>
           </label>
+          <div class="field" id="editAuctionSection" hidden>
+            <div class="auction-field">
+              <label class="auction-field-label" id="editAuctionMinStepLabel">Минимальный шаг</label>
+              <input id="editAuctionMinStep" type="number" min="1" placeholder="Например: 10" />
+              <div class="field-error" id="editAuctionMinStepError" hidden></div>
+            </div>
+            <div class="auction-field">
+              <label class="auction-field-label" id="editAuctionDurationLabel">Окончание (от текущего момента)</label>
+              <select id="editAuctionDuration">
+                <option value="" selected>Не менять</option>
+                <option value="1">1 час</option>
+                <option value="3">3 часа</option>
+                <option value="6">6 часов</option>
+                <option value="12">12 часов</option>
+                <option value="24" selected>24 часа</option>
+                <option value="48">2 дня</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div class="modal-actions modal-actions-wide">
           <button class="ghost cancel-action" id="editCancelBtn">Отмена</button>

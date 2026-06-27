@@ -360,7 +360,9 @@ function renderAds() {
     const actions = document.createElement("div");
     actions.className = "ad-actions";
 
-    const canEdit = !isAuction || !ad.is_published;
+    // Auctions are now editable after publishing too (description, photos,
+    // min step, end time) — start price stays fixed.
+    const canEdit = true;
     const editBtn = document.createElement("button");
     editBtn.className = "ghost ad-action ad-action-icon";
     editBtn.type = "button";

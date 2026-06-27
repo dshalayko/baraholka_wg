@@ -17,7 +17,10 @@ const state = {
   editModal: {
     id: null,
     photoFileIds: [],
+    originalPhotoFileIds: [],
     photoPreviews: [],
+    adType: "fixed",
+    startPrice: null,
   },
   busyCount: 0,
   lastError: null,

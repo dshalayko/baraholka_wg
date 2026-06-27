@@ -249,21 +249,31 @@ async def update_announcement(
     )
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "SELECT id FROM announcements WHERE id = ? AND user_id = ?",
+            "SELECT message_ids FROM announcements WHERE id = ? AND user_id = ?",
             (ann_id, user_id),
         )
         row = await cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Announcement not found")
+        is_published = bool(json.loads(row[0]) if row[0] else [])
 
-        # Auctions store the duration; the end time is finalized at publish.
+        # Auctions store the duration; for a draft the end time is finalized at
+        # publish. For an already-published (running) auction, editing sets a new
+        # end time = now + chosen duration so the deadline actually changes.
         update_ad_type = payload.ad_type or "fixed"
         update_duration = payload.auction_duration_hours if update_ad_type == "auction" else None
+        new_end_at = None
+        if update_ad_type == "auction" and is_published and payload.auction_duration_hours:
+            belgrade_tz = pytz.timezone("Europe/Belgrade")
+            now = datetime.now(pytz.utc).astimezone(belgrade_tz)
+            end_dt = min(now + timedelta(hours=payload.auction_duration_hours), now + MAX_AUCTION_DURATION)
+            new_end_at = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
         await db.execute(
             """
             UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?,
-                ad_type = ?, start_price = ?, min_step = ?, auction_duration_hours = COALESCE(?, auction_duration_hours)
+                ad_type = ?, start_price = COALESCE(?, start_price), min_step = ?, auction_duration_hours = COALESCE(?, auction_duration_hours),
+                auction_end_at = COALESCE(?, auction_end_at)
             WHERE id = ?
             """,
             (
@@ -277,6 +287,7 @@ async def update_announcement(
                 payload.start_price if update_ad_type == "auction" else None,
                 payload.min_step if update_ad_type == "auction" else None,
                 update_duration,
+                new_end_at,
                 ann_id,
             ),
         )
@@ -433,7 +444,8 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
             cursor = await db.execute(
                 """
                 SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp, is_reserved,
-                       COALESCE(ad_type,'fixed'), auction_status, start_price, min_step, auction_end_at, auction_duration_hours
+                       COALESCE(ad_type,'fixed'), auction_status, start_price, min_step, auction_end_at, auction_duration_hours,
+                       current_price, winner_username
                 FROM announcements WHERE id = ? AND user_id = ?
                 """,
                 (ann_id, user_id),
@@ -459,6 +471,8 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 pub_min_step,
                 pub_auction_end_at,
                 pub_auction_duration_hours,
+                pub_current_price,
+                pub_winner_username,
             ) = row
             photos = json.loads(photo_file_ids) if photo_file_ids else []
             old_message_ids = json.loads(message_ids_json) if message_ids_json else []
@@ -494,10 +508,10 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 contact_info=contact_info,
                 user_display=display_name,
                 start_price=pub_start_price,
-                current_price=None,
+                current_price=pub_current_price,
                 min_step=pub_min_step,
                 auction_end_at=pub_auction_end_at,
-                winner_username=None,
+                winner_username=pub_winner_username,
                 auction_status="active",
                 language_code=owner_language_code,
             )

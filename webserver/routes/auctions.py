@@ -1,6 +1,6 @@
 import json
 import mimetypes
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 import aiosqlite
@@ -10,11 +10,14 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 
 from config import DB_PATH, PRIVATE_CHANNEL_ID
-from utils import get_private_channel_post_link
+from utils import get_private_channel_post_link, get_serbia_time
 from webserver.auth import get_user_from_request
-from webserver.models import BidIn
+from webserver.models import AnnouncementIn, BidIn
 from webserver.settings import WEBAPP_URL, logger
 from webserver.telegram_client import bot, format_auction_text, make_bid_link_md, normalize_chat_id, texts_for
+
+# An auction may last at most 2 days minus 10 minutes (mirror of announcements).
+MAX_AUCTION_DURATION = timedelta(days=2) - timedelta(minutes=10)
 
 router = APIRouter()
 
@@ -516,3 +519,129 @@ async def stop_auction(
     user_id = user.get("id")
     logger.info("auction:stop ann_id=%s user_id=%s", ann_id, user_id)
     return await finish_auction(ann_id, expected_user_id=user_id)
+
+
+@router.post("/api/auctions/{ann_id}/edit")
+async def edit_auction(
+    ann_id: int, payload: AnnouncementIn, user: Dict[str, Any] = Depends(get_user_from_request)
+) -> Dict[str, Any]:
+    """Edit a running auction IN PLACE (no repost): update the DB and edit the
+    existing channel post's caption. Used when photos didn't change — albums
+    can't be restructured in place, so photo changes go through republish.
+    Start price and existing bids are preserved."""
+    user_id = user.get("id")
+    private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            SELECT user_id, username, contact_info, message_ids, photo_file_ids, start_price,
+                   current_price, winner_username, owner_language_code, auction_status
+            FROM announcements
+            WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
+            """,
+            (ann_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Auction not found")
+        (
+            seller_user_id,
+            seller_username,
+            _old_contact,
+            message_ids_json,
+            photo_file_ids,
+            start_price,
+            current_price,
+            winner_username,
+            owner_language_code,
+            auction_status,
+        ) = row
+
+        if user_id != seller_user_id:
+            raise HTTPException(status_code=403, detail="Only the owner can edit the auction")
+        message_ids = json.loads(message_ids_json) if message_ids_json else []
+        if not message_ids:
+            raise HTTPException(status_code=400, detail="Auction is not published")
+        if auction_status != "active":
+            raise HTTPException(status_code=400, detail="Auction is not active")
+
+        contact_info = (payload.contact_info or "").strip()
+        new_min_step = payload.min_step if payload.min_step else None
+
+        # New end time = now + chosen duration (capped). Keep current if not given.
+        new_end_at = None
+        if payload.auction_duration_hours:
+            belgrade_tz = pytz.timezone("Europe/Belgrade")
+            now = datetime.now(pytz.utc).astimezone(belgrade_tz)
+            end_dt = min(now + timedelta(hours=payload.auction_duration_hours), now + MAX_AUCTION_DURATION)
+            new_end_at = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        await db.execute(
+            """
+            UPDATE announcements
+            SET description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?,
+                min_step = COALESCE(?, min_step),
+                auction_duration_hours = COALESCE(?, auction_duration_hours),
+                auction_end_at = COALESCE(?, auction_end_at)
+            WHERE id = ?
+            """,
+            (
+                payload.description,
+                contact_info,
+                json.dumps(payload.photo_file_ids),
+                get_serbia_time(),
+                new_min_step,
+                payload.auction_duration_hours,
+                new_end_at,
+                ann_id,
+            ),
+        )
+        await db.commit()
+
+        # Re-read the effective values for rendering.
+        cursor2 = await db.execute(
+            "SELECT min_step, auction_end_at FROM announcements WHERE id = ?", (ann_id,)
+        )
+        eff_min_step, eff_end_at = await cursor2.fetchone()
+
+    # Rebuild and edit the post caption/text in place.
+    has_photo = bool(json.loads(photo_file_ids)) if photo_file_ids else False
+    message = format_auction_text(
+        description=payload.description,
+        username=seller_username,
+        contact_info=contact_info,
+        user_display=None,
+        start_price=start_price,
+        current_price=current_price,
+        min_step=eff_min_step,
+        auction_end_at=eff_end_at,
+        winner_username=winner_username,
+        auction_status="active",
+        language_code=owner_language_code,
+    )
+    message = message + "\n\n" + make_bid_link_md(ann_id, owner_language_code)
+
+    if private_channel_id is not None:
+        post_message_id = message_ids[0]
+        try:
+            if has_photo:
+                await bot.edit_message_caption(
+                    chat_id=private_channel_id, message_id=post_message_id,
+                    caption=message, parse_mode="MarkdownV2",
+                )
+            else:
+                await bot.edit_message_text(
+                    chat_id=private_channel_id, message_id=post_message_id,
+                    text=message, parse_mode="MarkdownV2",
+                )
+        except TelegramError as exc:
+            logger.warning("auction:edit edit_message failed ann_id=%s error=%s", ann_id, exc)
+            raise HTTPException(status_code=502, detail=f"Failed to edit post: {exc}")
+
+    post_link = (
+        get_private_channel_post_link(private_channel_id, message_ids[0])
+        if private_channel_id is not None
+        else None
+    )
+    return {"ok": True, "post_link": post_link}

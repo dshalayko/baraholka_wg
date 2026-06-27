@@ -371,6 +371,13 @@ async function stopAuction(annId) {
   return apiFetch(`/api/auctions/${annId}/stop`, { method: "POST" });
 }
 
+async function editAuctionInPlace(annId, payload) {
+  return apiFetch(`/api/auctions/${annId}/edit`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 async function placeBid(annId, amount) {
   return apiFetch(`/api/auctions/${annId}/bid`, {
     method: "POST",
