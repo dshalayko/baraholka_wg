@@ -141,7 +141,12 @@ async def place_bid(
     if private_channel_id is None:
         raise HTTPException(status_code=500, detail="PRIVATE_CHANNEL_ID is not set")
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    # isolation_level=None → no implicit BEGIN, so the explicit BEGIN IMMEDIATE
+    # below gives us full control over the transaction.
+    async with aiosqlite.connect(DB_PATH, timeout=15, isolation_level=None) as db:
+        # Take the write lock up front so the read-validate-write below is atomic:
+        # two concurrent bids can't both pass against the same current_price.
+        await db.execute("BEGIN IMMEDIATE")
         cursor = await db.execute(
             """
             SELECT id, user_id, description, username, contact_info, start_price, current_price, min_step,
@@ -155,7 +160,7 @@ async def place_bid(
         row = await cursor.fetchone()
 
         if not row:
-            raise HTTPException(status_code=404, detail="Auction not found")
+            raise HTTPException(status_code=404, detail={"code": "auction_not_found", "message": "Auction not found"})
 
         (
             aid,
@@ -177,31 +182,25 @@ async def place_bid(
 
         # Validations
         if auction_status != "active":
-            raise HTTPException(status_code=400, detail="Auction is not active")
+            raise HTTPException(status_code=400, detail={"code": "auction_not_active", "message": "Auction is not active"})
 
         now_str = _get_serbia_now_str()
         if auction_end_at and auction_end_at <= now_str:
-            raise HTTPException(status_code=400, detail="Auction has already ended")
+            raise HTTPException(status_code=400, detail={"code": "auction_ended", "message": "Auction has already ended"})
 
         if user_id == seller_user_id:
-            raise HTTPException(status_code=403, detail="You cannot bid on your own auction")
+            raise HTTPException(status_code=403, detail={"code": "own_auction", "message": "You cannot bid on your own auction"})
 
         if current_price is None:
             # No bids yet — first bid must be at least start_price + step.
-            base = start_price if start_price is not None else 0
-            min_required = base + (min_step or 0)
-            if payload.amount < min_required:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Bid must be at least {min_required}",
-                )
+            min_required = (start_price if start_price is not None else 0) + (min_step or 0)
         else:
             min_required = current_price + (min_step or 1)
-            if payload.amount < min_required:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Bid must be at least {min_required}",
-                )
+        if payload.amount < min_required:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "bid_too_low", "min_required": min_required, "message": f"Bid must be at least {min_required}"},
+            )
 
         # Insert bid
         await db.execute(

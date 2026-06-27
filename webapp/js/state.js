@@ -35,4 +35,6 @@ const state = {
   bidPostLink: null,
   bidMinRequired: null,
   askedWriteAccess: false,
+  // Telegram tells us up front whether the bot may already message this user.
+  writeAccessGranted: !!tg?.initDataUnsafe?.user?.allows_write_to_pm,
 };

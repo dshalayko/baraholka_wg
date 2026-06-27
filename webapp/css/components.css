@@ -1348,6 +1348,36 @@
   margin-bottom: 20px;
 }
 
+.bid-notif-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 170, 68, 0.14);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.bid-notif-text {
+  color: var(--text);
+}
+
+.bid-notif-enable {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 9px;
+  background: var(--accent, #3f8cff);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .bid-photos {
   display: flex;
   gap: 8px;

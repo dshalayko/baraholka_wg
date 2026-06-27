@@ -920,6 +920,29 @@ function renderBidScreen(data) {
   if (!elements.bidAuctionInfo) return;
   elements.bidAuctionInfo.innerHTML = "";
 
+  // Opt-in banner: without write access the bot can't tell the user if outbid.
+  if (!state.writeAccessGranted && tg?.requestWriteAccess) {
+    const banner = document.createElement("div");
+    banner.className = "bid-notif-banner";
+    const txt = document.createElement("span");
+    txt.className = "bid-notif-text";
+    txt.textContent = t("bidNotifOff");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "bid-notif-enable";
+    btn.textContent = t("bidNotifEnable");
+    btn.addEventListener("click", async () => {
+      haptic("light");
+      const granted = await ensureWriteAccess();
+      if (granted) {
+        showToast(t("bidNotifOn"), "success");
+        void refreshBidInfo(state.bidScreenAnnId);
+      }
+    });
+    banner.append(txt, btn);
+    elements.bidAuctionInfo.appendChild(banner);
+  }
+
   const addRow = (label, value, cls) => {
     const row = document.createElement("div");
     row.className = "bid-info-row";
@@ -1005,11 +1028,34 @@ function ensureWriteAccess() {
       return;
     }
     try {
-      tg.requestWriteAccess((granted) => resolve(!!granted));
+      tg.requestWriteAccess((granted) => {
+        if (granted) state.writeAccessGranted = true;
+        resolve(!!granted);
+      });
     } catch (_) {
       resolve(false);
     }
   });
+}
+
+// Localize an auction API error by its backend code (falls back to the raw message).
+function bidErrorMessage(err) {
+  const code = err?.data?.code;
+  switch (code) {
+    case "bid_too_low": {
+      const min = err?.data?.min_required ?? state.bidMinRequired;
+      return min ? `${t("bidMinRequired")}: ${min}` : t("bidFailed");
+    }
+    case "auction_ended":
+    case "auction_not_active":
+      return t("bidAuctionEnded");
+    case "own_auction":
+      return t("bidOwnAuction");
+    case "auction_not_found":
+      return t("loadFailed");
+    default:
+      return err?.message || t("bidFailed");
+  }
 }
 
 let bidPollTimer = null;
@@ -1240,13 +1286,9 @@ function bindAuctionEvents() {
         setFieldInvalid(elements.bidAmount, true);
       } else {
         // The bid likely lost to a newer one — resync the shown price/minimum,
-        // then surface the up-to-date minimum.
+        // then surface a localized message based on the backend error code.
         await refreshBidInfo(annId);
-        const freshMin = state.bidMinRequired;
-        const msg = (err?.status === 422 && freshMin)
-          ? `${t("bidMinRequired")}: ${freshMin}`
-          : (err?.message || t("bidFailed"));
-        if (elements.bidAmountError) setFieldError(elements.bidAmountError, msg);
+        if (elements.bidAmountError) setFieldError(elements.bidAmountError, bidErrorMessage(err));
         setFieldInvalid(elements.bidAmount, true);
       }
     } finally {
