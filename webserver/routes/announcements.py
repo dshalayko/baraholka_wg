@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from telegram import InputMediaPhoto
 from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 
-from comments_manager import forward_thread_replies, get_discussion_replies_counts
+from comments_manager import delete_channel_messages, forward_thread_replies, get_discussion_replies_counts
 from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
 from utils import get_private_channel_post_link, get_serbia_time, is_timestamp_older_than_days, parse_timestamp
 from webserver.auth import get_user_from_request
@@ -310,7 +310,9 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_us
         not_deleted_ids = []
 
         if message_ids and private_channel_id is not None:
-            for message_id in message_ids:
+            # User account first (no 48h Bot API limit); bot handles any leftovers.
+            remaining_to_delete = await delete_channel_messages(message_ids)
+            for message_id in remaining_to_delete:
                 try:
                     await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
                 except BadRequest as exc:
@@ -580,7 +582,10 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                     new_message_ids[0],
                 )
 
-            for message_id in old_message_ids:
+            # Delete old posts via the user account first (no 48h Bot API limit),
+            # then fall back to the bot for anything that's left.
+            remaining_to_delete = await delete_channel_messages(old_message_ids)
+            for message_id in remaining_to_delete:
                 try:
                     await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
                 except Exception as exc:

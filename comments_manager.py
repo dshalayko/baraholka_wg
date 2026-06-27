@@ -394,3 +394,26 @@ async def get_discussion_replies_counts(post_message_ids: Iterable[int]) -> Dict
             logger.warning("⚠️ [get_discussion_replies_counts] Failed to initialize client: %s", exc)
 
     return results
+
+
+async def delete_channel_messages(message_ids):
+    """Delete channel posts via the user account (Pyrogram). Unlike the Bot API,
+    a user/admin account has no 48-hour deletion limit, so old posts can still be
+    removed. Returns the list of message ids that still couldn't be deleted."""
+    channel_id = _normalize_int_chat_id(PRIVATE_CHANNEL_ID)
+    ids = [m for m in (message_ids or []) if m]
+    if channel_id is None or not ids:
+        return ids
+    failed = []
+    try:
+        async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH) as app:
+            for mid in ids:
+                try:
+                    await app.delete_messages(channel_id, mid)
+                except Exception as exc:
+                    logger.warning("🗑️ [delete_channel_messages] failed mid=%s error=%s", mid, exc)
+                    failed.append(mid)
+    except Exception as exc:
+        logger.warning("🗑️ [delete_channel_messages] client init failed: %s", exc)
+        return ids
+    return failed
