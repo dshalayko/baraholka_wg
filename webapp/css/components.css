@@ -1158,32 +1158,36 @@
 }
 
 /* ---- Auction: ad type toggle ---- */
+/* Match the top tab toggle exactly for a consistent look. */
 .ad-type-toggle {
   display: flex;
-  gap: 0;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
   background: var(--secondary-bg);
-  padding: 3px;
+  border: 1px solid var(--border-strong);
 }
 
 .ad-type-btn {
   flex: 1;
-  padding: 8px 12px;
-  border-radius: 9px;
-  border: none;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
   background: transparent;
-  color: var(--text);
-  font-weight: 600;
-  font-size: 14px;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 13px;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.18s, box-shadow 0.18s;
+  transition: all 0.18s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .ad-type-btn.active {
-  background: var(--card-bg);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  background: var(--button);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(38, 120, 182, 0.3);
 }
 
 /* ---- Auction: form fields ---- */

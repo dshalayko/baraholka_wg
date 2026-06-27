@@ -437,9 +437,17 @@ input[type="text"]:focus {
 }
 
 .photo-upload-zone:hover,
-.photo-upload-zone:active {
+.photo-upload-zone:active,
+.photo-upload-zone.drag-over {
   border-color: var(--link);
   background: rgba(106, 179, 243, 0.05);
+}
+
+.photo-upload-zone.drag-over,
+.photo-grid.drag-over {
+  outline: 2px dashed var(--link);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
 }
 
 :root[data-theme="light"] .photo-upload-zone:hover,

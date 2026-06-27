@@ -553,9 +553,7 @@ async function uploadEditPhotos(files) {
   }
 }
 
-function handlePhotoInput() {
-  const files = Array.from(elements.photos.files || []);
-  elements.photos.value = "";
+function processSelectedPhotoFiles(files) {
   if (!files.length) return;
   const hasExisting = state.photoFileIds.length > 0;
   const uploader = hasExisting ? appendPhotos : uploadPhotos;
@@ -575,4 +573,38 @@ function handlePhotoInput() {
       tg?.showAlert?.(err.message || t("uploadFailed"));
       setUploading(false);
     });
+}
+
+function handlePhotoInput() {
+  const files = Array.from(elements.photos.files || []);
+  elements.photos.value = "";
+  processSelectedPhotoFiles(files);
+}
+
+// Accept files dragged onto an element (desktop). HEIC has no MIME in some
+// browsers, so allow by extension too.
+function isImageFile(file) {
+  return (file?.type || "").startsWith("image/") || /\.(heic|heif)$/i.test(file?.name || "");
+}
+
+function enablePhotoDropZone(zoneEl) {
+  if (!zoneEl) return;
+  ["dragenter", "dragover"].forEach((ev) =>
+    zoneEl.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      zoneEl.classList.add("drag-over");
+    }),
+  );
+  ["dragleave", "dragend", "drop"].forEach((ev) =>
+    zoneEl.addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      zoneEl.classList.remove("drag-over");
+    }),
+  );
+  zoneEl.addEventListener("drop", (e) => {
+    const files = Array.from(e.dataTransfer?.files || []).filter(isImageFile);
+    if (files.length) processSelectedPhotoFiles(files);
+  });
 }

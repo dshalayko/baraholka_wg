@@ -269,10 +269,10 @@ function renderAds() {
       statusTag.textContent = t("statusDraft");
       statusTag.classList.add("is-draft");
     } else if (isAuction && ad.auction_status === "finished") {
-      statusTag.textContent = `✅ ${t("statusAuctionFinished")}`;
+      statusTag.textContent = t("statusAuctionFinished");
       statusTag.classList.add("is-auction-finished");
     } else if (isAuction && ad.auction_status === "active") {
-      statusTag.textContent = `🔨 ${t("statusAuctionActive")}`;
+      statusTag.textContent = t("statusAuctionActive");
       statusTag.classList.add("is-auction-active");
     } else if (ad.is_reserved) {
       statusTag.textContent = t("statusReserved");

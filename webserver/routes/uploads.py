@@ -1,6 +1,7 @@
 import asyncio
+import io
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from telegram.error import BadRequest, NetworkError, RetryAfter, TelegramError, TimedOut
@@ -13,6 +14,39 @@ from webserver.telegram_client import bot, normalize_chat_id, upload_photo
 router = APIRouter()
 MAX_TELEGRAM_PHOTO_SIZE_BYTES = 10 * 1024 * 1024
 PHOTO_TOO_LARGE_MESSAGE = "Фото слишком большое. Загрузите фото меньшего размера (до 10 МБ)."
+
+_HEIC_BRANDS = {b"heic", b"heix", b"hevc", b"heim", b"heis", b"hevm", b"hevs", b"mif1", b"msf1"}
+
+
+def _looks_like_heic(data: bytes, filename: str, content_type: str) -> bool:
+    name = (filename or "").lower()
+    ct = (content_type or "").lower()
+    if "heic" in ct or "heif" in ct or name.endswith(".heic") or name.endswith(".heif"):
+        return True
+    # ISO-BMFF magic: "ftyp" at offset 4, brand at offset 8.
+    return len(data) >= 12 and data[4:8] == b"ftyp" and data[8:12] in _HEIC_BRANDS
+
+
+def _convert_heic_to_jpeg(data: bytes, filename: str, content_type: str) -> Tuple[bytes, str]:
+    """iPhone HEIC/HEIF photos aren't accepted by Telegram as photos, so convert
+    them to JPEG before upload. Falls back to the original bytes on any error."""
+    if not _looks_like_heic(data, filename, content_type):
+        return data, filename
+    try:
+        import pillow_heif
+        from PIL import Image
+
+        pillow_heif.register_heif_opener()
+        img = Image.open(io.BytesIO(data))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=90)
+        base = (filename or "photo").rsplit(".", 1)[0] or "photo"
+        return out.getvalue(), f"{base}.jpg"
+    except Exception as exc:
+        logger.warning("upload:heic_convert_failed filename=%s error=%s", filename, exc)
+        return data, filename
 
 
 def _is_photo_too_large_error(exc: Exception) -> bool:
@@ -43,6 +77,7 @@ async def upload_files(
         data = await upload.read()
         filename = upload.filename or "photo.jpg"
         content_type = upload.content_type or "unknown"
+        data, filename = _convert_heic_to_jpeg(data, filename, content_type)
         size = len(data)
         logger.info(
             "upload:file user_id=%s filename=%s content_type=%s size=%s",

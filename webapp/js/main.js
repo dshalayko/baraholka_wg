@@ -508,6 +508,8 @@ function bindEvents() {
     elements.addMorePhotosBtn.hidden = !hasPhotos;
   }).observe(elements.photoGrid, { childList: true });
   elements.photos.addEventListener("change", handlePhotoInput);
+  enablePhotoDropZone(elements.photoUploadZone);
+  enablePhotoDropZone(elements.photoGrid);
   elements.descBoldBtn.addEventListener("click", () => wrapSelection(elements.description, "**"));
   elements.descItalicBtn.addEventListener("click", () => wrapSelection(elements.description, "_"));
   elements.descUnderlineBtn.addEventListener("click", () => wrapSelection(elements.description, "__"));
@@ -923,8 +925,9 @@ function renderBidScreen(data) {
   if (minRequired) {
     addRow(`${t("bidMinRequired")}:`, `${minRequired}`);
   }
-  if (elements.bidAmount && minRequired) {
-    elements.bidAmount.min = String(minRequired);
+  if (elements.bidAmount) {
+    elements.bidAmount.step = "1";
+    if (minRequired) elements.bidAmount.min = String(minRequired);
   }
 
   if (data.auction_end_at) {
@@ -941,7 +944,38 @@ function updateBackToPostBtn(postLink) {
   if (elements.bidBackToPostBtn) elements.bidBackToPostBtn.hidden = !postLink;
 }
 
+let bidPollTimer = null;
+
+function stopBidPolling() {
+  if (bidPollTimer) {
+    clearInterval(bidPollTimer);
+    bidPollTimer = null;
+  }
+}
+
+// Re-fetch the auction and re-render the info card so the shown price/minimum
+// stay in sync with other people's bids. Does not touch the input or error.
+async function refreshBidInfo(annId) {
+  if (state.bidScreenAnnId !== annId) return;
+  let data;
+  try {
+    data = await getAuctionInfo(annId);
+  } catch (err) {
+    return; // keep current info on transient errors
+  }
+  if (state.bidScreenAnnId !== annId) return;
+  updateBackToPostBtn(data.post_link);
+  if (data.auction_status === "finished") {
+    stopBidPolling();
+    if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-ended">${t("bidAuctionEnded")}</div>`;
+    if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = true;
+    return;
+  }
+  renderBidScreen(data);
+}
+
 async function openBidScreen(annId) {
+  stopBidPolling();
   state.bidScreenAnnId = annId;
   if (elements.bidScreen) elements.bidScreen.hidden = false;
   if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-loading">${t("busyLoading")}</div>`;
@@ -959,12 +993,15 @@ async function openBidScreen(annId) {
       return;
     }
     renderBidScreen(data);
+    // Keep the screen live while it's open.
+    bidPollTimer = setInterval(() => { void refreshBidInfo(annId); }, 6000);
   } catch (err) {
     if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-error">${err?.message || t("loadFailed")}</div>`;
   }
 }
 
 function closeBidScreen() {
+  stopBidPolling();
   state.bidScreenAnnId = null;
   if (elements.bidScreen) elements.bidScreen.hidden = true;
 }
@@ -1089,13 +1126,15 @@ function bindAuctionEvents() {
   elements.bidSubmitBtn?.addEventListener("click", async () => {
     const annId = state.bidScreenAnnId;
     if (!annId) return;
-    const rawAmount = elements.bidAmount?.value;
-    const amount = parseInt(rawAmount, 10);
-    if (!amount || amount <= 0) {
-      if (elements.bidAmountError) setFieldError(elements.bidAmountError, t("auctionStartPriceMin"));
+    // Only a clean positive integer is allowed — reject leading zeros,
+    // decimals ("263.5") and any non-digit input ("00330").
+    const rawAmount = (elements.bidAmount?.value || "").trim();
+    if (!/^[1-9]\d*$/.test(rawAmount)) {
+      if (elements.bidAmountError) setFieldError(elements.bidAmountError, t("bidInvalidAmount"));
       setFieldInvalid(elements.bidAmount, true);
       return;
     }
+    const amount = parseInt(rawAmount, 10);
     const minRequired = state.bidMinRequired;
     if (minRequired && amount < minRequired) {
       if (elements.bidAmountError) setFieldError(elements.bidAmountError, `${t("bidMinRequired")}: ${minRequired}`);
@@ -1115,7 +1154,13 @@ function bindAuctionEvents() {
         if (elements.bidAmountError) setFieldError(elements.bidAmountError, t("bidOpenInTelegram"));
         setFieldInvalid(elements.bidAmount, true);
       } else {
-        const msg = err?.message || t("bidFailed");
+        // The bid likely lost to a newer one — resync the shown price/minimum,
+        // then surface the up-to-date minimum.
+        await refreshBidInfo(annId);
+        const freshMin = state.bidMinRequired;
+        const msg = (err?.status === 422 && freshMin)
+          ? `${t("bidMinRequired")}: ${freshMin}`
+          : (err?.message || t("bidFailed"));
         if (elements.bidAmountError) setFieldError(elements.bidAmountError, msg);
         setFieldInvalid(elements.bidAmount, true);
       }
