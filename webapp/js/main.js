@@ -503,9 +503,9 @@ function bindEvents() {
     elements.formatToggleBtn.classList.toggle("active", willShow);
   });
   new MutationObserver(() => {
-    const hasPhotos = elements.photoGrid.children.length > 0;
-    if (elements.photoUploadZone) elements.photoUploadZone.hidden = hasPhotos;
-    elements.addMorePhotosBtn.hidden = !hasPhotos;
+    const count = elements.photoGrid.children.length;
+    if (elements.photoUploadZone) elements.photoUploadZone.hidden = count > 0;
+    elements.addMorePhotosBtn.hidden = count === 0 || count >= 10;
   }).observe(elements.photoGrid, { childList: true });
   elements.photos.addEventListener("change", handlePhotoInput);
   enablePhotoDropZone(elements.photoUploadZone);
@@ -926,7 +926,8 @@ function renderBidScreen(data) {
     addRow(`${t("bidMinRequired")}:`, `${minRequired}`);
   }
   if (elements.bidAmount) {
-    elements.bidAmount.step = "1";
+    // Spinner arrows step by the auction's min step, not by 1.
+    elements.bidAmount.step = String(data.min_step || 1);
     if (minRequired) elements.bidAmount.min = String(minRequired);
   }
 
@@ -942,6 +943,22 @@ function renderBidScreen(data) {
 function updateBackToPostBtn(postLink) {
   state.bidPostLink = postLink || null;
   if (elements.bidBackToPostBtn) elements.bidBackToPostBtn.hidden = !postLink;
+}
+
+// Ask the user to allow the bot to message them (for outbid/finish notifications).
+// Resolves regardless of the answer so the bid flow is never blocked.
+function ensureWriteAccess() {
+  return new Promise((resolve) => {
+    if (!tg?.requestWriteAccess) {
+      resolve(false);
+      return;
+    }
+    try {
+      tg.requestWriteAccess((granted) => resolve(!!granted));
+    } catch (_) {
+      resolve(false);
+    }
+  });
 }
 
 let bidPollTimer = null;
@@ -1049,6 +1066,17 @@ function renderBidsScreen(data) {
     const who = document.createElement("div");
     who.className = "bids-item-user";
     who.textContent = bid.username || "—";
+    // If the bidder has a @username, make it tap-to-open their Telegram profile.
+    const handle = (bid.username || "").trim();
+    if (handle.startsWith("@") && handle.length > 1) {
+      who.classList.add("bids-item-user-link");
+      who.addEventListener("click", () => {
+        haptic("light");
+        const url = `https://t.me/${handle.slice(1)}`;
+        if (tg?.openTelegramLink) tg.openTelegramLink(url);
+        else window.open(url, "_blank");
+      });
+    }
     const when = document.createElement("div");
     when.className = "bids-item-time";
     when.textContent = bid.created_at || "";
@@ -1143,6 +1171,12 @@ function bindAuctionEvents() {
     }
     setFieldInvalid(elements.bidAmount, false);
     if (elements.bidAmountError) setFieldError(elements.bidAmountError, "");
+    // Ask once for permission to message the user, so the bot can notify them
+    // when they get outbid or the auction ends (otherwise Telegram blocks it).
+    if (!state.askedWriteAccess) {
+      state.askedWriteAccess = true;
+      await ensureWriteAccess();
+    }
     setBusy(true, t("busyBidding"));
     try {
       await placeBid(annId, amount);

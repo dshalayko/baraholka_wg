@@ -142,7 +142,8 @@ async def place_bid(
         cursor = await db.execute(
             """
             SELECT id, user_id, description, username, contact_info, start_price, current_price, min_step,
-                   auction_end_at, auction_status, message_ids, photo_file_ids, owner_language_code
+                   auction_end_at, auction_status, message_ids, photo_file_ids, owner_language_code,
+                   winner_user_id, winner_language_code
             FROM announcements
             WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
             """,
@@ -167,6 +168,8 @@ async def place_bid(
             message_ids_json,
             photo_file_ids,
             owner_language_code,
+            prev_winner_user_id,
+            prev_winner_language_code,
         ) = row
 
         # Validations
@@ -281,6 +284,29 @@ async def place_bid(
         await bot.send_message(chat_id=seller_user_id, text=notify_text, reply_markup=bids_keyboard)
     except Exception as exc:
         logger.warning("auction:bid seller_notify failed ann_id=%s user_id=%s error=%s", ann_id, seller_user_id, exc)
+
+    # Notify the previous top bidder that they've been outbid, with a link to the
+    # post and a button to place a new bid.
+    if prev_winner_user_id and prev_winner_user_id != user_id:
+        try:
+            outbid_texts = texts_for(prev_winner_language_code)
+            post_link = (
+                get_private_channel_post_link(private_channel_id, message_ids[0])
+                if message_ids and private_channel_id is not None
+                else ""
+            )
+            desc_preview = (description or "").strip()
+            if len(desc_preview) > 120:
+                desc_preview = desc_preview[:120].rstrip() + "…"
+            outbid_text = outbid_texts.AUCTION_OUTBID_MESSAGE.format(
+                desc=desc_preview, amount=payload.amount, link=post_link
+            )
+            outbid_keyboard = InlineKeyboardMarkup(
+                [[InlineKeyboardButton(outbid_texts.AUCTION_OUTBID_BUTTON, web_app=WebAppInfo(f"{WEBAPP_URL}?bid={ann_id}"))]]
+            )
+            await bot.send_message(chat_id=prev_winner_user_id, text=outbid_text, reply_markup=outbid_keyboard)
+        except Exception as exc:
+            logger.warning("auction:bid outbid_notify failed ann_id=%s user_id=%s error=%s", ann_id, prev_winner_user_id, exc)
 
     return {"ok": True, "current_price": payload.amount}
 

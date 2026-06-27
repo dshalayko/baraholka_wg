@@ -304,6 +304,38 @@ function bindPhotoReorder(photoItem, index, isEdit = false) {
   });
 }
 
+// First photo is a big full-width hero; the rest go 2 per row (few photos) or
+// 3 per row (many). The last incomplete row is stretched to fill the width so
+// there's no empty space.
+function justifyPhotoGrid(gridEl) {
+  const items = Array.from(gridEl.children);
+  const n = items.length;
+  if (n === 0) return;
+
+  const remaining = n - 1;
+  const cols = remaining <= 4 ? 2 : 3;
+  gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  // Reset any inline sizing left on the non-hero items from a previous render.
+  for (let i = 1; i < n; i += 1) {
+    items[i].style.gridColumn = "";
+    items[i].style.aspectRatio = "";
+  }
+
+  // Fill the last incomplete row by widening its items (height kept via aspect).
+  const r = remaining % cols;
+  if (remaining > 0 && r !== 0) {
+    const base = Math.floor(cols / r);
+    let extra = cols - base * r;
+    for (let j = n - r; j < n; j += 1) {
+      const span = base + (extra > 0 ? 1 : 0);
+      if (extra > 0) extra -= 1;
+      items[j].style.gridColumn = `span ${span}`;
+      items[j].style.aspectRatio = `${span} / 1`;
+    }
+  }
+}
+
 function renderPhotoPreviews() {
   elements.photoChips.innerHTML = "";
   elements.photoGrid.innerHTML = "";
@@ -316,7 +348,7 @@ function renderPhotoPreviews() {
   const grid = document.createDocumentFragment();
   state.photoPreviews.forEach((item, index) => {
     const photoItem = document.createElement("div");
-    photoItem.className = "photo-item";
+    photoItem.className = "photo-item" + (index === 0 ? " photo-item-main" : "");
     bindPhotoReorder(photoItem, index);
 
     const img = document.createElement("img");
@@ -343,7 +375,8 @@ function renderPhotoPreviews() {
   });
 
   elements.photoGrid.appendChild(grid);
-  elements.addMorePhotosBtn.hidden = false;
+  justifyPhotoGrid(elements.photoGrid);
+  elements.addMorePhotosBtn.hidden = state.photoPreviews.length >= 10;
 }
 
 function renderEditPhotoPreviews() {
@@ -357,7 +390,7 @@ function renderEditPhotoPreviews() {
   const grid = document.createDocumentFragment();
   state.editModal.photoPreviews.forEach((item, index) => {
     const photoItem = document.createElement("div");
-    photoItem.className = "photo-item";
+    photoItem.className = "photo-item" + (index === 0 ? " photo-item-main" : "");
     bindPhotoReorder(photoItem, index, true);
 
     const img = document.createElement("img");
@@ -384,7 +417,8 @@ function renderEditPhotoPreviews() {
   });
 
   elements.editPhotoGrid.appendChild(grid);
-  elements.editAddMorePhotosBtn.hidden = false;
+  justifyPhotoGrid(elements.editPhotoGrid);
+  elements.editAddMorePhotosBtn.hidden = state.editModal.photoPreviews.length >= 10;
 }
 
 function removePhotoAt(index) {

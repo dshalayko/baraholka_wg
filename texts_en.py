@@ -94,6 +94,10 @@ AUCTION_NEW_BID_FROM = "From"
 AUCTION_NEW_BID_TOTAL = "Total bids"
 AUCTION_VIEW_BIDS_BUTTON = "📊 View bids"
 
+# --- Auction (outbid notification) ---
+AUCTION_OUTBID_MESSAGE = "🔔 You've been outbid!\n\n{desc}\n\nCurrent bid: {amount}\nListing: {link}"
+AUCTION_OUTBID_BUTTON = "🔼 Raise your bid"
+
 # --- Auction (finish) ---
 AUCTION_SELLER_FINISHED_WIN = "Auction ended!\nWinner: {winner}\nFinal price: {price}\nListing: {link}"
 AUCTION_SELLER_FINISHED_NOBIDS = "Auction ended.\nNo bids were placed.\nListing: {link}"

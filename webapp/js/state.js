@@ -31,4 +31,5 @@ const state = {
   bidScreenAnnId: null,
   bidPostLink: null,
   bidMinRequired: null,
+  askedWriteAccess: false,
 };

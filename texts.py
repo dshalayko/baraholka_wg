@@ -94,6 +94,10 @@ AUCTION_NEW_BID_FROM = "От"
 AUCTION_NEW_BID_TOTAL = "Всего ставок"
 AUCTION_VIEW_BIDS_BUTTON = "📊 Посмотреть ставки"
 
+# --- Аукцион (уведомление перебитому участнику) ---
+AUCTION_OUTBID_MESSAGE = "🔔 Вашу ставку перебили!\n\n{desc}\n\nТекущая ставка: {amount}\nОбъявление: {link}"
+AUCTION_OUTBID_BUTTON = "🔼 Поднять ставку"
+
 # --- Аукцион (завершение) ---
 AUCTION_SELLER_FINISHED_WIN = "Аукцион завершён!\nПобедитель: {winner}\nФинальная цена: {price}\nОбъявление: {link}"
 AUCTION_SELLER_FINISHED_NOBIDS = "Аукцион завершён.\nСтавок не поступило.\nОбъявление: {link}"

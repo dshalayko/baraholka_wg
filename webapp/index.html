@@ -138,7 +138,6 @@
 
           <div class="form-section">
             <div class="form-section-title" id="descLabel">Описание</div>
-            <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..." aria-label="Description"></textarea>
             <div class="desc-footer">
               <button class="format-toggle-btn" id="formatToggleBtn" type="button" title="Форматирование">Aa</button>
               <div class="char-counter" id="descCounter">0/800</div>
@@ -152,6 +151,7 @@
               <button class="tool-btn" id="descMonoBtn" type="button" title="Monospace"></button>
               <button class="tool-btn" id="descSpoilerBtn" type="button" title="Spoiler"></button>
             </div>
+            <textarea id="description" rows="5" maxlength="800" placeholder="Describe the item..." aria-label="Description"></textarea>
             <div class="field-error" id="descError" hidden></div>
           </div>
 
@@ -298,8 +298,8 @@
               <button class="tool-btn" id="editDescMonoBtn" type="button" title="Monospace"></button>
               <button class="tool-btn" id="editDescSpoilerBtn" type="button" title="Spoiler"></button>
             </div>
-            <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
             <div class="char-counter" id="editDescCounter">0/800</div>
+            <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
             <div class="field-error" id="editDescError" hidden></div>
           </label>
           <label class="field" id="editContactField">

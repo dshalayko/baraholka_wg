@@ -259,8 +259,20 @@ input[type="text"]:focus {
 
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, 1fr); /* JS sets 2 or 3 cols by photo count */
+  gap: 8px;
+}
+
+/* Square thumbnails; min-width:0 keeps large images from overflowing tracks. */
+.photo-item {
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+}
+
+/* The first photo is a big full-width hero. */
+.photo-item-main {
+  grid-column: 1 / -1;
+  aspect-ratio: 3 / 2;
 }
 
 .photo-actions {
@@ -333,7 +345,7 @@ input[type="text"]:focus {
 
 .photo-item img {
   width: 100%;
-  height: 80px;
+  height: 100%;
   object-fit: cover;
   border-radius: 12px;
   border: 1px solid var(--border);
@@ -479,14 +491,22 @@ input[type="text"]:focus {
 .photo-grid-footer {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 8px;
-  min-height: 20px;
+}
+
+/* The idle spinner uses visibility:hidden but still reserves a line above the
+   button — drop it from layout unless an upload is in progress. */
+.photo-grid-footer .spinner:not(.active) {
+  display: none;
 }
 
 .photo-add-more-btn {
-  font-size: 13px;
-  padding: 7px 14px;
+  flex: 1 1 100%;
+  width: 100%;
+  font-size: 14px;
+  padding: 11px 14px;
 }
 
 /* Description section footer */
@@ -494,7 +514,8 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
+  margin-top: 4px;
+  margin-bottom: 6px;
   gap: 8px;
 }
 

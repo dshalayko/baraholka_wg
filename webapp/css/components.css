@@ -1508,6 +1508,11 @@
   white-space: nowrap;
 }
 
+.bids-item-user-link {
+  color: var(--accent, #3f8cff);
+  cursor: pointer;
+}
+
 .bids-item-time {
   font-size: 12px;
   color: var(--meta-text);
