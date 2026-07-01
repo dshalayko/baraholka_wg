@@ -194,6 +194,7 @@ async function saveAd() {
       start_price: parseInt(elements.auctionStartPrice?.value, 10) || null,
       min_step: parseInt(elements.auctionMinStep?.value, 10) || null,
       auction_duration_hours: parseInt(elements.auctionDuration?.value, 10) || 24,
+      currency: state.auctionCurrency,
     };
   } else {
     const priceInDescription = elements.priceInDescription.checked;

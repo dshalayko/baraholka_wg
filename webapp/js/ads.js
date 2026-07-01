@@ -19,11 +19,15 @@ function showAdsSkeleton() {
 
 function showTab(tab) {
   const isList = tab === "list";
+  const isForm = tab === "form";
+  const isSettings = tab === "settings";
   elements.listPanel.hidden = !isList;
-  elements.formPanel.hidden = isList;
+  elements.formPanel.hidden = !isForm;
+  if (elements.settingsPanel) elements.settingsPanel.hidden = !isSettings;
   elements.tabMyAds.classList.toggle("active", isList);
-  elements.tabCreate.classList.toggle("active", !isList);
-  if (!isList) {
+  elements.tabCreate.classList.toggle("active", isForm);
+  if (elements.tabSettings) elements.tabSettings.classList.toggle("active", isSettings);
+  if (isForm) {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         autoResizeDescription();
@@ -66,6 +70,7 @@ function resetForm() {
   if (elements.auctionStartPrice) elements.auctionStartPrice.value = "";
   if (elements.auctionMinStep) elements.auctionMinStep.value = "";
   if (elements.auctionDuration) elements.auctionDuration.value = "24";
+  if (typeof setAuctionCurrency === "function") setAuctionCurrency("RSD");
   setAdType("fixed");
   updateCounts();
   autoResizeDescription();
@@ -190,6 +195,16 @@ function renderAds() {
       card.classList.add("ad-card-expired");
     }
 
+    // Tapping the photo opens the edit screen (same as the edit button).
+    const openAdEdit = () => {
+      haptic("light");
+      if (ad.is_published) {
+        openEditModal(ad);
+      } else {
+        startEdit(ad);
+      }
+    };
+
     const photos = Array.isArray(ad.photo_file_ids) ? ad.photo_file_ids : [];
     if (photos.length) {
       card.classList.add("ad-card-media");
@@ -199,15 +214,19 @@ function renderAds() {
       const initData = encodeURIComponent(tg.initData);
       const total = photos.length;
 
+      gallery.style.cursor = "pointer";
       if (total === 1) {
         const img = document.createElement("img");
         img.className = "ad-photo";
+        img.style.cursor = "pointer";
         const fileId = photos[0];
         img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
         img.alt = ad.description || "photo";
+        img.addEventListener("click", openAdEdit);
         card.appendChild(img);
       } else if (total === 2) {
         gallery.className = "ad-gallery ad-gallery-two";
+        gallery.addEventListener("click", openAdEdit);
         photos.slice(0, 2).forEach((fileId) => {
           const img = document.createElement("img");
           img.className = "ad-gallery-img";
@@ -218,6 +237,7 @@ function renderAds() {
         card.appendChild(gallery);
       } else {
         gallery.className = "ad-gallery ad-gallery-three";
+        gallery.addEventListener("click", openAdEdit);
         const top = document.createElement("img");
         top.className = "ad-gallery-img ad-gallery-top";
         top.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(photos[0])}&initData=${initData}`;
@@ -312,9 +332,10 @@ function renderAds() {
         meta.appendChild(row);
       };
 
+      const adCur = ad.currency || "RSD";
       if (ad.auction_status === "finished") {
         if (ad.current_price != null) {
-          addBidRow(`${t("auctionCurrentBid")}:`, `${ad.current_price}`);
+          addBidRow(`${t("auctionCurrentBid")}:`, formatMoney(ad.current_price, adCur));
         }
         if (ad.winner_username) {
           addBidRow(`${t("auctionWinner")}:`, ad.winner_username);
@@ -323,9 +344,9 @@ function renderAds() {
         }
       } else {
         if (ad.current_price != null) {
-          addBidRow(`${t("auctionCurrentBid")}:`, `${ad.current_price}`, "ad-auction-current");
+          addBidRow(`${t("auctionCurrentBid")}:`, formatMoney(ad.current_price, adCur), "ad-auction-current");
         } else {
-          addBidRow(`${t("auctionStartPrice") || "Старт"}:`, `${ad.start_price != null ? ad.start_price : "—"}`);
+          addBidRow(`${t("auctionStartPrice") || "Старт"}:`, ad.start_price != null ? formatMoney(ad.start_price, adCur) : "—");
           const noBids = document.createElement("div");
           noBids.className = "ad-auction-nobids";
           noBids.textContent = t("auctionNoBids");
@@ -374,14 +395,7 @@ function renderAds() {
       </svg>
     `;
     editBtn.hidden = !canEdit;
-    editBtn.onclick = () => {
-      haptic("light");
-      if (ad.is_published) {
-        openEditModal(ad);
-      } else {
-        startEdit(ad);
-      }
-    };
+    editBtn.onclick = openAdEdit;
     actions.appendChild(editBtn);
 
     if (!ad.is_published) {
@@ -531,6 +545,7 @@ function startEdit(ad) {
     if (elements.auctionDuration && ad.auction_duration_hours) {
       elements.auctionDuration.value = String(ad.auction_duration_hours);
     }
+    if (typeof setAuctionCurrency === "function") setAuctionCurrency(ad.currency || "RSD");
   } else {
     elements.price.value = ad.price || "";
     elements.priceInDescription.checked = !!ad.price_in_description;

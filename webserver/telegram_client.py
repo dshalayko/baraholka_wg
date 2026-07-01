@@ -12,6 +12,15 @@ from utils import escape_markdown_v2, get_serbia_time
 from webserver.settings import BOT_TOKEN, BOT_USERNAME, WEBAPP_URL
 
 
+SUPPORTED_CURRENCIES = ("RSD", "EUR")
+
+
+def normalize_currency(currency):
+    """Return a valid currency code, defaulting to RSD."""
+    code = (currency or "RSD").upper()
+    return code if code in SUPPORTED_CURRENCIES else "RSD"
+
+
 def texts_for(language_code):
     """Pick the texts module for a Telegram language_code (English for any
     non-Russian locale, Russian otherwise)."""
@@ -193,13 +202,18 @@ def format_auction_text(
     winner_username,
     auction_status,
     language_code=None,
+    currency=None,
 ) -> str:
     texts = texts_for(language_code)
     description_escaped = _escape_description_with_styles(description)
+    cur = normalize_currency(currency)
 
     def kv(text, value):
         # "Label: *value*" — compact inline pair.
         return escape_markdown_v2(text) + ": *" + escape_markdown_v2(str(value)) + "*"
+
+    def money(value):
+        return f"{value} {cur}"
 
     sep = " · "
 
@@ -217,7 +231,7 @@ def format_auction_text(
         lines = [escape_markdown_v2(texts.AUCTION_FINISHED_HEADER), "", description_escaped, ""]
         parts = []
         if current_price is not None:
-            parts.append(kv(texts.AUCTION_FINAL_PRICE, current_price))
+            parts.append(kv(texts.AUCTION_FINAL_PRICE, money(current_price)))
         if winner_username:
             parts.append(kv(texts.AUCTION_WINNER, winner_username))
         lines.append(sep.join(parts) if parts else escape_markdown_v2(texts.AUCTION_NO_BIDS_PLACED))
@@ -227,13 +241,13 @@ def format_auction_text(
         lines = [escape_markdown_v2(texts.AUCTION_HEADER), "", description_escaped, ""]
         parts = []
         if start_price is not None:
-            parts.append(kv(texts.AUCTION_START_PRICE, start_price))
+            parts.append(kv(texts.AUCTION_START_PRICE, money(start_price)))
         if current_price is not None:
-            parts.append(kv(texts.AUCTION_CURRENT_BID, current_price))
+            parts.append(kv(texts.AUCTION_CURRENT_BID, money(current_price)))
         else:
             parts.append(escape_markdown_v2(texts.AUCTION_NO_BIDS_YET))
         if min_step is not None:
-            parts.append(kv(texts.AUCTION_MIN_STEP, min_step))
+            parts.append(kv(texts.AUCTION_MIN_STEP, money(min_step)))
         lines.append(sep.join(parts))
         if auction_end_at:
             lines.append(kv(texts.AUCTION_END_AT, auction_end_at))

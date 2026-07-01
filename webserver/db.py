@@ -62,6 +62,8 @@ async def ensure_db() -> None:
             await db.execute("ALTER TABLE announcements ADD COLUMN auction_end_at TEXT")
         if "auction_duration_hours" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN auction_duration_hours INTEGER")
+        if "currency" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN currency TEXT")
         if "winner_user_id" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN winner_user_id INTEGER")
         if "winner_username" not in columns:

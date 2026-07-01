@@ -1,3 +1,28 @@
+// Telegram's native Back button drives the full-screen "page" modals.
+function syncPageBackButton() {
+  if (!tg?.BackButton) return;
+  const pages = [
+    elements.editModal,
+    elements.commentsOverviewModal,
+    elements.statsModal,
+    elements.expiredAdsModal,
+  ];
+  const anyOpen = pages.some((el) => el && !el.hidden);
+  if (anyOpen) tg.BackButton.show();
+  else tg.BackButton.hide();
+}
+
+function handlePageBackButton() {
+  if (!elements.editModal.hidden) { closeEditModal(); return; }
+  if (!elements.commentsOverviewModal.hidden) { closeCommentsOverviewModal(); return; }
+  if (!elements.statsModal.hidden) { closeStatsModal(); return; }
+  if (!elements.expiredAdsModal.hidden) { closeExpiredAdsModal(); return; }
+}
+
+if (tg?.BackButton?.onClick) {
+  tg.BackButton.onClick(handlePageBackButton);
+}
+
 function openDeleteConfirm(id) {
   state.pendingDeleteId = id;
   elements.confirmModal.hidden = false;
@@ -45,31 +70,37 @@ function closePhotoViewer() {
 function openCommentsOverviewModal() {
   elements.commentsOverviewModal.hidden = false;
   elements.commentsOverviewModal.style.display = "flex";
+  syncPageBackButton();
 }
 
 function closeCommentsOverviewModal() {
   elements.commentsOverviewModal.hidden = true;
   elements.commentsOverviewModal.style.display = "none";
+  syncPageBackButton();
 }
 
 function openStatsModal() {
   elements.statsModal.hidden = false;
   elements.statsModal.style.display = "flex";
+  syncPageBackButton();
 }
 
 function closeStatsModal() {
   elements.statsModal.hidden = true;
   elements.statsModal.style.display = "none";
+  syncPageBackButton();
 }
 
 function openExpiredAdsModal() {
   elements.expiredAdsModal.hidden = false;
   elements.expiredAdsModal.style.display = "flex";
+  syncPageBackButton();
 }
 
 function closeExpiredAdsModal() {
   elements.expiredAdsModal.hidden = true;
   elements.expiredAdsModal.style.display = "none";
+  syncPageBackButton();
 }
 
 function openFeedbackModal() {
@@ -105,6 +136,7 @@ function resetEditModal() {
   applyPriceInDescriptionToggle(elements.editPriceInDescription, elements.editPrice, elements.editPriceField);
   state.editModal.adType = "fixed";
   state.editModal.startPrice = null;
+  state.editModal.currency = "RSD";
   if (elements.editAuctionSection) elements.editAuctionSection.hidden = true;
   if (elements.editAuctionMinStep) elements.editAuctionMinStep.value = "";
   if (elements.editPriceField) elements.editPriceField.hidden = false;
@@ -139,6 +171,19 @@ function openEditModal(ad) {
     if (elements.editAuctionSection) elements.editAuctionSection.hidden = false;
     if (elements.editAuctionMinStepLabel) elements.editAuctionMinStepLabel.textContent = t("auctionMinStep");
     if (elements.editAuctionDurationLabel) elements.editAuctionDurationLabel.textContent = t("auctionDurationFromNow");
+    if (elements.editAuctionCurrencyLabel) elements.editAuctionCurrencyLabel.textContent = t("auctionCurrency");
+    setEditAuctionCurrency(ad.currency || "RSD");
+    // Confirm the currency from the authoritative endpoint so it's never reset
+    // to RSD just because the list payload was stale.
+    if (ad.is_published && ad.id) {
+      getAuctionInfo(ad.id)
+        .then((info) => {
+          if (state.editModal.id === ad.id && info && info.currency) {
+            setEditAuctionCurrency(info.currency);
+          }
+        })
+        .catch(() => {});
+    }
     if (elements.editAuctionMinStep) elements.editAuctionMinStep.value = ad.min_step ?? "";
     if (elements.editAuctionDuration) {
       const opts = elements.editAuctionDuration.options;
@@ -165,6 +210,7 @@ function openEditModal(ad) {
   updateCharCounter(elements.editDescription, elements.editDescCounter, 800);
   elements.editModal.hidden = false;
   elements.editModal.style.display = "flex";
+  syncPageBackButton();
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       autoResizeTextarea(elements.editDescription);
@@ -176,4 +222,5 @@ function closeEditModal() {
   elements.editModal.hidden = true;
   elements.editModal.style.display = "none";
   resetEditModal();
+  syncPageBackButton();
 }

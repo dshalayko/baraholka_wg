@@ -2,7 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <title>WG Black Market Mini App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,69 +30,29 @@
         </div>
       </div>
       <div id="authorizedContent">
-        <header class="app-header">
-          <div class="app-title">
-            <span id="appTitleText">WG Black Market</span>
-          </div>
-          <div class="settings-wrap">
-            <button class="settings-toggle stats-toggle" id="statsToggle" aria-label="Stats" hidden>
+        <div class="top-bar">
+          <nav class="tabs">
+            <button class="tab active" id="tabMyAds">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M4 20h16"></path>
-                <path d="M7 20V11"></path>
-                <path d="M12 20V7"></path>
-                <path d="M17 20v-5"></path>
+                <path d="M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01"/>
               </svg>
+              <span id="tabMyAdsText">My ads</span>
             </button>
-            <button class="settings-toggle comments-toggle" id="commentsToggle" aria-label="Comments">
+            <button class="tab" id="tabCreate">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M7 10a5 5 0 1 1 10 0v4l2 2H5l2-2v-4"></path>
-                <path d="M10 18a2 2 0 0 0 4 0"></path>
+                <path d="M12 5v14M5 12h14"/>
               </svg>
-              <span class="header-badge" id="commentsTotalBadge" hidden>0</span>
+              <span id="tabCreateText">Create ad</span>
             </button>
-            <button class="settings-toggle feedback-toggle" id="feedbackToggle" aria-label="Feedback">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V7a2 2 0 0 1 2-2z"></path>
-              </svg>
-            </button>
-            <button class="settings-toggle" id="settingsToggle" aria-label="Settings">
+            <button class="tab tab-settings" id="tabSettings" aria-label="Settings">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <circle cx="12" cy="12" r="3"></circle>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33h-.01a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51h-.01a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82v-.01a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1v-.01a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
               </svg>
+              <span id="tabSettingsText">Settings</span>
             </button>
-            <div class="settings-menu" id="settingsMenu" hidden>
-              <div class="settings-group">
-                <div class="settings-label" id="settingsThemeLabel">Theme</div>
-                <div class="settings-options">
-                  <button class="settings-option" id="themeLightBtn" type="button">Light</button>
-                  <button class="settings-option" id="themeDarkBtn" type="button">Dark</button>
-                </div>
-              </div>
-              <div class="settings-group">
-                <div class="settings-label" id="settingsLanguageLabel">Language</div>
-                <div class="settings-options">
-                  <button class="settings-option" id="languageRuBtn" type="button">RU</button>
-                  <button class="settings-option" id="languageEnBtn" type="button">EN</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-        <nav class="tabs">
-          <button class="tab active" id="tabMyAds">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01"/>
-            </svg>
-            <span id="tabMyAdsText">My ads</span>
-          </button>
-          <button class="tab" id="tabCreate">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M12 5v14M5 12h14"/>
-            </svg>
-            <span id="tabCreateText">Create ad</span>
-          </button>
-        </nav>
+          </nav>
+        </div>
 
         <section class="panel panel-list" id="listPanel">
           <div class="list-shell" id="adsList">
@@ -108,14 +68,6 @@
         </section>
 
         <section class="form-panel" id="formPanel" hidden>
-
-          <div class="form-section" id="adTypeSection">
-            <div class="form-section-title" id="adTypeSectionTitle">Тип объявления</div>
-            <div class="ad-type-toggle">
-              <button class="ad-type-btn active" id="adTypeFixedBtn" type="button">Продажа</button>
-              <button class="ad-type-btn" id="adTypeAuctionBtn" type="button">Аукцион</button>
-            </div>
-          </div>
 
           <div class="form-section">
             <div class="form-section-title" id="photosLabel">Фото</div>
@@ -155,6 +107,14 @@
             <div class="field-error" id="descError" hidden></div>
           </div>
 
+          <div class="form-section" id="adTypeSection">
+            <div class="form-section-title" id="adTypeSectionTitle">Тип объявления</div>
+            <div class="ad-type-toggle">
+              <button class="ad-type-btn active" id="adTypeFixedBtn" type="button">Продажа</button>
+              <button class="ad-type-btn" id="adTypeAuctionBtn" type="button">Аукцион</button>
+            </div>
+          </div>
+
           <div id="priceSectionWrap">
             <div class="form-section">
               <div class="form-section-title" id="priceLabel">Цена</div>
@@ -178,6 +138,13 @@
 
           <div class="form-section" id="auctionSection" hidden>
             <div class="form-section-title" id="auctionSectionTitle">Параметры аукциона</div>
+            <div class="auction-field">
+              <label class="auction-field-label" id="auctionCurrencyLabel">Валюта</label>
+              <div class="currency-toggle" id="auctionCurrencyToggle">
+                <button class="currency-btn active" id="auctionCurrencyRsdBtn" type="button" data-currency="RSD">RSD</button>
+                <button class="currency-btn" id="auctionCurrencyEurBtn" type="button" data-currency="EUR">EUR</button>
+              </div>
+            </div>
             <div class="auction-field">
               <label class="auction-field-label" id="auctionStartPriceLabel">Стартовая цена</label>
               <input id="auctionStartPrice" type="number" min="1" placeholder="Например: 100" />
@@ -218,6 +185,50 @@
             <button class="primary form-publish-btn" id="publishBtn">Опубликовать</button>
           </div>
 
+        </section>
+
+        <section class="panel settings-panel" id="settingsPanel" hidden>
+          <div class="settings-group">
+            <div class="settings-label" id="settingsThemeLabel">Theme</div>
+            <div class="settings-options">
+              <button class="settings-option" id="themeAutoBtn" type="button">Auto</button>
+              <button class="settings-option" id="themeLightBtn" type="button">Light</button>
+              <button class="settings-option" id="themeDarkBtn" type="button">Dark</button>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-label" id="settingsLanguageLabel">Language</div>
+            <div class="settings-options">
+              <button class="settings-option" id="languageAutoBtn" type="button">Auto</button>
+              <button class="settings-option" id="languageRuBtn" type="button">RU</button>
+              <button class="settings-option" id="languageEnBtn" type="button">EN</button>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button class="settings-menu-item comments-toggle" id="commentsToggle" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M7 10a5 5 0 1 1 10 0v4l2 2H5l2-2v-4"></path>
+                <path d="M10 18a2 2 0 0 0 4 0"></path>
+              </svg>
+              <span id="commentsMenuText">Comments</span>
+              <span class="header-badge settings-badge" id="commentsTotalBadge" hidden>0</span>
+            </button>
+            <button class="settings-menu-item feedback-toggle" id="feedbackToggle" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V7a2 2 0 0 1 2-2z"></path>
+              </svg>
+              <span id="feedbackMenuText">Feedback</span>
+            </button>
+            <button class="settings-menu-item stats-toggle" id="statsToggle" type="button" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 20h16"></path>
+                <path d="M7 20V11"></path>
+                <path d="M12 20V7"></path>
+                <path d="M17 20v-5"></path>
+              </svg>
+              <span id="statsMenuText">Statistics</span>
+            </button>
+          </div>
         </section>
       </div>
       <div class="bid-screen" id="bidScreen" hidden>
@@ -272,24 +283,34 @@
       </section>
     </div>
 
-    <div class="modal-backdrop" id="editModal" hidden>
+    <div class="modal-backdrop modal-page" id="editModal" hidden>
       <div class="modal modal-wide">
         <div class="modal-title" id="editModalTitle">Редактирование</div>
         <div class="modal-body">
           <div class="field">
             <span id="editPhotosLabel">Фотографии (максимум 10)</span>
-            <div class="photo-actions">
-              <button class="ghost" id="editAddMorePhotosBtn">Добавить фото</button>
-            </div>
             <input id="editPhotos" type="file" accept="image/*,.heic,.heif" multiple hidden />
-            <div class="upload-row">
-              <div class="spinner" id="editUploadSpinner" aria-hidden="true"></div>
-            </div>
+            <button class="photo-upload-zone" id="editPhotoUploadZone" type="button">
+              <svg class="photo-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span class="photo-upload-text" id="editPhotoUploadText">Добавить фото</span>
+              <span class="photo-upload-hint" id="editPhotoUploadHint">до 10 фото</span>
+            </button>
             <div class="photo-grid" id="editPhotoGrid"></div>
+            <div class="photo-grid-footer">
+              <div class="spinner" id="editUploadSpinner" aria-hidden="true"></div>
+              <button class="ghost photo-add-more-btn" id="editAddMorePhotosBtn" type="button" hidden>Добавить фото</button>
+            </div>
           </div>
-          <label class="field">
+          <div class="field">
             <span id="editDescLabel">Описание</span>
-            <div class="text-toolbar">
+            <div class="desc-footer">
+              <button class="format-toggle-btn" id="editFormatToggleBtn" type="button" title="Форматирование">Aa</button>
+              <div class="char-counter" id="editDescCounter">0/800</div>
+            </div>
+            <div class="text-toolbar" id="editDescToolbar" hidden>
               <button class="tool-btn" id="editDescBoldBtn" type="button" title="Bold"></button>
               <button class="tool-btn" id="editDescItalicBtn" type="button" title="Italic"></button>
               <button class="tool-btn" id="editDescUnderlineBtn" type="button" title="Underline"></button>
@@ -298,10 +319,9 @@
               <button class="tool-btn" id="editDescMonoBtn" type="button" title="Monospace"></button>
               <button class="tool-btn" id="editDescSpoilerBtn" type="button" title="Spoiler"></button>
             </div>
-            <div class="char-counter" id="editDescCounter">0/800</div>
             <textarea id="editDescription" rows="5" maxlength="800" placeholder="Опишите товар..."></textarea>
             <div class="field-error" id="editDescError" hidden></div>
-          </label>
+          </div>
           <label class="field" id="editContactField">
             <span id="editContactLabel">Как связаться</span>
             <input
@@ -329,6 +349,13 @@
             <div class="field-error" id="editPriceError" hidden></div>
           </label>
           <div class="field" id="editAuctionSection" hidden>
+            <div class="auction-field">
+              <label class="auction-field-label" id="editAuctionCurrencyLabel">Валюта</label>
+              <div class="currency-toggle" id="editAuctionCurrencyToggle">
+                <button class="currency-btn active" id="editAuctionCurrencyRsdBtn" type="button" data-currency="RSD">RSD</button>
+                <button class="currency-btn" id="editAuctionCurrencyEurBtn" type="button" data-currency="EUR">EUR</button>
+              </div>
+            </div>
             <div class="auction-field">
               <label class="auction-field-label" id="editAuctionMinStepLabel">Минимальный шаг</label>
               <input id="editAuctionMinStep" type="number" min="1" placeholder="Например: 10" />
@@ -383,7 +410,7 @@
       <img id="photoViewerImage" alt="photo" />
     </div>
 
-    <div class="modal-backdrop" id="commentsOverviewModal" hidden>
+    <div class="modal-backdrop modal-page" id="commentsOverviewModal" hidden>
       <div class="modal">
         <div class="modal-title" id="commentsOverviewTitle">Комментарии к объявлениям</div>
         <div class="modal-body comments-overview-body" id="commentsOverviewList"></div>
@@ -393,7 +420,7 @@
       </div>
     </div>
 
-    <div class="modal-backdrop" id="statsModal" hidden>
+    <div class="modal-backdrop modal-page" id="statsModal" hidden>
       <div class="modal">
         <div class="modal-title" id="statsTitle">Статистика</div>
         <div class="modal-body stats-body">
@@ -406,7 +433,7 @@
       </div>
     </div>
 
-    <div class="modal-backdrop" id="expiredAdsModal" hidden>
+    <div class="modal-backdrop modal-page" id="expiredAdsModal" hidden>
       <div class="modal modal-wide">
         <div class="modal-title" id="expiredAdsTitle">Просроченные объявления</div>
         <div class="modal-body expired-ads-body" id="expiredAdsList"></div>

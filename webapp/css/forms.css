@@ -177,7 +177,8 @@
 }
 
 textarea,
-input[type="text"] {
+input[type="text"],
+input[type="number"] {
   width: 100%;
   padding: 11px 13px;
   border-radius: 10px;
@@ -190,7 +191,8 @@ input[type="text"] {
 }
 
 textarea::placeholder,
-input[type="text"]::placeholder {
+input[type="text"]::placeholder,
+input[type="number"]::placeholder {
   color: var(--muted);
 }
 
@@ -205,14 +207,16 @@ input[type="file"] {
 }
 
 textarea:focus,
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="number"]:focus {
   outline: none;
   border-color: var(--link);
   box-shadow: 0 0 0 2px rgba(106, 179, 243, 0.16);
 }
 
 :root[data-theme="light"] textarea:focus,
-:root[data-theme="light"] input[type="text"]:focus {
+:root[data-theme="light"] input[type="text"]:focus,
+:root[data-theme="light"] input[type="number"]:focus {
   box-shadow: 0 0 0 2px rgba(38, 120, 182, 0.14);
 }
 
@@ -283,9 +287,13 @@ input[type="text"]:focus {
 
 .photo-item {
   position: relative;
-  cursor: grab;
-  touch-action: none;
+  /* Let touches on the photo scroll the page; dragging starts from the handle. */
+  touch-action: auto;
   transition: opacity 150ms ease, transform 150ms ease, outline-color 150ms ease;
+}
+
+.photo-item img {
+  cursor: zoom-in;
 }
 
 .photo-item.dragging {
@@ -303,16 +311,19 @@ input[type="text"]:focus {
   position: absolute;
   top: 6px;
   left: 6px;
-  width: 24px;
-  height: 22px;
+  width: 32px;
+  height: 30px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.46);
   color: #fff;
-  opacity: 0.72;
-  pointer-events: none;
+  opacity: 0.85;
+  /* The handle is the drag initiator; it must not scroll. */
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
   z-index: 2;
 }
 

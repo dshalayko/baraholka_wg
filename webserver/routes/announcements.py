@@ -18,7 +18,7 @@ from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, AnnouncementOut
 from webserver.routes.stats import increment_stat
 from webserver.settings import BUG_CHAT_ID, WEBAPP_URL, logger
-from webserver.telegram_client import bot, format_announcement_text, format_auction_text, make_bid_link_md, normalize_chat_id
+from webserver.telegram_client import bot, format_announcement_text, format_auction_text, make_bid_link_md, normalize_chat_id, normalize_currency
 
 router = APIRouter()
 
@@ -76,7 +76,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
         cursor = await db.execute(
             """
             SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit, is_reserved,
-                   COALESCE(ad_type,'fixed'), auction_status, start_price, current_price, min_step, auction_end_at, winner_username, auction_duration_hours,
+                   COALESCE(ad_type,'fixed'), auction_status, start_price, current_price, min_step, auction_end_at, winner_username, auction_duration_hours, currency,
                    (SELECT COUNT(*) FROM auction_bids WHERE announcement_id = announcements.id) as bids_count
             FROM announcements WHERE user_id = ?
             """,
@@ -108,6 +108,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
             auction_end_at,
             winner_username,
             auction_duration_hours,
+            currency,
             bids_count,
         ) = row
         photo_list = json.loads(photo_file_ids) if photo_file_ids else []
@@ -145,6 +146,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
                 "auction_end_at": auction_end_at,
                 "winner_username": winner_username,
                 "auction_duration_hours": auction_duration_hours,
+                "currency": currency or "RSD",
                 "bids_count": bids_count or 0,
                 "_root_message_id": root_message_id,
             }
@@ -195,12 +197,13 @@ async def create_announcement(
     # computed at publish, so a saved draft doesn't expire before it goes live.
     ad_type = payload.ad_type or "fixed"
     auction_duration_hours = payload.auction_duration_hours if ad_type == "auction" else None
+    currency = normalize_currency(payload.currency) if ad_type == "auction" else None
 
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids, updated_at, ad_type, start_price, min_step, auction_duration_hours, owner_language_code)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids, updated_at, ad_type, start_price, min_step, auction_duration_hours, owner_language_code, currency)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -216,6 +219,7 @@ async def create_announcement(
                 payload.min_step if ad_type == "auction" else None,
                 auction_duration_hours,
                 user.get("language_code"),
+                currency,
             ),
         )
         await db.commit()
@@ -262,6 +266,7 @@ async def update_announcement(
         # end time = now + chosen duration so the deadline actually changes.
         update_ad_type = payload.ad_type or "fixed"
         update_duration = payload.auction_duration_hours if update_ad_type == "auction" else None
+        update_currency = normalize_currency(payload.currency) if update_ad_type == "auction" else None
         new_end_at = None
         if update_ad_type == "auction" and is_published and payload.auction_duration_hours:
             belgrade_tz = pytz.timezone("Europe/Belgrade")
@@ -273,7 +278,7 @@ async def update_announcement(
             """
             UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?,
                 ad_type = ?, start_price = COALESCE(?, start_price), min_step = ?, auction_duration_hours = COALESCE(?, auction_duration_hours),
-                auction_end_at = COALESCE(?, auction_end_at)
+                auction_end_at = COALESCE(?, auction_end_at), currency = COALESCE(?, currency)
             WHERE id = ?
             """,
             (
@@ -288,6 +293,7 @@ async def update_announcement(
                 payload.min_step if update_ad_type == "auction" else None,
                 update_duration,
                 new_end_at,
+                update_currency,
                 ann_id,
             ),
         )
@@ -445,7 +451,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 """
                 SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp, is_reserved,
                        COALESCE(ad_type,'fixed'), auction_status, start_price, min_step, auction_end_at, auction_duration_hours,
-                       current_price, winner_username
+                       current_price, winner_username, currency
                 FROM announcements WHERE id = ? AND user_id = ?
                 """,
                 (ann_id, user_id),
@@ -473,6 +479,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 pub_auction_duration_hours,
                 pub_current_price,
                 pub_winner_username,
+                pub_currency,
             ) = row
             photos = json.loads(photo_file_ids) if photo_file_ids else []
             old_message_ids = json.loads(message_ids_json) if message_ids_json else []
@@ -514,6 +521,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 winner_username=pub_winner_username,
                 auction_status="active",
                 language_code=owner_language_code,
+                currency=pub_currency,
             )
             # Telegram does not allow inline buttons on media groups (albums), so the
             # bid action is a clickable link inside the caption. This keeps everything

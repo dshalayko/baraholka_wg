@@ -1,5 +1,5 @@
 function closeSettingsMenu() {
-  elements.settingsMenu.hidden = true;
+  if (elements.settingsMenu) elements.settingsMenu.hidden = true;
 }
 
 function renderStatsSummary() {
@@ -185,7 +185,7 @@ function renderExpiredAdsList() {
 }
 
 function toggleSettingsMenu() {
-  elements.settingsMenu.hidden = !elements.settingsMenu.hidden;
+  if (elements.settingsMenu) elements.settingsMenu.hidden = !elements.settingsMenu.hidden;
 }
 
 function setLanguage(languageCode) {
@@ -196,13 +196,24 @@ function setLanguage(languageCode) {
   renderAds();
 }
 
+// "Auto" language: drop the saved choice and follow Telegram's language.
+function setLanguageAuto() {
+  localStorage.removeItem("language");
+  state.languageCode = tg?.initDataUnsafe?.user?.language_code || "ru";
+  applyTranslations();
+  renderAds();
+}
+
 function syncSettingsOptions() {
-  const isDark = isDarkTheme();
-  const isRu = state.languageCode?.startsWith("ru");
-  elements.themeDarkBtn.classList.toggle("active", isDark);
-  elements.themeLightBtn.classList.toggle("active", !isDark);
-  elements.languageRuBtn.classList.toggle("active", isRu);
-  elements.languageEnBtn.classList.toggle("active", !isRu);
+  const savedTheme = localStorage.getItem("theme");
+  elements.themeAutoBtn?.classList.toggle("active", savedTheme !== "light" && savedTheme !== "dark");
+  elements.themeLightBtn.classList.toggle("active", savedTheme === "light");
+  elements.themeDarkBtn.classList.toggle("active", savedTheme === "dark");
+
+  const savedLang = localStorage.getItem("language");
+  elements.languageAutoBtn?.classList.toggle("active", !savedLang);
+  elements.languageRuBtn.classList.toggle("active", !!savedLang && savedLang.startsWith("ru"));
+  elements.languageEnBtn.classList.toggle("active", !!savedLang && !savedLang.startsWith("ru"));
 }
 
 function setToolButton(button, marker, label, tagName = "span") {
@@ -234,17 +245,23 @@ function applyFormatToolLabels(buttons) {
 
 function applyTranslations() {
   document.documentElement.lang = state.languageCode?.startsWith("ru") ? "ru" : "en";
-  elements.appTitleText.textContent = t("appTitle");
+  if (elements.appTitleText) elements.appTitleText.textContent = t("appTitle");
   if (elements.tabMyAdsText) elements.tabMyAdsText.textContent = t("myAds");
   if (elements.tabCreateText) elements.tabCreateText.textContent = t("create");
-  elements.settingsToggle.setAttribute("aria-label", t("settings"));
+  if (elements.tabSettingsText) elements.tabSettingsText.textContent = t("settings");
+  if (elements.settingsToggle) elements.settingsToggle.setAttribute("aria-label", t("settings"));
   elements.statsToggle.setAttribute("aria-label", t("stats"));
+  if (elements.statsMenuText) elements.statsMenuText.textContent = t("stats");
   elements.commentsToggle.setAttribute("aria-label", t("comments"));
+  if (elements.commentsMenuText) elements.commentsMenuText.textContent = t("comments");
   elements.feedbackToggle.setAttribute("aria-label", t("feedback"));
+  if (elements.feedbackMenuText) elements.feedbackMenuText.textContent = t("feedback");
   elements.settingsThemeLabel.textContent = t("settingsTheme");
   elements.settingsLanguageLabel.textContent = t("settingsLanguage");
+  if (elements.themeAutoBtn) elements.themeAutoBtn.textContent = t("themeAuto");
   elements.themeLightBtn.textContent = t("themeLight");
   elements.themeDarkBtn.textContent = t("themeDark");
+  if (elements.languageAutoBtn) elements.languageAutoBtn.textContent = t("languageAuto");
   elements.languageRuBtn.textContent = t("languageRu");
   elements.languageEnBtn.textContent = t("languageEn");
   elements.cancelFormBtn.textContent = t("cancel");
@@ -295,6 +312,8 @@ function applyTranslations() {
   elements.contactInfo.placeholder = t("contactPlaceholder");
   elements.editContactInfo.placeholder = t("contactPlaceholder");
   elements.editAddMorePhotosBtn.textContent = t("addMore");
+  if (elements.editPhotoUploadText) elements.editPhotoUploadText.textContent = t("addMore");
+  if (elements.editPhotoUploadHint) elements.editPhotoUploadHint.textContent = t("photoHint");
   elements.editCancelBtn.textContent = t("editCancel");
   elements.editPublishBtn.textContent = t("editPublish");
   elements.confirmTitle.textContent = t("confirmTitle");
@@ -325,6 +344,7 @@ function applyTranslations() {
   if (elements.auctionStartPriceLabel) elements.auctionStartPriceLabel.textContent = t("auctionStartPrice");
   if (elements.auctionMinStepLabel) elements.auctionMinStepLabel.textContent = t("auctionMinStep");
   if (elements.auctionDurationLabel) elements.auctionDurationLabel.textContent = t("auctionDuration");
+  if (elements.auctionCurrencyLabel) elements.auctionCurrencyLabel.textContent = t("auctionCurrency");
   if (elements.auctionStartPrice) elements.auctionStartPrice.placeholder = t("auctionStartPricePlaceholder");
   if (elements.auctionMinStep) elements.auctionMinStep.placeholder = t("auctionMinStepPlaceholder");
   if (elements.auctionDuration) {
@@ -354,6 +374,10 @@ function bindEvents() {
   elements.tabCreate.addEventListener("click", () => {
     resetForm();
     showTab("form");
+  });
+
+  elements.tabSettings?.addEventListener("click", () => {
+    showTab("settings");
   });
 
   elements.emptyStateBtn?.addEventListener("click", () => {
@@ -517,7 +541,7 @@ function bindEvents() {
   elements.descQuoteBtn.addEventListener("click", () => prefixSelectionLines(elements.description, "> "));
   elements.descMonoBtn.addEventListener("click", () => wrapSelection(elements.description, "`"));
   elements.descSpoilerBtn.addEventListener("click", () => wrapSelection(elements.description, "||"));
-  elements.settingsToggle.addEventListener("click", (event) => {
+  elements.settingsToggle?.addEventListener("click", (event) => {
     event.stopPropagation();
     toggleSettingsMenu();
   });
@@ -549,8 +573,12 @@ function bindEvents() {
     closeSettingsMenu();
     openFeedbackModal();
   });
-  elements.settingsMenu.addEventListener("click", (event) => {
+  elements.settingsMenu?.addEventListener("click", (event) => {
     event.stopPropagation();
+  });
+  elements.themeAutoBtn?.addEventListener("click", () => {
+    setThemeAuto();
+    closeSettingsMenu();
   });
   elements.themeLightBtn.addEventListener("click", () => {
     setTheme("light");
@@ -558,6 +586,10 @@ function bindEvents() {
   });
   elements.themeDarkBtn.addEventListener("click", () => {
     setTheme("dark");
+    closeSettingsMenu();
+  });
+  elements.languageAutoBtn?.addEventListener("click", () => {
+    setLanguageAuto();
     closeSettingsMenu();
   });
   elements.languageRuBtn.addEventListener("click", () => {
@@ -580,6 +612,19 @@ function bindEvents() {
     event.preventDefault();
     elements.editPhotos.click();
   });
+  elements.editPhotoUploadZone?.addEventListener("click", () => {
+    elements.editPhotos.click();
+  });
+  elements.editFormatToggleBtn?.addEventListener("click", () => {
+    const willShow = elements.editDescToolbar.hidden;
+    elements.editDescToolbar.hidden = !willShow;
+    elements.editFormatToggleBtn.classList.toggle("active", willShow);
+  });
+  new MutationObserver(() => {
+    const count = elements.editPhotoGrid.children.length;
+    if (elements.editPhotoUploadZone) elements.editPhotoUploadZone.hidden = count > 0;
+    elements.editAddMorePhotosBtn.hidden = count === 0 || count >= 10;
+  }).observe(elements.editPhotoGrid, { childList: true });
   elements.editDescription.addEventListener("input", () => {
     autoResizeTextarea(elements.editDescription);
     setFieldInvalid(elements.editDescription, false);
@@ -676,6 +721,7 @@ function bindEvents() {
         min_step: minStep,
         // Empty = keep the current end time; a value sets end = now + duration.
         auction_duration_hours: parseInt(elements.editAuctionDuration?.value, 10) || null,
+        currency: state.editModal.currency,
       };
     } else {
       const priceInDescription = elements.editPriceInDescription.checked;
@@ -892,7 +938,20 @@ function getAuctionPayloadFields() {
     start_price: parseInt(elements.auctionStartPrice?.value, 10) || null,
     min_step: parseInt(elements.auctionMinStep?.value, 10) || null,
     auction_duration_hours: parseInt(elements.auctionDuration?.value, 10) || 24,
+    currency: state.auctionCurrency,
   };
+}
+
+function setAuctionCurrency(currency) {
+  state.auctionCurrency = currency === "EUR" ? "EUR" : "RSD";
+  elements.auctionCurrencyRsdBtn?.classList.toggle("active", state.auctionCurrency === "RSD");
+  elements.auctionCurrencyEurBtn?.classList.toggle("active", state.auctionCurrency === "EUR");
+}
+
+function setEditAuctionCurrency(currency) {
+  state.editModal.currency = currency === "EUR" ? "EUR" : "RSD";
+  elements.editAuctionCurrencyRsdBtn?.classList.toggle("active", state.editModal.currency === "RSD");
+  elements.editAuctionCurrencyEurBtn?.classList.toggle("active", state.editModal.currency === "EUR");
 }
 
 function validateAuctionFields() {
@@ -978,12 +1037,13 @@ function renderBidScreen(data) {
   descEl.textContent = data.description || "";
   elements.bidAuctionInfo.appendChild(descEl);
 
+  const cur = data.currency || "RSD";
   if (data.start_price != null) {
-    addRow(`${t("auctionStartPrice")}:`, `${data.start_price}`);
+    addRow(`${t("auctionStartPrice")}:`, formatMoney(data.start_price, cur));
   }
 
   if (data.current_price != null) {
-    addRow(`${t("auctionLastBid")}:`, `${data.current_price}`, "bid-current-price");
+    addRow(`${t("auctionLastBid")}:`, formatMoney(data.current_price, cur), "bid-current-price");
     if (data.winner_username) {
       addRow(`${t("auctionLastBidder")}:`, data.winner_username);
     }
@@ -997,7 +1057,7 @@ function renderBidScreen(data) {
     : (data.start_price || 0) + (data.min_step || 0);
   state.bidMinRequired = minRequired || null;
   if (minRequired) {
-    addRow(`${t("bidMinRequired")}:`, `${minRequired}`);
+    addRow(`${t("bidMinRequired")}:`, formatMoney(minRequired, cur));
   }
   if (elements.bidAmount) {
     // Spinner arrows step by the auction's min step, not by 1.
@@ -1140,8 +1200,9 @@ function renderBidsScreen(data) {
       row.append(lbl, val);
       elements.bidsAuctionInfo.appendChild(row);
     };
-    if (data.start_price != null) addRow(`${t("auctionStartPrice")}:`, `${data.start_price}`);
-    if (data.current_price != null) addRow(`${t("auctionCurrentBid")}:`, `${data.current_price}`, "bid-current-price");
+    const cur = data.currency || "RSD";
+    if (data.start_price != null) addRow(`${t("auctionStartPrice")}:`, formatMoney(data.start_price, cur));
+    if (data.current_price != null) addRow(`${t("auctionCurrentBid")}:`, formatMoney(data.current_price, cur), "bid-current-price");
     addRow(`${t("auctionBidsCount")}:`, String((data.bids || []).length));
   }
 
@@ -1180,7 +1241,7 @@ function renderBidsScreen(data) {
     left.append(who, when);
     const amount = document.createElement("div");
     amount.className = "bids-item-amount";
-    amount.textContent = `${bid.amount}`;
+    amount.textContent = formatMoney(bid.amount, data.currency || "RSD");
     item.append(left, amount);
     elements.bidsList.appendChild(item);
   });
@@ -1208,6 +1269,10 @@ function bindAuctionEvents() {
     haptic("light");
     setAdType("auction");
   });
+  elements.auctionCurrencyRsdBtn?.addEventListener("click", () => { haptic("light"); setAuctionCurrency("RSD"); });
+  elements.auctionCurrencyEurBtn?.addEventListener("click", () => { haptic("light"); setAuctionCurrency("EUR"); });
+  elements.editAuctionCurrencyRsdBtn?.addEventListener("click", () => { haptic("light"); setEditAuctionCurrency("RSD"); });
+  elements.editAuctionCurrencyEurBtn?.addEventListener("click", () => { haptic("light"); setEditAuctionCurrency("EUR"); });
   elements.auctionStartPrice?.addEventListener("input", () => {
     setFieldInvalid(elements.auctionStartPrice, false);
     if (elements.auctionStartPriceError) setFieldError(elements.auctionStartPriceError, "");

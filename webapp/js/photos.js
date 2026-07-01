@@ -226,7 +226,7 @@ function bindPhotoReorder(photoItem, index, isEdit = false) {
   let pointerStartX = 0;
   let pointerStartY = 0;
 
-  photoItem.draggable = true;
+  photoItem.draggable = false;
   photoItem.dataset.photoIndex = String(index);
   photoItem.setAttribute("aria-label", `Photo ${index + 1}`);
 
@@ -259,7 +259,9 @@ function bindPhotoReorder(photoItem, index, isEdit = false) {
   });
 
   photoItem.addEventListener("pointerdown", (event) => {
-    if (event.target.closest("button")) return;
+    // Drag (reorder) only when starting from the handle, so touching the photo
+    // itself scrolls the page instead of being captured as a drag.
+    if (!event.target.closest(".photo-drag-handle")) return;
     pointerStarted = true;
     pointerMoved = false;
     pointerStartX = event.clientX;
@@ -284,8 +286,7 @@ function bindPhotoReorder(photoItem, index, isEdit = false) {
     photoItem.releasePointerCapture?.(event.pointerId);
     photoItem.classList.remove("dragging");
     if (!pointerMoved) {
-      const photoState = isEdit ? state.editModal : state;
-      openPhotoViewer(photoState.photoPreviews[index]?.url);
+      // Tapped the handle without dragging — nothing to do.
       clearPhotoDropTargets();
       return;
     }
@@ -355,6 +356,7 @@ function renderPhotoPreviews() {
     img.src = item.url;
     img.alt = "photo";
     img.draggable = false;
+    img.addEventListener("click", () => openPhotoViewer(item.url));
 
     const dragHandle = document.createElement("div");
     dragHandle.className = "photo-drag-handle";
@@ -383,7 +385,8 @@ function renderEditPhotoPreviews() {
   elements.editPhotoGrid.innerHTML = "";
 
   if (state.editModal.photoPreviews.length === 0) {
-    elements.editAddMorePhotosBtn.hidden = false;
+    if (elements.editPhotoUploadZone) elements.editPhotoUploadZone.hidden = false;
+    elements.editAddMorePhotosBtn.hidden = true;
     return;
   }
 
@@ -397,6 +400,7 @@ function renderEditPhotoPreviews() {
     img.src = item.url;
     img.alt = "photo";
     img.draggable = false;
+    img.addEventListener("click", () => openPhotoViewer(item.url));
 
     const dragHandle = document.createElement("div");
     dragHandle.className = "photo-drag-handle";
@@ -418,6 +422,7 @@ function renderEditPhotoPreviews() {
 
   elements.editPhotoGrid.appendChild(grid);
   justifyPhotoGrid(elements.editPhotoGrid);
+  if (elements.editPhotoUploadZone) elements.editPhotoUploadZone.hidden = true;
   elements.editAddMorePhotosBtn.hidden = state.editModal.photoPreviews.length >= 10;
 }
 

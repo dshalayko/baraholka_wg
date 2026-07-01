@@ -14,7 +14,7 @@ from utils import get_private_channel_post_link, get_serbia_time
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, BidIn
 from webserver.settings import WEBAPP_URL, logger
-from webserver.telegram_client import bot, format_auction_text, make_bid_link_md, normalize_chat_id, texts_for
+from webserver.telegram_client import bot, format_auction_text, make_bid_link_md, normalize_chat_id, normalize_currency, texts_for
 
 # An auction may last at most 2 days minus 10 minutes (mirror of announcements).
 MAX_AUCTION_DURATION = timedelta(days=2) - timedelta(minutes=10)
@@ -34,7 +34,7 @@ async def get_auction(ann_id: int) -> Dict[str, Any]:
         cursor = await db.execute(
             """
             SELECT id, description, start_price, current_price, min_step, auction_end_at,
-                   auction_status, winner_username, username, photo_file_ids, message_ids,
+                   auction_status, winner_username, username, photo_file_ids, message_ids, currency,
                    (SELECT COUNT(*) FROM auction_bids WHERE announcement_id = announcements.id) as bids_count
             FROM announcements
             WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
@@ -58,6 +58,7 @@ async def get_auction(ann_id: int) -> Dict[str, Any]:
         seller_username,
         photo_file_ids,
         message_ids_json,
+        currency,
         bids_count,
     ) = row
 
@@ -82,6 +83,7 @@ async def get_auction(ann_id: int) -> Dict[str, Any]:
         "seller_username": seller_username,
         "photo_file_ids": json.loads(photo_file_ids) if photo_file_ids else [],
         "post_link": post_link,
+        "currency": currency or "RSD",
     }
 
 
@@ -151,7 +153,7 @@ async def place_bid(
             """
             SELECT id, user_id, description, username, contact_info, start_price, current_price, min_step,
                    auction_end_at, auction_status, message_ids, photo_file_ids, owner_language_code,
-                   winner_user_id, winner_language_code
+                   winner_user_id, winner_language_code, currency
             FROM announcements
             WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
             """,
@@ -178,7 +180,9 @@ async def place_bid(
             owner_language_code,
             prev_winner_user_id,
             prev_winner_language_code,
+            currency,
         ) = row
+        currency = normalize_currency(currency)
 
         # Validations
         if auction_status != "active":
@@ -240,6 +244,7 @@ async def place_bid(
             winner_username=winner_name,
             auction_status="active",
             language_code=owner_language_code,
+            currency=currency,
         )
         updated_text = updated_text + "\n\n" + make_bid_link_md(ann_id, owner_language_code)
         try:
@@ -276,7 +281,7 @@ async def place_bid(
         notify_text = (
             f"{owner_texts.AUCTION_NEW_BID_TITLE}\n\n"
             f"{desc_preview}\n\n"
-            f"{owner_texts.AUCTION_NEW_BID_AMOUNT}: {payload.amount}\n"
+            f"{owner_texts.AUCTION_NEW_BID_AMOUNT}: {payload.amount} {currency}\n"
             f"{owner_texts.AUCTION_NEW_BID_FROM}: {winner_name}\n"
             f"{owner_texts.AUCTION_NEW_BID_TOTAL}: {bids_count}"
         )
@@ -301,7 +306,7 @@ async def place_bid(
             if len(desc_preview) > 120:
                 desc_preview = desc_preview[:120].rstrip() + "…"
             outbid_text = outbid_texts.AUCTION_OUTBID_MESSAGE.format(
-                desc=desc_preview, amount=payload.amount, link=post_link
+                desc=desc_preview, amount=f"{payload.amount} {currency}", link=post_link
             )
             outbid_keyboard = InlineKeyboardMarkup(
                 [[InlineKeyboardButton(outbid_texts.AUCTION_OUTBID_BUTTON, web_app=WebAppInfo(f"{WEBAPP_URL}?bid={ann_id}"))]]
@@ -325,7 +330,7 @@ async def list_bids(
         cursor = await db.execute(
             """
             SELECT user_id, description, start_price, current_price, min_step,
-                   auction_end_at, auction_status
+                   auction_end_at, auction_status, currency
             FROM announcements
             WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
             """,
@@ -344,6 +349,7 @@ async def list_bids(
             min_step,
             auction_end_at,
             auction_status,
+            currency,
         ) = row
 
         if user_id != seller_user_id:
@@ -373,6 +379,7 @@ async def list_bids(
         "min_step": min_step,
         "auction_end_at": auction_end_at,
         "auction_status": auction_status,
+        "currency": currency or "RSD",
         "bids": bids,
     }
 
@@ -393,7 +400,7 @@ async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str,
             """
             SELECT user_id, description, username, contact_info, start_price, current_price,
                    min_step, auction_end_at, winner_user_id, winner_username, message_ids,
-                   photo_file_ids, owner_language_code, winner_language_code, auction_status
+                   photo_file_ids, owner_language_code, winner_language_code, auction_status, currency
             FROM announcements
             WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
             """,
@@ -422,7 +429,9 @@ async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str,
             owner_language_code,
             winner_language_code,
             auction_status,
+            currency,
         ) = row
+        currency = normalize_currency(currency)
 
         if expected_user_id is not None and seller_user_id != expected_user_id:
             raise HTTPException(status_code=403, detail="Only the owner can stop the auction")
@@ -458,6 +467,7 @@ async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str,
             winner_username=winner_username,
             auction_status="finished",
             language_code=owner_language_code,
+            currency=currency,
         )
         try:
             if has_photo:
@@ -488,7 +498,7 @@ async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str,
         seller_texts = texts_for(owner_language_code)
         if winner_username:
             seller_msg = seller_texts.AUCTION_SELLER_FINISHED_WIN.format(
-                winner=winner_username, price=current_price, link=post_link
+                winner=winner_username, price=f"{current_price} {currency}", link=post_link
             )
         else:
             seller_msg = seller_texts.AUCTION_SELLER_FINISHED_NOBIDS.format(link=post_link)
@@ -501,7 +511,7 @@ async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str,
         try:
             winner_texts = texts_for(winner_language_code)
             winner_msg = winner_texts.AUCTION_WINNER_FINISHED.format(
-                price=current_price, seller_contact=seller_contact, link=post_link
+                price=f"{current_price} {currency}", seller_contact=seller_contact, link=post_link
             )
             await bot.send_message(chat_id=winner_user_id, text=winner_msg)
         except Exception as exc:
@@ -535,7 +545,7 @@ async def edit_auction(
         cursor = await db.execute(
             """
             SELECT user_id, username, contact_info, message_ids, photo_file_ids, start_price,
-                   current_price, winner_username, owner_language_code, auction_status
+                   current_price, winner_username, owner_language_code, auction_status, currency
             FROM announcements
             WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
             """,
@@ -555,7 +565,9 @@ async def edit_auction(
             winner_username,
             owner_language_code,
             auction_status,
+            currency,
         ) = row
+        currency = normalize_currency(currency)
 
         if user_id != seller_user_id:
             raise HTTPException(status_code=403, detail="Only the owner can edit the auction")
@@ -567,6 +579,7 @@ async def edit_auction(
 
         contact_info = (payload.contact_info or "").strip()
         new_min_step = payload.min_step if payload.min_step else None
+        new_currency = normalize_currency(payload.currency) if payload.currency else None
 
         # New end time = now + chosen duration (capped). Keep current if not given.
         new_end_at = None
@@ -582,7 +595,8 @@ async def edit_auction(
             SET description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?,
                 min_step = COALESCE(?, min_step),
                 auction_duration_hours = COALESCE(?, auction_duration_hours),
-                auction_end_at = COALESCE(?, auction_end_at)
+                auction_end_at = COALESCE(?, auction_end_at),
+                currency = COALESCE(?, currency)
             WHERE id = ?
             """,
             (
@@ -593,6 +607,7 @@ async def edit_auction(
                 new_min_step,
                 payload.auction_duration_hours,
                 new_end_at,
+                new_currency,
                 ann_id,
             ),
         )
@@ -600,9 +615,9 @@ async def edit_auction(
 
         # Re-read the effective values for rendering.
         cursor2 = await db.execute(
-            "SELECT min_step, auction_end_at FROM announcements WHERE id = ?", (ann_id,)
+            "SELECT min_step, auction_end_at, currency FROM announcements WHERE id = ?", (ann_id,)
         )
-        eff_min_step, eff_end_at = await cursor2.fetchone()
+        eff_min_step, eff_end_at, eff_currency = await cursor2.fetchone()
 
     # Rebuild and edit the post caption/text in place.
     has_photo = bool(json.loads(photo_file_ids)) if photo_file_ids else False
@@ -618,6 +633,7 @@ async def edit_auction(
         winner_username=winner_username,
         auction_status="active",
         language_code=owner_language_code,
+        currency=eff_currency,
     )
     message = message + "\n\n" + make_bid_link_md(ann_id, owner_language_code)
 
@@ -634,6 +650,13 @@ async def edit_auction(
                     chat_id=private_channel_id, message_id=post_message_id,
                     text=message, parse_mode="MarkdownV2",
                 )
+        except BadRequest as exc:
+            # Nothing actually changed in the post — that's fine, the DB is updated.
+            if "not modified" in str(exc).lower():
+                logger.info("auction:edit post unchanged ann_id=%s", ann_id)
+            else:
+                logger.warning("auction:edit edit_message failed ann_id=%s error=%s", ann_id, exc)
+                raise HTTPException(status_code=502, detail=f"Failed to edit post: {exc}")
         except TelegramError as exc:
             logger.warning("auction:edit edit_message failed ann_id=%s error=%s", ann_id, exc)
             raise HTTPException(status_code=502, detail=f"Failed to edit post: {exc}")

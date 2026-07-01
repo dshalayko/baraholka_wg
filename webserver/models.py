@@ -13,6 +13,7 @@ class AnnouncementIn(BaseModel):
     start_price: Optional[int] = None
     min_step: Optional[int] = None
     auction_duration_hours: Optional[int] = None
+    currency: Optional[str] = None
 
 
 class AnnouncementOut(BaseModel):

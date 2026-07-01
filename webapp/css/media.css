@@ -1,6 +1,6 @@
 @media (max-width: 640px) {
   #app {
-    padding: 8px 10px 24px;
+    padding: 8px 10px calc(94px + env(safe-area-inset-bottom));
   }
 
   .panel-header {
@@ -9,29 +9,14 @@
     gap: 10px;
   }
 
-  .tabs {
-    top: 8px;
-    margin-top: 6px;
-    padding: 4px;
-  }
-
-  .settings-menu {
-    width: 200px;
-  }
-
-  .settings-wrap {
-    gap: 6px;
-  }
-
   .tab {
-    padding: 8px 8px;
-    font-size: 13px;
+    font-size: 11px;
   }
 
   .ad-gallery,
   .ad-photo {
-    height: 200px;
-    max-height: 200px;
+    height: 250px;
+    max-height: 250px;
   }
 
   .modal {
@@ -46,7 +31,7 @@
 
 @media (max-width: 420px) {
   #app {
-    padding: 6px 8px 20px;
+    padding: 6px 8px calc(92px + env(safe-area-inset-bottom));
   }
 
   .app-title {
@@ -54,12 +39,12 @@
   }
 
   .tabs {
-    gap: 6px;
+    gap: 0;
   }
 
   .tab {
-    font-size: 12px;
-    padding: 8px 6px;
+    font-size: 11px;
+    padding: 6px 4px;
   }
 
   .tab-icon {
@@ -102,8 +87,8 @@
 
   .ad-gallery,
   .ad-photo {
-    height: 176px;
-    max-height: 176px;
+    height: 230px;
+    max-height: 230px;
   }
 
   .modal-actions {

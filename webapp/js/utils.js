@@ -1,3 +1,8 @@
+function formatMoney(amount, currency) {
+  const cur = currency === "EUR" ? "EUR" : "RSD";
+  return `${amount} ${cur}`;
+}
+
 function hexToRgb(hex) {
   if (!hex) return null;
   const value = hex.replace("#", "");
@@ -347,24 +352,32 @@ function setTheme(theme) {
   applyTheme(theme);
 }
 
+function applySystemTheme() {
+  if (applyTelegramTheme()) {
+    tg?.setBackgroundColor?.(tg.themeParams?.bg_color || "#ffffff");
+  } else {
+    applyTheme(tg?.colorScheme === "light" ? "light" : "dark");
+  }
+}
+
+// "Auto" theme: drop the saved choice and follow the system/Telegram theme.
+function setThemeAuto() {
+  localStorage.removeItem("theme");
+  applySystemTheme();
+  applyTranslations();
+}
+
 function initTheme() {
+  // Always follow live system theme changes when no explicit theme is saved.
+  tg?.onEvent?.("themeChanged", () => {
+    if (localStorage.getItem("theme")) return;
+    applySystemTheme();
+    applyTranslations();
+  });
   const saved = localStorage.getItem("theme");
   if (saved === "light" || saved === "dark") {
     applyTheme(saved);
     return;
   }
-  if (applyTelegramTheme()) {
-    tg?.setBackgroundColor?.(tg.themeParams.bg_color || "#ffffff");
-    tg?.onEvent?.("themeChanged", () => {
-      if (localStorage.getItem("theme")) return;
-      applyTelegramTheme();
-      applyTranslations();
-    });
-    return;
-  }
-  if (tg?.colorScheme === "light") {
-    applyTheme("light");
-  } else {
-    applyTheme("dark");
-  }
+  applySystemTheme();
 }
