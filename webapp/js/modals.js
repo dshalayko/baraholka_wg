@@ -13,7 +13,7 @@ function syncPageBackButton() {
 }
 
 function handlePageBackButton() {
-  if (!elements.editModal.hidden) { closeEditModal(); return; }
+  if (!elements.editModal.hidden) { confirmLeaveEditModal(closeEditModal); return; }
   if (!elements.commentsOverviewModal.hidden) { closeCommentsOverviewModal(); return; }
   if (!elements.statsModal.hidden) { closeStatsModal(); return; }
   if (!elements.expiredAdsModal.hidden) { closeExpiredAdsModal(); return; }
@@ -21,6 +21,36 @@ function handlePageBackButton() {
 
 if (tg?.BackButton?.onClick) {
   tg.BackButton.onClick(handlePageBackButton);
+}
+
+// Discard-confirm: guards navigation away from the create/edit form and the
+// published-ad edit modal so in-progress, unsaved input isn't lost silently.
+function openDiscardConfirm(action) {
+  state.pendingDiscardAction = action;
+  elements.discardConfirmModal.hidden = false;
+  elements.discardConfirmModal.style.display = "flex";
+}
+
+function closeDiscardConfirm() {
+  state.pendingDiscardAction = null;
+  elements.discardConfirmModal.hidden = true;
+  elements.discardConfirmModal.style.display = "none";
+}
+
+function confirmLeaveForm(action) {
+  if (!isFormDirty()) {
+    action();
+    return;
+  }
+  openDiscardConfirm(action);
+}
+
+function confirmLeaveEditModal(action) {
+  if (!isEditModalDirty()) {
+    action();
+    return;
+  }
+  openDiscardConfirm(action);
 }
 
 function openDeleteConfirm(id) {
@@ -119,6 +149,24 @@ function closeFeedbackModal() {
   }
 }
 
+function captureEditModalSnapshot() {
+  return JSON.stringify({
+    description: elements.editDescription.value,
+    contactInfo: elements.editContactInfo.value,
+    price: elements.editPrice.value,
+    priceInDescription: elements.editPriceInDescription.checked,
+    adType: state.editModal.adType,
+    photoFileIds: state.editModal.photoFileIds,
+    minStep: elements.editAuctionMinStep?.value || "",
+    duration: elements.editAuctionDuration?.value || "",
+    currency: state.editModal.currency,
+  });
+}
+
+function isEditModalDirty() {
+  return !elements.editModal.hidden && captureEditModalSnapshot() !== state.editModalSnapshot;
+}
+
 function resetEditModal() {
   state.editModal.id = null;
   state.editModal.photoFileIds = [];
@@ -180,6 +228,7 @@ function openEditModal(ad) {
         .then((info) => {
           if (state.editModal.id === ad.id && info && info.currency) {
             setEditAuctionCurrency(info.currency);
+            state.editModalSnapshot = captureEditModalSnapshot();
           }
         })
         .catch(() => {});
@@ -216,6 +265,7 @@ function openEditModal(ad) {
       autoResizeTextarea(elements.editDescription);
     });
   });
+  state.editModalSnapshot = captureEditModalSnapshot();
 }
 
 function closeEditModal() {

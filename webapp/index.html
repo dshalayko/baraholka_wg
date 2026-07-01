@@ -32,6 +32,7 @@
       <div id="authorizedContent">
         <div class="top-bar">
           <nav class="tabs">
+            <span class="tab-indicator" id="tabIndicator" aria-hidden="true"></span>
             <button class="tab active" id="tabMyAds">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01"/>
@@ -389,6 +390,17 @@
         <div class="modal-actions">
           <button class="ghost cancel-action" id="confirmNoBtn">Отмена</button>
           <button class="danger" id="confirmYesBtn">Да, удалить</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="discardConfirmModal" hidden>
+      <div class="modal">
+        <div class="modal-title" id="discardConfirmTitle">Отменить изменения?</div>
+        <div class="modal-text" id="discardConfirmText">Введённые данные не сохранены и будут потеряны.</div>
+        <div class="modal-actions">
+          <button class="ghost cancel-action" id="discardConfirmStayBtn">Остаться</button>
+          <button class="danger" id="discardConfirmLeaveBtn">Да, выйти</button>
         </div>
       </div>
     </div>

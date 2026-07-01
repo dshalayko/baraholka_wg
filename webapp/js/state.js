@@ -14,6 +14,9 @@ const state = {
   hasUsername: !!tg?.initDataUnsafe?.user?.username,
   languageCode: initialLanguage,
   pendingDeleteId: null,
+  formSnapshot: null,
+  editModalSnapshot: null,
+  pendingDiscardAction: null,
   editModal: {
     id: null,
     photoFileIds: [],

@@ -216,6 +216,7 @@ h2 {
 }
 
 .tabs {
+  position: relative;
   display: flex;
   gap: 0;
   margin: 0 auto;
@@ -227,7 +228,21 @@ h2 {
   box-shadow: none;
 }
 
+.tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--tab-active-bg);
+  transition: transform 0.32s cubic-bezier(0.34, 1.4, 0.4, 1), width 0.32s cubic-bezier(0.34, 1.4, 0.4, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .tab {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: inline-flex;
   flex-direction: column;
@@ -242,7 +257,7 @@ h2 {
   font-weight: 600;
   font-size: 11px;
   cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: color 0.2s ease;
 }
 
 .tab svg {
@@ -257,7 +272,6 @@ h2 {
 }
 
 .tab.active {
-  background: var(--tab-active-bg);
   color: var(--link);
   box-shadow: none;
 }
@@ -267,7 +281,6 @@ h2 {
 }
 
 :root[data-theme="light"] .tab.active {
-  background: var(--tab-active-bg);
   color: var(--link);
 }
 

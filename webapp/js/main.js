@@ -320,6 +320,10 @@ function applyTranslations() {
   elements.confirmText.textContent = t("deleteConfirm");
   elements.confirmYesBtn.textContent = t("confirmYes");
   elements.confirmNoBtn.textContent = t("confirmNo");
+  elements.discardConfirmTitle.textContent = t("discardConfirmTitle");
+  elements.discardConfirmText.textContent = t("discardConfirmText");
+  elements.discardConfirmLeaveBtn.textContent = t("discardConfirmLeave");
+  elements.discardConfirmStayBtn.textContent = t("discardConfirmStay");
   elements.errorTitle.textContent = t("errorTitle");
   elements.errorCloseBtn.textContent = t("errorClose");
   elements.errorReportBtn.textContent = t("reportError");
@@ -368,16 +372,18 @@ function applyTranslations() {
 
 function bindEvents() {
   elements.tabMyAds.addEventListener("click", () => {
-    showTab("list");
+    confirmLeaveForm(() => showTab("list"));
   });
 
   elements.tabCreate.addEventListener("click", () => {
-    resetForm();
-    showTab("form");
+    confirmLeaveForm(() => {
+      resetForm();
+      showTab("form");
+    });
   });
 
   elements.tabSettings?.addEventListener("click", () => {
-    showTab("settings");
+    confirmLeaveForm(() => showTab("settings"));
   });
 
   elements.emptyStateBtn?.addEventListener("click", () => {
@@ -386,8 +392,22 @@ function bindEvents() {
   });
 
   elements.cancelFormBtn.addEventListener("click", () => {
-    resetForm();
-    showTab("list");
+    confirmLeaveForm(() => {
+      resetForm();
+      showTab("list");
+    });
+  });
+
+  elements.discardConfirmStayBtn.addEventListener("click", closeDiscardConfirm);
+  elements.discardConfirmLeaveBtn.addEventListener("click", () => {
+    const action = state.pendingDiscardAction;
+    closeDiscardConfirm();
+    if (action) action();
+  });
+  elements.discardConfirmModal.addEventListener("click", (event) => {
+    if (event.target === elements.discardConfirmModal) {
+      closeDiscardConfirm();
+    }
   });
 
   elements.saveAdBtn.addEventListener("click", saveAd);
@@ -673,13 +693,17 @@ function bindEvents() {
       });
   });
   elements.editCancelBtn.addEventListener("click", () => {
-    closeEditModal();
-    showToast(t("editCanceled"));
+    confirmLeaveEditModal(() => {
+      closeEditModal();
+      showToast(t("editCanceled"));
+    });
   });
   elements.editModal.addEventListener("click", (event) => {
     if (event.target === elements.editModal) {
-      closeEditModal();
-      showToast(t("editCanceled"));
+      confirmLeaveEditModal(() => {
+        closeEditModal();
+        showToast(t("editCanceled"));
+      });
     }
   });
   elements.editPublishBtn.addEventListener("click", async () => {
@@ -1368,9 +1392,11 @@ bindEvents();
 bindAuctionEvents();
 updateCounts();
 showTab("list");
+window.addEventListener("resize", () => moveTabIndicator(document.querySelector(".tab.active")));
 showAdsSkeleton();
 initTheme();
 closeDeleteConfirm();
+closeDiscardConfirm();
 closeEditModal();
 closeErrorModal();
 closePhotoViewer();

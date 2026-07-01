@@ -17,6 +17,12 @@ function showAdsSkeleton() {
   }
 }
 
+function moveTabIndicator(activeTab) {
+  if (!elements.tabIndicator || !activeTab) return;
+  elements.tabIndicator.style.width = `${activeTab.offsetWidth}px`;
+  elements.tabIndicator.style.transform = `translateX(${activeTab.offsetLeft}px)`;
+}
+
 function showTab(tab) {
   const isList = tab === "list";
   const isForm = tab === "form";
@@ -27,6 +33,7 @@ function showTab(tab) {
   elements.tabMyAds.classList.toggle("active", isList);
   elements.tabCreate.classList.toggle("active", isForm);
   if (elements.tabSettings) elements.tabSettings.classList.toggle("active", isSettings);
+  moveTabIndicator(isForm ? elements.tabCreate : isSettings ? elements.tabSettings : elements.tabMyAds);
   if (isForm) {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -45,6 +52,25 @@ function setAdType(type) {
   if (elements.auctionSection) elements.auctionSection.hidden = !isAuction;
   // Drafts can be saved for auctions too — the end time is set at publish.
   if (elements.saveAdBtn) elements.saveAdBtn.hidden = false;
+}
+
+function captureFormSnapshot() {
+  return JSON.stringify({
+    description: elements.description.value,
+    contactInfo: elements.contactInfo.value,
+    price: elements.price.value,
+    priceInDescription: elements.priceInDescription.checked,
+    adType: state.adType,
+    photoFileIds: state.photoFileIds,
+    auctionStartPrice: elements.auctionStartPrice?.value || "",
+    auctionMinStep: elements.auctionMinStep?.value || "",
+    auctionDuration: elements.auctionDuration?.value || "",
+    auctionCurrency: state.auctionCurrency,
+  });
+}
+
+function isFormDirty() {
+  return !elements.formPanel.hidden && captureFormSnapshot() !== state.formSnapshot;
 }
 
 function resetForm() {
@@ -75,6 +101,7 @@ function resetForm() {
   updateCounts();
   autoResizeDescription();
   updateCharCounter(elements.description, elements.descCounter, 800);
+  state.formSnapshot = captureFormSnapshot();
 }
 
 function updatePreview() {}
@@ -562,4 +589,5 @@ function startEdit(ad) {
     });
   });
   updateCounts();
+  state.formSnapshot = captureFormSnapshot();
 }
