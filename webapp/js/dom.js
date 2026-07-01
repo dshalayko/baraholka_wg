@@ -24,6 +24,7 @@ const elements = {
   languageRuBtn: document.getElementById("languageRuBtn"),
   languageEnBtn: document.getElementById("languageEnBtn"),
   appTitleText: document.getElementById("appTitleText"),
+  topBar: document.querySelector(".top-bar"),
   tabIndicator: document.getElementById("tabIndicator"),
   tabMyAds: document.getElementById("tabMyAds"),
   tabMyAdsText: document.getElementById("tabMyAdsText"),

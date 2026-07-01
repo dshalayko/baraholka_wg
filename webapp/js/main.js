@@ -954,6 +954,22 @@ function bindEvents() {
     closeDeleteConfirm();
     await deleteAd(id);
   });
+
+  // Hide the floating tab bar while the on-screen keyboard is up so it
+  // doesn't float over the focused field.
+  const KEYBOARD_INPUT_TYPES = new Set(["text", "number", "tel", "email", "url", "search", "password"]);
+  const opensKeyboard = (el) =>
+    el?.tagName === "TEXTAREA" || (el?.tagName === "INPUT" && KEYBOARD_INPUT_TYPES.has(el.type));
+  document.addEventListener("focusin", (event) => {
+    if (opensKeyboard(event.target)) {
+      elements.topBar?.classList.add("top-bar-hidden");
+    }
+  });
+  document.addEventListener("focusout", (event) => {
+    if (opensKeyboard(event.target)) {
+      elements.topBar?.classList.remove("top-bar-hidden");
+    }
+  });
 }
 
 function getAuctionPayloadFields() {
