@@ -13,10 +13,8 @@
     font-size: 11px;
   }
 
-  .ad-gallery,
-  .ad-photo {
-    height: 250px;
-    max-height: 250px;
+  #adsList.single-ad .ad-card.ad-card-media {
+    height: calc(100vh - 120px - env(safe-area-inset-bottom));
   }
 
   .modal {
@@ -85,10 +83,8 @@
     padding: 12px;
   }
 
-  .ad-gallery,
-  .ad-photo {
-    height: 230px;
-    max-height: 230px;
+  #adsList.single-ad .ad-card.ad-card-media {
+    height: calc(100vh - 116px - env(safe-area-inset-bottom));
   }
 
   .modal-actions {

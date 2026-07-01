@@ -242,7 +242,7 @@
 
 .ad-photo {
   width: 100%;
-  max-height: 280px;
+  max-height: min(52vh, 460px);
   object-fit: cover;
   object-position: center 58%;
   border-radius: 0;
@@ -258,7 +258,27 @@
   width: 100%;
   margin: 0;
   overflow: hidden;
-  height: 280px;
+  height: min(52vh, 460px);
+}
+
+/* Sole ad in the list: card fills the screen down to the floating nav bar,
+   with the photo absorbing the space left over by the (variable-height) body. */
+#adsList.single-ad .ad-card.ad-card-media {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 132px - env(safe-area-inset-bottom));
+}
+
+#adsList.single-ad .ad-gallery,
+#adsList.single-ad .ad-photo {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+}
+
+#adsList.single-ad .ad-body {
+  flex: 0 0 auto;
 }
 
 .ad-gallery-img {
@@ -303,14 +323,17 @@
 .ad-gallery-three {
   grid-template-rows: repeat(2, minmax(0, 1fr));
   grid-auto-rows: minmax(0, 1fr);
+  gap: 3px;
+  background: var(--secondary-bg);
 }
 
 .ad-gallery-bottom {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0;
+  gap: 3px;
   height: 100%;
   min-height: 0;
+  background: var(--secondary-bg);
 }
 
 .ad-gallery-two .ad-gallery-img,

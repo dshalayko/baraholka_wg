@@ -206,6 +206,7 @@ function renderCommentsOverview() {
 
 function renderAds() {
   elements.adsList.innerHTML = "";
+  elements.adsList.classList.toggle("single-ad", state.ads.length === 1);
   if (!state.ads.length) {
     elements.adsList.appendChild(elements.emptyState);
     elements.emptyState.hidden = false;
