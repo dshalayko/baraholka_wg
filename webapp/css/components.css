@@ -266,7 +266,7 @@
 #adsList.single-ad .ad-card.ad-card-media {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 132px - env(safe-area-inset-bottom));
+  height: calc(100vh - 146px - env(safe-area-inset-bottom));
 }
 
 #adsList.single-ad .ad-gallery,
@@ -279,6 +279,18 @@
 
 #adsList.single-ad .ad-body {
   flex: 0 0 auto;
+}
+
+/* Description expanded: let the card grow instead of squeezing the photo. */
+#adsList.single-ad .ad-card.ad-card-media.ad-card-desc-expanded {
+  height: auto;
+}
+
+#adsList.single-ad .ad-card.ad-card-desc-expanded .ad-gallery,
+#adsList.single-ad .ad-card.ad-card-desc-expanded .ad-photo {
+  flex: none;
+  height: min(52vh, 460px);
+  max-height: min(52vh, 460px);
 }
 
 .ad-gallery-img {

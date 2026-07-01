@@ -335,11 +335,7 @@ function renderAds() {
     header.appendChild(statusTag);
 
     const title = document.createElement("h3");
-    title.className = "ad-description";
-    const isLongDesc = (ad.description || "").length > 220;
-    if (isLongDesc) {
-      title.classList.add("ad-description-clamped");
-    }
+    title.className = "ad-description ad-description-clamped";
     title.innerHTML = renderStyledText(ad.description || t("noAds"));
 
     let meta;
@@ -526,26 +522,30 @@ function renderAds() {
     deleteBtn.onclick = () => { haptic("light"); openDeleteConfirm(ad.id); };
     actions.appendChild(deleteBtn);
 
-    let readMoreBtn = null;
-    if (isLongDesc) {
-      readMoreBtn = document.createElement("button");
-      readMoreBtn.className = "ad-read-more-btn";
-      readMoreBtn.type = "button";
-      readMoreBtn.textContent = t("readMore");
-      readMoreBtn.onclick = () => {
-        const isExpanded = !title.classList.contains("ad-description-clamped");
-        title.classList.toggle("ad-description-clamped", isExpanded);
-        readMoreBtn.textContent = isExpanded ? t("readMore") : t("readLess");
-      };
-    }
+    const readMoreBtn = document.createElement("button");
+    readMoreBtn.className = "ad-read-more-btn";
+    readMoreBtn.type = "button";
+    readMoreBtn.textContent = t("readMore");
+    readMoreBtn.hidden = true;
+    readMoreBtn.onclick = () => {
+      const nowClamped = !title.classList.contains("ad-description-clamped");
+      title.classList.toggle("ad-description-clamped", nowClamped);
+      card.classList.toggle("ad-card-desc-expanded", !nowClamped);
+      readMoreBtn.textContent = nowClamped ? t("readMore") : t("readLess");
+    };
 
     if (isExpiredFromChannel) {
-      body.append(title, ...(readMoreBtn ? [readMoreBtn] : []), meta, removedNote, actions);
+      body.append(title, readMoreBtn, meta, removedNote, actions);
     } else {
-      body.append(title, ...(readMoreBtn ? [readMoreBtn] : []), meta, actions);
+      body.append(title, readMoreBtn, meta, actions);
     }
     card.append(header, body);
     elements.adsList.appendChild(card);
+
+    // Reveal "read more" only once we know the clamp actually truncates this text.
+    if (title.scrollHeight > title.clientHeight + 1) {
+      readMoreBtn.hidden = false;
+    }
   });
   renderCommentsOverview();
 }

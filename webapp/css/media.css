@@ -14,7 +14,7 @@
   }
 
   #adsList.single-ad .ad-card.ad-card-media {
-    height: calc(100vh - 120px - env(safe-area-inset-bottom));
+    height: calc(100vh - 134px - env(safe-area-inset-bottom));
   }
 
   .modal {
@@ -84,7 +84,7 @@
   }
 
   #adsList.single-ad .ad-card.ad-card-media {
-    height: calc(100vh - 116px - env(safe-area-inset-bottom));
+    height: calc(100vh - 130px - env(safe-area-inset-bottom));
   }
 
   .modal-actions {
