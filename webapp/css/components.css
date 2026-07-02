@@ -585,11 +585,13 @@
   margin-bottom: 14px;
 }
 
-/* Actions: text buttons wrap two per row on top, icon buttons sit in a
-   single bar below with delete always pinned to the right corner. */
+/* Actions: one tidy row — text buttons stretch to share the space, icon
+   buttons keep a fixed size and stay pinned to the right; when the row
+   runs out of room the icon bar wraps below without breaking alignment. */
 .ad-actions {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
@@ -597,22 +599,31 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .ad-actions-bar {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .ad-action {
   min-height: 38px;
   min-width: 0;
+  padding: 0 10px;
   font-size: 12px;
 }
 
 .ad-action-main {
-  flex: 1 1 calc(50% - 8px);
+  flex: 1 1 auto;
+  min-width: 96px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ad-action-stop {

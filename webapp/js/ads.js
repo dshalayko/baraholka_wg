@@ -409,9 +409,12 @@ function renderAds() {
     removedNote.className = "ad-removed-note";
     removedNote.textContent = t("removedFromChannel");
 
-    // Consistent action layout on every card: text actions in a wrapping
-    // two-per-row block on top, then a bar of equal icon buttons with
-    // delete always pinned to the bottom-right corner.
+    // Consistent action layout on every card: one row with text actions
+    // stretching on the left and fixed-size icon buttons pinned to the
+    // right; the icon bar wraps below only when the row runs out of room.
+    // Per-type button sets: drafts keep publish/edit/delete; published ads
+    // are edited by tapping the photo, so the pencil only appears when
+    // there is no photo to tap.
     const actions = document.createElement("div");
     actions.className = "ad-actions";
     const actionsMain = document.createElement("div");
@@ -419,22 +422,20 @@ function renderAds() {
     const actionsBar = document.createElement("div");
     actionsBar.className = "ad-actions-bar";
 
-    // Auctions are now editable after publishing too (description, photos,
-    // min step, end time) — start price stays fixed.
-    const canEdit = true;
-    const editBtn = document.createElement("button");
-    editBtn.className = "ghost ad-action ad-action-icon";
-    editBtn.type = "button";
-    editBtn.setAttribute("aria-label", t("edit"));
-    editBtn.title = t("edit");
-    editBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M4 20h4l10.5-10.5a1.4 1.4 0 0 0 0-2L16.5 5.5a1.4 1.4 0 0 0-2 0L4 16v4zM13.8 7.2l3 3"></path>
-      </svg>
-    `;
-    editBtn.hidden = !canEdit;
-    editBtn.onclick = openAdEdit;
-    actionsBar.appendChild(editBtn);
+    if (!ad.is_published || !photos.length) {
+      const editBtn = document.createElement("button");
+      editBtn.className = "ghost ad-action ad-action-icon";
+      editBtn.type = "button";
+      editBtn.setAttribute("aria-label", t("edit"));
+      editBtn.title = t("edit");
+      editBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 20h4l10.5-10.5a1.4 1.4 0 0 0 0-2L16.5 5.5a1.4 1.4 0 0 0-2 0L4 16v4zM13.8 7.2l3 3"></path>
+        </svg>
+      `;
+      editBtn.onclick = openAdEdit;
+      actionsBar.appendChild(editBtn);
+    }
 
     if (!ad.is_published) {
       const publishBtn = document.createElement("button");
@@ -443,15 +444,6 @@ function renderAds() {
       publishBtn.textContent = t("publish");
       publishBtn.onclick = () => { haptic("medium"); void publishAd(ad.id); };
       actionsMain.appendChild(publishBtn);
-    }
-
-    if (ad.post_link && !isExpiredFromChannel) {
-      const openBtn = document.createElement("button");
-      openBtn.className = "ad-open ad-action ad-action-main";
-      openBtn.type = "button";
-      openBtn.textContent = t("open");
-      openBtn.onclick = () => tg?.openTelegramLink?.(ad.post_link);
-      actionsMain.appendChild(openBtn);
     }
 
     if (ad.is_published && !isExpiredFromChannel && !isAuction) {
@@ -501,7 +493,7 @@ function renderAds() {
     }
 
     const commentsCount = Number(ad.comments_count) || 0;
-    if (ad.is_published && ad.post_link && commentsCount > 0 && !isExpiredFromChannel) {
+    if (ad.is_published && !isAuction && ad.post_link && commentsCount > 0 && !isExpiredFromChannel) {
       const commentsBtn = document.createElement("button");
       commentsBtn.className = "ghost ad-action ad-action-icon ad-action-comments";
       commentsBtn.type = "button";
@@ -522,24 +514,35 @@ function renderAds() {
       actionsBar.appendChild(commentsBtn);
     }
 
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "ghost ad-action ad-action-icon ad-action-delete";
-    deleteBtn.type = "button";
-    deleteBtn.setAttribute("aria-label", t("delete"));
-    deleteBtn.title = t("delete");
-    deleteBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M9 4h6l1 2h4v2H4V6h4l1-2z"></path>
-        <path d="M6 8h12l-1 12H7L6 8z"></path>
-      </svg>
-    `;
-    deleteBtn.onclick = () => { haptic("light"); openDeleteConfirm(ad.id); };
-    actionsBar.appendChild(deleteBtn);
+    // Active auctions can't be deleted — the trash icon appears only once
+    // the auction is over (or the post has already left the channel).
+    const canDelete =
+      !ad.is_published ||
+      !isAuction ||
+      ad.auction_status === "finished" ||
+      isExpiredFromChannel;
+    if (canDelete) {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "ghost ad-action ad-action-icon ad-action-delete";
+      deleteBtn.type = "button";
+      deleteBtn.setAttribute("aria-label", t("delete"));
+      deleteBtn.title = t("delete");
+      deleteBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M9 4h6l1 2h4v2H4V6h4l1-2z"></path>
+          <path d="M6 8h12l-1 12H7L6 8z"></path>
+        </svg>
+      `;
+      deleteBtn.onclick = () => { haptic("light"); openDeleteConfirm(ad.id); };
+      actionsBar.appendChild(deleteBtn);
+    }
 
     if (actionsMain.childElementCount) {
       actions.appendChild(actionsMain);
     }
-    actions.appendChild(actionsBar);
+    if (actionsBar.childElementCount) {
+      actions.appendChild(actionsBar);
+    }
 
     const readMoreBtn = document.createElement("button");
     readMoreBtn.className = "ad-read-more-btn";
