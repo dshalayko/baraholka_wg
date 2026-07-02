@@ -42,5 +42,6 @@ async def log_group_messages(update: Update, context: CallbackContext):
 def register_handlers(app):
     logger.info(f"CHAT_ID: {CHAT_ID} (тип: {type(CHAT_ID)})")
     logger.info(f"✅ [register_handlers] Найден CHAT_ID={CHAT_ID}")
-    #app.add_handler(MessageHandler(filters.Chat(int(CHAT_ID)), log_group_messages))
-    app.add_handler(MessageHandler(filters.ALL & filters.Chat(int(CHAT_ID)), log_group_messages))
+    # Только новые сообщения: у edited_message и прочих типов апдейтов
+    # update.message == None, и обработчик падал на update.message.text.
+    app.add_handler(MessageHandler(filters.UpdateType.MESSAGE & filters.Chat(int(CHAT_ID)), log_group_messages))
