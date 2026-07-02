@@ -80,6 +80,52 @@ async function apiFetch(path, options = {}) {
   return response.json();
 }
 
+// Photo endpoints require auth, and the initData credential must travel in a
+// header — never in the URL, where server access logs would capture it. So
+// images are fetched manually and shown via object URLs, cached per URL to
+// avoid re-downloading on re-renders (the bid screen re-renders every 6s).
+const authedImagePromises = new Map();
+
+function resolveAuthedImageUrl(url) {
+  if (!url || !url.startsWith("/api/")) return Promise.resolve(url);
+  if (!authedImagePromises.has(url)) {
+    const promise = (async () => {
+      const headers = { "ngrok-skip-browser-warning": "1" };
+      const initData = await waitTelegramInitData();
+      if (initData) {
+        headers["X-Telegram-Init-Data"] = initData;
+      }
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        throw new Error(`Photo load failed: HTTP ${response.status}`);
+      }
+      return URL.createObjectURL(await response.blob());
+    })();
+    promise.catch(() => authedImagePromises.delete(url));
+    authedImagePromises.set(url, promise);
+  }
+  return authedImagePromises.get(url);
+}
+
+function setAuthedImage(img, url) {
+  // Shimmer placeholder while the bytes are fetched, so cards keep their
+  // shape instead of jumping when the image arrives.
+  img.classList.add("photo-loading");
+  resolveAuthedImageUrl(url)
+    .then((objectUrl) => {
+      img.src = objectUrl;
+      return img.decode ? img.decode().catch(() => {}) : null;
+    })
+    .catch(() => {})
+    .finally(() => img.classList.remove("photo-loading"));
+}
+
+function openAuthedPhotoViewer(url) {
+  resolveAuthedImageUrl(url)
+    .then((objectUrl) => openPhotoViewer(objectUrl))
+    .catch(() => {});
+}
+
 async function trackEvent(eventName) {
   if (!eventName) return;
   const initData = await waitTelegramInitData(1200);

@@ -1,6 +1,6 @@
 @media (max-width: 640px) {
   #app {
-    padding: 8px 10px calc(94px + env(safe-area-inset-bottom));
+    padding: 8px 10px calc(114px + env(safe-area-inset-bottom));
   }
 
   .panel-header {
@@ -29,7 +29,7 @@
 
 @media (max-width: 420px) {
   #app {
-    padding: 6px 8px calc(92px + env(safe-area-inset-bottom));
+    padding: 6px 8px calc(112px + env(safe-area-inset-bottom));
   }
 
   .app-title {

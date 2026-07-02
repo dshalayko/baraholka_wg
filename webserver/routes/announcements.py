@@ -1,5 +1,4 @@
 import json
-import mimetypes
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -16,6 +15,7 @@ from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
 from utils import get_private_channel_post_link, get_serbia_time, is_timestamp_older_than_days, parse_timestamp
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, AnnouncementOut
+from webserver.photos import serve_telegram_photo
 from webserver.routes.stats import increment_stat
 from webserver.settings import BUG_CHAT_ID, WEBAPP_URL, logger
 from webserver.telegram_client import bot, format_announcement_text, format_auction_text, make_bid_link_md, normalize_chat_id, normalize_currency
@@ -830,6 +830,7 @@ async def reserve_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
 async def get_announcement_photo(
     ann_id: int,
     file_id: str,
+    size: str = "full",
     user: Dict[str, Any] = Depends(get_user_from_request),
 ) -> Response:
     user_id = user.get("id")
@@ -848,20 +849,4 @@ async def get_announcement_photo(
     if file_id not in photo_ids:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    try:
-        tg_file = await bot.get_file(file_id)
-        data = await tg_file.download_as_bytearray()
-    except BadRequest as exc:
-        exc_text = str(exc).lower()
-        if "temporarily unavailable" in exc_text:
-            raise HTTPException(status_code=503, detail="Photo temporarily unavailable")
-        if "wrong file_id" in exc_text or "file_id" in exc_text:
-            raise HTTPException(status_code=404, detail="Photo not found")
-        raise HTTPException(status_code=502, detail=str(exc))
-    except (TimedOut, NetworkError) as exc:
-        raise HTTPException(status_code=503, detail=f"Telegram timeout: {exc}")
-    except TelegramError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
-
-    content_type, _ = mimetypes.guess_type(tg_file.file_path or "")
-    return Response(content=bytes(data), media_type=content_type or "image/jpeg")
+    return await serve_telegram_photo(file_id, size)

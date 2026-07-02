@@ -57,7 +57,9 @@ def _verify_init_data(init_data: str, bot_token: str) -> Dict[str, Any]:
 
 
 def get_user_from_request(request: Request) -> Dict[str, Any]:
-    init_data = request.headers.get("X-Telegram-Init-Data") or request.query_params.get("initData")
+    # Header only: initData is a 24h bearer credential, so it must never appear
+    # in query strings where server/proxy access logs would capture it.
+    init_data = request.headers.get("X-Telegram-Init-Data")
     if not init_data:
         logger.warning("auth: missing init data")
         raise HTTPException(status_code=401, detail="Missing init data")

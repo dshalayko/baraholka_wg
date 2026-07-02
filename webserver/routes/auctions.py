@@ -1,5 +1,4 @@
 import json
-import mimetypes
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
@@ -7,12 +6,13 @@ import aiosqlite
 import pytz
 from fastapi import APIRouter, Depends, HTTPException, Response
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
+from telegram.error import BadRequest, TelegramError
 
 from config import DB_PATH, PRIVATE_CHANNEL_ID
 from utils import get_private_channel_post_link, get_serbia_time
 from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, BidIn
+from webserver.photos import serve_telegram_photo
 from webserver.settings import WEBAPP_URL, logger
 from webserver.telegram_client import bot, format_auction_text, make_bid_link_md, normalize_chat_id, normalize_currency, texts_for
 
@@ -28,8 +28,8 @@ def _get_serbia_now_str() -> str:
 
 
 @router.get("/api/auctions/{ann_id}")
-async def get_auction(ann_id: int) -> Dict[str, Any]:
-    logger.info("auction:get ann_id=%s", ann_id)
+async def get_auction(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
+    logger.info("auction:get ann_id=%s user_id=%s", ann_id, user.get("id"))
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
@@ -91,6 +91,7 @@ async def get_auction(ann_id: int) -> Dict[str, Any]:
 async def get_auction_photo(
     ann_id: int,
     file_id: str,
+    size: str = "full",
     user: Dict[str, Any] = Depends(get_user_from_request),
 ) -> Response:
     """Serve an auction photo to any authenticated user (not only the owner),
@@ -110,23 +111,7 @@ async def get_auction_photo(
     if file_id not in photo_ids:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    try:
-        tg_file = await bot.get_file(file_id)
-        data = await tg_file.download_as_bytearray()
-    except BadRequest as exc:
-        exc_text = str(exc).lower()
-        if "temporarily unavailable" in exc_text:
-            raise HTTPException(status_code=503, detail="Photo temporarily unavailable")
-        if "wrong file_id" in exc_text or "file_id" in exc_text:
-            raise HTTPException(status_code=404, detail="Photo not found")
-        raise HTTPException(status_code=502, detail=str(exc))
-    except (TimedOut, NetworkError) as exc:
-        raise HTTPException(status_code=503, detail=f"Telegram timeout: {exc}")
-    except TelegramError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
-
-    content_type, _ = mimetypes.guess_type(tg_file.file_path or "")
-    return Response(content=bytes(data), media_type=content_type or "image/jpeg")
+    return await serve_telegram_photo(file_id, size)
 
 
 @router.post("/api/auctions/{ann_id}/bid")

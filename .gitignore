@@ -5,3 +5,4 @@ __pycache__/
 .idea/
 data/*.session
 data/*.db
+data/photo_cache/

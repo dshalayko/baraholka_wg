@@ -237,9 +237,10 @@ function renderAds() {
     if (photos.length) {
       card.classList.add("ad-card-media");
     }
-    if (photos.length && tg?.initData) {
+    if (photos.length) {
       const gallery = document.createElement("div");
-      const initData = encodeURIComponent(tg.initData);
+      // Cards show small previews, so ask the server for lightweight thumbnails.
+      const thumbUrl = (fileId) => `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&size=thumb`;
       const total = photos.length;
 
       gallery.style.cursor = "pointer";
@@ -247,8 +248,8 @@ function renderAds() {
         const img = document.createElement("img");
         img.className = "ad-photo";
         img.style.cursor = "pointer";
-        const fileId = photos[0];
-        img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+        img.loading = "lazy";
+        setAuthedImage(img, thumbUrl(photos[0]));
         img.alt = ad.description || "photo";
         img.addEventListener("click", openAdEdit);
         card.appendChild(img);
@@ -258,7 +259,8 @@ function renderAds() {
         photos.slice(0, 2).forEach((fileId) => {
           const img = document.createElement("img");
           img.className = "ad-gallery-img";
-          img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+          img.loading = "lazy";
+          setAuthedImage(img, thumbUrl(fileId));
           img.alt = ad.description || "photo";
           gallery.appendChild(img);
         });
@@ -268,7 +270,8 @@ function renderAds() {
         gallery.addEventListener("click", openAdEdit);
         const top = document.createElement("img");
         top.className = "ad-gallery-img ad-gallery-top";
-        top.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(photos[0])}&initData=${initData}`;
+        top.loading = "lazy";
+        setAuthedImage(top, thumbUrl(photos[0]));
         top.alt = ad.description || "photo";
 
         const bottom = document.createElement("div");
@@ -277,7 +280,8 @@ function renderAds() {
         photos.slice(1, 3).forEach((fileId) => {
           const img = document.createElement("img");
           img.className = "ad-gallery-img";
-          img.src = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+          img.loading = "lazy";
+          setAuthedImage(img, thumbUrl(fileId));
           img.alt = ad.description || "photo";
           bottom.appendChild(img);
         });
@@ -380,10 +384,10 @@ function renderAds() {
           addBidRow(`${t("auctionBidsCount")}:`, String(ad.bids_count));
         }
         if (ad.auction_end_at) {
-          addBidRow(`${t("auctionEndAt")}:`, ad.auction_end_at);
+          addBidRow(`${t("auctionEndAt")}:`, formatAuctionEnd(ad.auction_end_at));
         }
       }
-    } else {
+    } else if (ad.price_in_description || (ad.price || "").trim()) {
       meta = document.createElement("div");
       meta.className = "ad-meta ad-price";
 
@@ -393,17 +397,27 @@ function renderAds() {
 
       const priceValue = document.createElement("span");
       priceValue.className = "ad-price-value";
-      priceValue.textContent = ad.price_in_description ? t("priceInDescriptionValue") : (ad.price || "");
+      priceValue.textContent = ad.price_in_description ? t("priceInDescriptionValue") : ad.price;
 
       meta.append(priceLabel, priceValue);
+    } else {
+      // Draft without a price yet — don't render an empty price block.
+      meta = null;
     }
 
     const removedNote = document.createElement("div");
     removedNote.className = "ad-removed-note";
     removedNote.textContent = t("removedFromChannel");
 
+    // Consistent action layout on every card: text actions in a wrapping
+    // two-per-row block on top, then a bar of equal icon buttons with
+    // delete always pinned to the bottom-right corner.
     const actions = document.createElement("div");
     actions.className = "ad-actions";
+    const actionsMain = document.createElement("div");
+    actionsMain.className = "ad-actions-main";
+    const actionsBar = document.createElement("div");
+    actionsBar.className = "ad-actions-bar";
 
     // Auctions are now editable after publishing too (description, photos,
     // min step, end time) — start price stays fixed.
@@ -420,7 +434,7 @@ function renderAds() {
     `;
     editBtn.hidden = !canEdit;
     editBtn.onclick = openAdEdit;
-    actions.appendChild(editBtn);
+    actionsBar.appendChild(editBtn);
 
     if (!ad.is_published) {
       const publishBtn = document.createElement("button");
@@ -428,7 +442,7 @@ function renderAds() {
       publishBtn.type = "button";
       publishBtn.textContent = t("publish");
       publishBtn.onclick = () => { haptic("medium"); void publishAd(ad.id); };
-      actions.appendChild(publishBtn);
+      actionsMain.appendChild(publishBtn);
     }
 
     if (ad.post_link && !isExpiredFromChannel) {
@@ -437,7 +451,7 @@ function renderAds() {
       openBtn.type = "button";
       openBtn.textContent = t("open");
       openBtn.onclick = () => tg?.openTelegramLink?.(ad.post_link);
-      actions.appendChild(openBtn);
+      actionsMain.appendChild(openBtn);
     }
 
     if (ad.is_published && !isExpiredFromChannel && !isAuction) {
@@ -446,7 +460,7 @@ function renderAds() {
       reserveBtn.type = "button";
       reserveBtn.textContent = t(ad.is_reserved ? "unreserve" : "reserve");
       reserveBtn.onclick = () => { haptic("light"); reserveAd(ad.id, !!ad.is_reserved); };
-      actions.appendChild(reserveBtn);
+      actionsMain.appendChild(reserveBtn);
     }
 
     if (ad.is_published && isAuction) {
@@ -455,7 +469,7 @@ function renderAds() {
       bidsBtn.type = "button";
       bidsBtn.textContent = t("viewBids");
       bidsBtn.onclick = () => { haptic("light"); void openBidsScreen(ad.id); };
-      actions.appendChild(bidsBtn);
+      actionsMain.appendChild(bidsBtn);
     }
 
     if (ad.is_published && isAuction && ad.auction_status === "active") {
@@ -483,7 +497,7 @@ function renderAds() {
           void doStop();
         }
       };
-      actions.appendChild(stopBtn);
+      actionsMain.appendChild(stopBtn);
     }
 
     const commentsCount = Number(ad.comments_count) || 0;
@@ -505,11 +519,11 @@ function renderAds() {
         void trackEvent("open_comments");
         tg?.openTelegramLink?.(commentsLink || ad.post_link);
       };
-      actions.appendChild(commentsBtn);
+      actionsBar.appendChild(commentsBtn);
     }
 
     const deleteBtn = document.createElement("button");
-    deleteBtn.className = "danger ad-action ad-action-icon ad-action-delete";
+    deleteBtn.className = "ghost ad-action ad-action-icon ad-action-delete";
     deleteBtn.type = "button";
     deleteBtn.setAttribute("aria-label", t("delete"));
     deleteBtn.title = t("delete");
@@ -520,7 +534,12 @@ function renderAds() {
       </svg>
     `;
     deleteBtn.onclick = () => { haptic("light"); openDeleteConfirm(ad.id); };
-    actions.appendChild(deleteBtn);
+    actionsBar.appendChild(deleteBtn);
+
+    if (actionsMain.childElementCount) {
+      actions.appendChild(actionsMain);
+    }
+    actions.appendChild(actionsBar);
 
     const readMoreBtn = document.createElement("button");
     readMoreBtn.className = "ad-read-more-btn";
@@ -535,9 +554,9 @@ function renderAds() {
     };
 
     if (isExpiredFromChannel) {
-      body.append(title, readMoreBtn, meta, removedNote, actions);
+      body.append(...[title, readMoreBtn, meta, removedNote, actions].filter(Boolean));
     } else {
-      body.append(title, readMoreBtn, meta, actions);
+      body.append(...[title, readMoreBtn, meta, actions].filter(Boolean));
     }
     card.append(header, body);
     elements.adsList.appendChild(card);
@@ -554,10 +573,11 @@ function startEdit(ad) {
   state.editingId = ad.id;
   state.photoFileIds = ad.photo_file_ids || [];
   state.photoPreviews = (ad.photo_file_ids || []).map((fileId, idx) => {
-    const initData = encodeURIComponent(tg?.initData || "");
+    const base = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}`;
     return {
       source: "remote",
-      url: `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`,
+      url: `${base}&size=thumb`,
+      fullUrl: base,
       label: `#${idx + 1}`,
     };
   });

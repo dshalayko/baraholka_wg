@@ -200,10 +200,11 @@ function openEditModal(ad) {
   state.editModal.photoFileIds = ad.photo_file_ids || [];
   state.editModal.originalPhotoFileIds = [...(ad.photo_file_ids || [])];
   state.editModal.photoPreviews = (ad.photo_file_ids || []).map((fileId, idx) => {
-    const initData = encodeURIComponent(tg?.initData || "");
+    const base = `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}`;
     return {
       source: "remote",
-      url: `/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`,
+      url: `${base}&size=thumb`,
+      fullUrl: base,
       label: `#${idx + 1}`,
     };
   });

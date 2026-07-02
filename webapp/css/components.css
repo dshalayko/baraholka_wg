@@ -110,16 +110,12 @@
   box-shadow: 0 0 0 3px rgba(38, 120, 182, 0.28);
 }
 
+/* Cancel is a neutral escape hatch, not a destructive action — keep it quiet
+   so the primary button owns the visual hierarchy. */
 .cancel-action {
-  background: rgba(224, 84, 84, 0.1);
-  border: 1px solid rgba(224, 84, 84, 0.32);
-  color: #f08080;
-}
-
-:root[data-theme="light"] .cancel-action {
-  background: rgba(224, 84, 84, 0.07);
-  border-color: rgba(224, 84, 84, 0.28);
-  color: #c03030;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--meta-text);
 }
 
 .busy-overlay {
@@ -250,6 +246,33 @@
   border: none;
   background: rgba(255, 255, 255, 0.08);
   display: block;
+}
+
+/* Loading placeholder: reserve the final footprint and shimmer until the
+   authed fetch delivers the image bytes. */
+.photo-loading {
+  background: linear-gradient(
+    100deg,
+    rgba(127, 140, 155, 0.14) 40%,
+    rgba(127, 140, 155, 0.26) 50%,
+    rgba(127, 140, 155, 0.14) 60%
+  );
+  background-size: 200% 100%;
+  animation: photo-shimmer 1.2s linear infinite;
+}
+
+@keyframes photo-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.ad-photo.photo-loading {
+  height: min(52vh, 460px);
+}
+
+.bid-photo.photo-loading {
+  width: 120px;
 }
 
 .ad-gallery {
@@ -472,17 +495,6 @@
   background: rgba(215, 50, 50, 0.13);
 }
 
-/* On photo overlay: dark base for status so text is always readable */
-.ad-card-media .ad-status-tag {
-  background: rgba(0, 0, 0, 0.44);
-}
-
-.ad-card-media .ad-status-tag.is-draft    { color: #ffd580; }
-.ad-card-media .ad-status-tag.is-published { color: #72e89e; }
-.ad-card-media .ad-status-tag.is-updated   { color: #90d8ff; }
-.ad-card-media .ad-status-tag.is-reserved  { color: #ffd580; }
-.ad-card-media .ad-status-tag.is-removed   { color: #ffaaaa; }
-
 .ad-card h3 {
   margin: 0 0 8px;
   font-size: 15px;
@@ -573,30 +585,37 @@
   margin-bottom: 14px;
 }
 
+/* Actions: text buttons wrap two per row on top, icon buttons sit in a
+   single bar below with delete always pinned to the right corner. */
 .ad-actions {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-items: stretch;
+}
+
+.ad-actions-main {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
+.ad-actions-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .ad-action {
-  flex: 1 1 auto;
   min-height: 38px;
   min-width: 0;
   font-size: 12px;
 }
 
 .ad-action-main {
-  flex: 1 1 100px;
-}
-
-.ad-action-reserve {
-  flex: 1 1 100px;
+  flex: 1 1 calc(50% - 8px);
 }
 
 .ad-action-stop {
-  flex: 1 1 100px;
   color: var(--danger, #e53935);
 }
 
@@ -621,7 +640,9 @@
 }
 
 .ad-action-delete {
+  margin-left: auto;
   box-shadow: none;
+  color: var(--danger, #e53935);
 }
 
 .ad-action-comments {
@@ -1391,6 +1412,50 @@
 
 :root[data-theme="dark"] .ad-status-tag.is-auction-finished {
   background: #1a3620;
+  color: #72c472;
+}
+
+/* On photo overlay: opaque dark chip so the status is readable on any image.
+   Theme variants are repeated so these rules outweigh the theme-specific
+   colors above in both specificity and source order. */
+.ad-card-media .ad-status-tag,
+:root[data-theme="light"] .ad-card-media .ad-status-tag,
+:root[data-theme="dark"] .ad-card-media .ad-status-tag {
+  background: rgba(15, 19, 26, 0.94);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.ad-card-media .ad-status-tag.is-draft,
+.ad-card-media .ad-status-tag.is-reserved,
+:root[data-theme="light"] .ad-card-media .ad-status-tag.is-draft,
+:root[data-theme="light"] .ad-card-media .ad-status-tag.is-reserved {
+  color: #ffd580;
+}
+
+.ad-card-media .ad-status-tag.is-published,
+:root[data-theme="light"] .ad-card-media .ad-status-tag.is-published {
+  color: #72e89e;
+}
+
+.ad-card-media .ad-status-tag.is-updated,
+:root[data-theme="light"] .ad-card-media .ad-status-tag.is-updated {
+  color: #90d8ff;
+}
+
+.ad-card-media .ad-status-tag.is-removed,
+:root[data-theme="light"] .ad-card-media .ad-status-tag.is-removed {
+  color: #ffaaaa;
+}
+
+.ad-card-media .ad-status-tag.is-auction-active,
+:root[data-theme="light"] .ad-card-media .ad-status-tag.is-auction-active,
+:root[data-theme="dark"] .ad-card-media .ad-status-tag.is-auction-active {
+  color: #7ec6ff;
+}
+
+.ad-card-media .ad-status-tag.is-auction-finished,
+:root[data-theme="light"] .ad-card-media .ad-status-tag.is-auction-finished,
+:root[data-theme="dark"] .ad-card-media .ad-status-tag.is-auction-finished {
   color: #72c472;
 }
 

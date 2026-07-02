@@ -1056,17 +1056,17 @@ function renderBidScreen(data) {
   };
 
   const photos = Array.isArray(data.photo_file_ids) ? data.photo_file_ids : [];
-  if (photos.length && tg?.initData) {
-    const initData = encodeURIComponent(tg.initData);
+  if (photos.length) {
     const gallery = document.createElement("div");
     gallery.className = "bid-photos";
     photos.forEach((fileId) => {
       const img = document.createElement("img");
       img.className = "bid-photo";
       img.loading = "lazy";
-      img.src = `/api/auctions/${data.id}/photo?file_id=${encodeURIComponent(fileId)}&initData=${initData}`;
+      const photoUrl = `/api/auctions/${data.id}/photo?file_id=${encodeURIComponent(fileId)}`;
+      setAuthedImage(img, `${photoUrl}&size=thumb`);
       img.alt = data.description || "photo";
-      img.addEventListener("click", () => openPhotoViewer(img.src));
+      img.addEventListener("click", () => openAuthedPhotoViewer(photoUrl));
       gallery.appendChild(img);
     });
     elements.bidAuctionInfo.appendChild(gallery);
@@ -1106,7 +1106,7 @@ function renderBidScreen(data) {
   }
 
   if (data.auction_end_at) {
-    addRow(`${t("auctionEndAt")}:`, data.auction_end_at);
+    addRow(`${t("auctionEndAt")}:`, formatAuctionEnd(data.auction_end_at));
   }
 
   if (data.bids_count > 0) {

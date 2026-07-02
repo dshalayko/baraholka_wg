@@ -242,6 +242,21 @@ function validateAdForm({
   return hasDescription && hasPrice && hasContact;
 }
 
+// "2026-07-03 18:00:00" (Belgrade time from the server) → "3 июл., 18:00".
+function formatAuctionEnd(value) {
+  if (!value) return "";
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!m) return String(value);
+  const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  const locale = String(state.languageCode || "ru").toLowerCase().startsWith("ru") ? "ru-RU" : "en-GB";
+  return new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(dt);
+}
+
 function formatPublishedAt(value) {
   if (!value) return "";
   const match = String(value).trim().match(/^(\d{2}\.\d{2}\.\d{4})/);

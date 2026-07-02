@@ -353,10 +353,10 @@ function renderPhotoPreviews() {
     bindPhotoReorder(photoItem, index);
 
     const img = document.createElement("img");
-    img.src = item.url;
+    setAuthedImage(img, item.url);
     img.alt = "photo";
     img.draggable = false;
-    img.addEventListener("click", () => openPhotoViewer(item.url));
+    img.addEventListener("click", () => openAuthedPhotoViewer(item.fullUrl || item.url));
 
     const dragHandle = document.createElement("div");
     dragHandle.className = "photo-drag-handle";
@@ -397,10 +397,10 @@ function renderEditPhotoPreviews() {
     bindPhotoReorder(photoItem, index, true);
 
     const img = document.createElement("img");
-    img.src = item.url;
+    setAuthedImage(img, item.url);
     img.alt = "photo";
     img.draggable = false;
-    img.addEventListener("click", () => openPhotoViewer(item.url));
+    img.addEventListener("click", () => openAuthedPhotoViewer(item.fullUrl || item.url));
 
     const dragHandle = document.createElement("div");
     dragHandle.className = "photo-drag-handle";

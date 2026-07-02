@@ -9,6 +9,8 @@
   --button-text: #ffffff;
   --border: rgba(255, 255, 255, 0.07);
   --border-strong: rgba(255, 255, 255, 0.12);
+  --input-bg: #1a2026;
+  --input-border: rgba(255, 255, 255, 0.14);
   --danger: #e05454;
   --chip-bg: rgba(106, 179, 243, 0.14);
   --chip-ink: #6ab3f3;
@@ -37,6 +39,8 @@
   --button-text: #ffffff;
   --border: rgba(0, 0, 0, 0.07);
   --border-strong: rgba(0, 0, 0, 0.12);
+  --input-bg: #edeff4;
+  --input-border: rgba(0, 0, 0, 0.16);
   --danger: #e53e3e;
   --chip-bg: rgba(38, 120, 182, 0.1);
   --chip-ink: #1a6da8;
@@ -79,6 +83,7 @@ a,
 #app {
   max-width: 920px;
   margin: 0 auto;
-  /* extra bottom space so content clears the fixed bottom nav bar */
-  padding: 16px 16px calc(98px + env(safe-area-inset-bottom));
+  /* extra bottom space so content clears the fixed bottom nav bar
+     (nav height + its 14px bottom margin + a visible gap) */
+  padding: 16px 16px calc(118px + env(safe-area-inset-bottom));
 }

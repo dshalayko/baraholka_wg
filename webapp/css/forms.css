@@ -177,15 +177,16 @@
 }
 
 textarea,
+select,
 input[type="text"],
 input[type="number"] {
   width: 100%;
   padding: 11px 13px;
   border-radius: 10px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--input-border);
   font-size: 14px;
   font-family: inherit;
-  background: var(--bg);
+  background: var(--input-bg);
   color: var(--ink);
   transition: border-color 0.15s ease;
 }

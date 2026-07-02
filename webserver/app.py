@@ -2,8 +2,8 @@ import asyncio
 import json
 import os
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, Response
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from webserver.db import ensure_db
@@ -32,6 +32,30 @@ class NoCacheStaticFiles(StaticFiles):
 
 app = FastAPI()
 app.mount("/static", NoCacheStaticFiles(directory=WEBAPP_DIR), name="static")
+
+MAX_JSON_BODY_BYTES = 2 * 1024 * 1024
+# Uploads: up to 10 photos × 10 MB each, plus multipart overhead.
+MAX_UPLOAD_BODY_BYTES = 110 * 1024 * 1024
+
+
+@app.middleware("http")
+async def limit_request_body(request: Request, call_next):
+    # Handlers read the whole body into memory, so an unbounded body is a
+    # memory-DoS vector; reject oversized (or undeclared chunked) bodies early.
+    if request.method in ("POST", "PUT", "PATCH"):
+        limit = MAX_UPLOAD_BODY_BYTES if request.url.path == "/api/uploads" else MAX_JSON_BODY_BYTES
+        content_length = request.headers.get("content-length")
+        if content_length is None:
+            if request.headers.get("transfer-encoding"):
+                return JSONResponse({"detail": "Content-Length required"}, status_code=411)
+        else:
+            try:
+                declared = int(content_length)
+            except ValueError:
+                return JSONResponse({"detail": "Invalid Content-Length"}, status_code=400)
+            if declared > limit:
+                return JSONResponse({"detail": "Request body too large"}, status_code=413)
+    return await call_next(request)
 
 
 @app.on_event("startup")
