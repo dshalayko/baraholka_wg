@@ -157,6 +157,11 @@
               <div class="field-error" id="auctionMinStepError" hidden></div>
             </div>
             <div class="auction-field">
+              <label class="auction-field-label" id="auctionBuyoutLabel">Цена «Купить сразу»</label>
+              <input id="auctionBuyout" type="number" min="1" placeholder="Необязательно" />
+              <div class="field-error" id="auctionBuyoutError" hidden></div>
+            </div>
+            <div class="auction-field">
               <label class="auction-field-label" id="auctionDurationLabel">Длительность</label>
               <select id="auctionDuration">
                 <option value="1">1 час</option>
@@ -251,6 +256,9 @@
           <div class="bid-form-actions">
             <button class="primary bid-submit-btn" id="bidSubmitBtn" type="button">
               <span id="bidSubmitText">Поставить ставку</span>
+            </button>
+            <button class="bid-buyout-btn" id="bidBuyoutBtn" type="button" hidden>
+              <span id="bidBuyoutText">Купить сразу</span>
             </button>
             <button class="bid-back-to-post-btn" id="bidBackToPostBtn" type="button" hidden>
               <span id="bidBackToPostText">Вернуться к объявлению</span>
@@ -361,6 +369,11 @@
               <label class="auction-field-label" id="editAuctionMinStepLabel">Минимальный шаг</label>
               <input id="editAuctionMinStep" type="number" min="1" placeholder="Например: 10" />
               <div class="field-error" id="editAuctionMinStepError" hidden></div>
+            </div>
+            <div class="auction-field">
+              <label class="auction-field-label" id="editAuctionBuyoutLabel">Цена «Купить сразу»</label>
+              <input id="editAuctionBuyout" type="number" min="1" placeholder="Необязательно" />
+              <div class="field-error" id="editAuctionBuyoutError" hidden></div>
             </div>
             <div class="auction-field">
               <label class="auction-field-label" id="editAuctionDurationLabel">Окончание (от текущего момента)</label>

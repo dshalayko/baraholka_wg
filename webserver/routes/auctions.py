@@ -33,7 +33,7 @@ async def get_auction(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            SELECT id, description, start_price, current_price, min_step, auction_end_at,
+            SELECT id, description, start_price, current_price, min_step, buyout_price, auction_end_at,
                    auction_status, winner_username, username, photo_file_ids, message_ids, currency,
                    (SELECT COUNT(*) FROM auction_bids WHERE announcement_id = announcements.id) as bids_count
             FROM announcements
@@ -52,6 +52,7 @@ async def get_auction(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_
         start_price,
         current_price,
         min_step,
+        buyout_price,
         auction_end_at,
         auction_status,
         winner_username,
@@ -76,6 +77,7 @@ async def get_auction(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_
         "start_price": start_price,
         "current_price": current_price,
         "min_step": min_step,
+        "buyout_price": buyout_price,
         "auction_end_at": auction_end_at,
         "auction_status": auction_status,
         "winner_username": winner_username,
@@ -137,7 +139,7 @@ async def place_bid(
         cursor = await db.execute(
             """
             SELECT id, user_id, description, username, contact_info, start_price, current_price, min_step,
-                   auction_end_at, auction_status, message_ids, photo_file_ids, owner_language_code,
+                   buyout_price, auction_end_at, auction_status, message_ids, photo_file_ids, owner_language_code,
                    winner_user_id, winner_language_code, currency
             FROM announcements
             WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
@@ -158,6 +160,7 @@ async def place_bid(
             start_price,
             current_price,
             min_step,
+            buyout_price,
             auction_end_at,
             auction_status,
             message_ids_json,
@@ -211,6 +214,13 @@ async def place_bid(
         bids_count_row = await cursor2.fetchone()
         bids_count = bids_count_row[0] if bids_count_row else 1
 
+    # A bid at or above the buyout price wins instantly: finish_auction rewrites
+    # the post to the finished state and notifies the seller and the winner, so
+    # the regular post-edit and notifications below are skipped.
+    if buyout_price is not None and payload.amount >= buyout_price:
+        await finish_auction(ann_id)
+        return {"ok": True, "current_price": payload.amount, "won": True}
+
     # Edit channel post. For an album the caption lives on the first message;
     # for a text-only auction it's the only message — message_ids[0] covers both.
     message_ids = json.loads(message_ids_json) if message_ids_json else []
@@ -230,6 +240,7 @@ async def place_bid(
             auction_status="active",
             language_code=owner_language_code,
             currency=currency,
+            buyout_price=buyout_price,
         )
         updated_text = updated_text + "\n\n" + make_bid_link_md(ann_id, owner_language_code)
         try:
@@ -301,6 +312,70 @@ async def place_bid(
             logger.warning("auction:bid outbid_notify failed ann_id=%s user_id=%s error=%s", ann_id, prev_winner_user_id, exc)
 
     return {"ok": True, "current_price": payload.amount}
+
+
+@router.post("/api/auctions/{ann_id}/buyout")
+async def buyout_auction(
+    ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)
+) -> Dict[str, Any]:
+    """Instantly win the auction at the seller's buyout price: the buyout is
+    recorded as a regular bid and the auction is finished on the spot."""
+    user_id = user.get("id")
+    username = user.get("username") or "None"
+    display_name = " ".join(filter(None, [user.get("first_name"), user.get("last_name")])).strip() or None
+    winner_name = f"@{username}" if username != "None" else (display_name or str(user_id))
+    logger.info("auction:buyout ann_id=%s user_id=%s", ann_id, user_id)
+
+    private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
+    if private_channel_id is None:
+        raise HTTPException(status_code=500, detail="PRIVATE_CHANNEL_ID is not set")
+
+    # Same locking pattern as place_bid: BEGIN IMMEDIATE serializes concurrent
+    # buyers so only the first one becomes the recorded winner.
+    async with aiosqlite.connect(DB_PATH, timeout=15, isolation_level=None) as db:
+        await db.execute("BEGIN IMMEDIATE")
+        cursor = await db.execute(
+            """
+            SELECT user_id, buyout_price, auction_end_at, auction_status
+            FROM announcements
+            WHERE id = ? AND COALESCE(ad_type,'fixed') = 'auction'
+            """,
+            (ann_id,),
+        )
+        row = await cursor.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail={"code": "auction_not_found", "message": "Auction not found"})
+
+        seller_user_id, buyout_price, auction_end_at, auction_status = row
+
+        if auction_status != "active":
+            raise HTTPException(status_code=400, detail={"code": "auction_not_active", "message": "Auction is not active"})
+
+        now_str = _get_serbia_now_str()
+        if auction_end_at and auction_end_at <= now_str:
+            raise HTTPException(status_code=400, detail={"code": "auction_ended", "message": "Auction has already ended"})
+
+        if user_id == seller_user_id:
+            raise HTTPException(status_code=403, detail={"code": "own_auction", "message": "You cannot buy your own auction"})
+
+        if not buyout_price:
+            raise HTTPException(status_code=400, detail={"code": "no_buyout", "message": "This auction has no buyout price"})
+
+        await db.execute(
+            "INSERT INTO auction_bids (announcement_id, user_id, username, amount, created_at) VALUES (?, ?, ?, ?, ?)",
+            (ann_id, user_id, winner_name, buyout_price, now_str),
+        )
+        await db.execute(
+            "UPDATE announcements SET current_price = ?, winner_user_id = ?, winner_username = ?, winner_language_code = ? WHERE id = ?",
+            (buyout_price, user_id, winner_name, user.get("language_code"), ann_id),
+        )
+        await db.commit()
+
+    # finish_auction edits the channel post to the finished state and notifies
+    # the seller and the winner.
+    await finish_auction(ann_id)
+    return {"ok": True, "current_price": buyout_price, "won": True}
 
 
 @router.get("/api/auctions/{ann_id}/bids")
@@ -564,6 +639,7 @@ async def edit_auction(
 
         contact_info = (payload.contact_info or "").strip()
         new_min_step = payload.min_step if payload.min_step else None
+        new_buyout_price = payload.buyout_price if payload.buyout_price else None
         new_currency = normalize_currency(payload.currency) if payload.currency else None
 
         # New end time = now + chosen duration (capped). Keep current if not given.
@@ -579,6 +655,7 @@ async def edit_auction(
             UPDATE announcements
             SET description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?,
                 min_step = COALESCE(?, min_step),
+                buyout_price = COALESCE(?, buyout_price),
                 auction_duration_hours = COALESCE(?, auction_duration_hours),
                 auction_end_at = COALESCE(?, auction_end_at),
                 currency = COALESCE(?, currency)
@@ -590,6 +667,7 @@ async def edit_auction(
                 json.dumps(payload.photo_file_ids),
                 get_serbia_time(),
                 new_min_step,
+                new_buyout_price,
                 payload.auction_duration_hours,
                 new_end_at,
                 new_currency,
@@ -600,9 +678,9 @@ async def edit_auction(
 
         # Re-read the effective values for rendering.
         cursor2 = await db.execute(
-            "SELECT min_step, auction_end_at, currency FROM announcements WHERE id = ?", (ann_id,)
+            "SELECT min_step, buyout_price, auction_end_at, currency FROM announcements WHERE id = ?", (ann_id,)
         )
-        eff_min_step, eff_end_at, eff_currency = await cursor2.fetchone()
+        eff_min_step, eff_buyout_price, eff_end_at, eff_currency = await cursor2.fetchone()
 
     # Rebuild and edit the post caption/text in place.
     has_photo = bool(json.loads(photo_file_ids)) if photo_file_ids else False
@@ -619,6 +697,7 @@ async def edit_auction(
         auction_status="active",
         language_code=owner_language_code,
         currency=eff_currency,
+        buyout_price=eff_buyout_price,
     )
     message = message + "\n\n" + make_bid_link_md(ann_id, owner_language_code)
 

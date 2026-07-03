@@ -158,6 +158,7 @@ function captureEditModalSnapshot() {
     adType: state.editModal.adType,
     photoFileIds: state.editModal.photoFileIds,
     minStep: elements.editAuctionMinStep?.value || "",
+    buyout: elements.editAuctionBuyout?.value || "",
     duration: elements.editAuctionDuration?.value || "",
     currency: state.editModal.currency,
   });
@@ -187,6 +188,7 @@ function resetEditModal() {
   state.editModal.currency = "RSD";
   if (elements.editAuctionSection) elements.editAuctionSection.hidden = true;
   if (elements.editAuctionMinStep) elements.editAuctionMinStep.value = "";
+  if (elements.editAuctionBuyout) elements.editAuctionBuyout.value = "";
   if (elements.editPriceField) elements.editPriceField.hidden = false;
   if (elements.editPriceToggleField) elements.editPriceToggleField.hidden = false;
   elements.editPhotos.value = "";
@@ -219,6 +221,8 @@ function openEditModal(ad) {
     // price fields are not used.
     if (elements.editAuctionSection) elements.editAuctionSection.hidden = false;
     if (elements.editAuctionMinStepLabel) elements.editAuctionMinStepLabel.textContent = t("auctionMinStep");
+    if (elements.editAuctionBuyoutLabel) elements.editAuctionBuyoutLabel.textContent = t("auctionBuyoutPrice");
+    if (elements.editAuctionBuyout) elements.editAuctionBuyout.placeholder = t("auctionBuyoutPlaceholder");
     if (elements.editAuctionDurationLabel) elements.editAuctionDurationLabel.textContent = t("auctionDurationFromNow");
     if (elements.editAuctionCurrencyLabel) elements.editAuctionCurrencyLabel.textContent = t("auctionCurrency");
     setEditAuctionCurrency(ad.currency || "RSD");
@@ -235,6 +239,7 @@ function openEditModal(ad) {
         .catch(() => {});
     }
     if (elements.editAuctionMinStep) elements.editAuctionMinStep.value = ad.min_step ?? "";
+    if (elements.editAuctionBuyout) elements.editAuctionBuyout.value = ad.buyout_price ?? "";
     if (elements.editAuctionDuration) {
       const opts = elements.editAuctionDuration.options;
       const durationKeys = ["duration1h", "duration3h", "duration6h", "duration12h", "duration24h", "duration48h"];

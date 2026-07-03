@@ -64,6 +64,7 @@ function captureFormSnapshot() {
     photoFileIds: state.photoFileIds,
     auctionStartPrice: elements.auctionStartPrice?.value || "",
     auctionMinStep: elements.auctionMinStep?.value || "",
+    auctionBuyout: elements.auctionBuyout?.value || "",
     auctionDuration: elements.auctionDuration?.value || "",
     auctionCurrency: state.auctionCurrency,
   });
@@ -95,6 +96,7 @@ function resetForm() {
   if (elements.formatToggleBtn) elements.formatToggleBtn.classList.remove("active");
   if (elements.auctionStartPrice) elements.auctionStartPrice.value = "";
   if (elements.auctionMinStep) elements.auctionMinStep.value = "";
+  if (elements.auctionBuyout) elements.auctionBuyout.value = "";
   if (elements.auctionDuration) elements.auctionDuration.value = "24";
   if (typeof setAuctionCurrency === "function") setAuctionCurrency("RSD");
   setAdType("fixed");
@@ -380,6 +382,9 @@ function renderAds() {
           noBids.textContent = t("auctionNoBids");
           meta.appendChild(noBids);
         }
+        if (ad.buyout_price != null) {
+          addBidRow(`${t("auctionBuyoutRow")}:`, formatMoney(ad.buyout_price, adCur));
+        }
         if (ad.bids_count > 0) {
           addBidRow(`${t("auctionBidsCount")}:`, String(ad.bids_count));
         }
@@ -593,6 +598,7 @@ function startEdit(ad) {
   if (isAuction) {
     if (elements.auctionStartPrice) elements.auctionStartPrice.value = ad.start_price || "";
     if (elements.auctionMinStep) elements.auctionMinStep.value = ad.min_step || "";
+    if (elements.auctionBuyout) elements.auctionBuyout.value = ad.buyout_price || "";
     if (elements.auctionDuration && ad.auction_duration_hours) {
       elements.auctionDuration.value = String(ad.auction_duration_hours);
     }

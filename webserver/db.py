@@ -58,6 +58,8 @@ async def ensure_db() -> None:
             await db.execute("ALTER TABLE announcements ADD COLUMN current_price INTEGER")
         if "min_step" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN min_step INTEGER")
+        if "buyout_price" not in columns:
+            await db.execute("ALTER TABLE announcements ADD COLUMN buyout_price INTEGER")
         if "auction_end_at" not in columns:
             await db.execute("ALTER TABLE announcements ADD COLUMN auction_end_at TEXT")
         if "auction_duration_hours" not in columns:

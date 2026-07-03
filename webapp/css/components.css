@@ -1660,6 +1660,28 @@
   font-size: 15px;
 }
 
+.bid-buyout-btn {
+  width: 100%;
+  padding: 13px;
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #2f9e5f;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.bid-buyout-btn:active {
+  opacity: 0.8;
+}
+
+.bid-buyout-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .bid-back-to-post-btn {
   width: 100%;
   padding: 13px;

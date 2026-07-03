@@ -425,6 +425,13 @@ async function editAuctionInPlace(annId, payload) {
   });
 }
 
+async function buyoutAuction(annId) {
+  return apiFetch(`/api/auctions/${annId}/buyout`, {
+    method: "POST",
+    noUnauthorizedMode: true,
+  });
+}
+
 async function placeBid(annId, amount) {
   return apiFetch(`/api/auctions/${annId}/bid`, {
     method: "POST",

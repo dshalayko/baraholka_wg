@@ -351,6 +351,8 @@ function applyTranslations() {
   if (elements.auctionCurrencyLabel) elements.auctionCurrencyLabel.textContent = t("auctionCurrency");
   if (elements.auctionStartPrice) elements.auctionStartPrice.placeholder = t("auctionStartPricePlaceholder");
   if (elements.auctionMinStep) elements.auctionMinStep.placeholder = t("auctionMinStepPlaceholder");
+  if (elements.auctionBuyoutLabel) elements.auctionBuyoutLabel.textContent = t("auctionBuyoutPrice");
+  if (elements.auctionBuyout) elements.auctionBuyout.placeholder = t("auctionBuyoutPlaceholder");
   if (elements.auctionDuration) {
     const durationOptions = elements.auctionDuration.options;
     const durationKeys = ["duration1h", "duration3h", "duration6h", "duration12h", "duration24h", "duration48h"];
@@ -733,7 +735,14 @@ function bindEvents() {
         if (elements.editAuctionMinStepError) setFieldError(elements.editAuctionMinStepError, t("auctionMinStepMin"));
         setFieldInvalid(elements.editAuctionMinStep, true);
       }
-      if (!descValid || !stepValid) return;
+      const buyoutPrice = parseInt(elements.editAuctionBuyout?.value, 10) || null;
+      let buyoutValid = true;
+      if (elements.editAuctionBuyout?.value && (!buyoutPrice || (state.editModal.startPrice && buyoutPrice <= state.editModal.startPrice))) {
+        buyoutValid = false;
+        if (elements.editAuctionBuyoutError) setFieldError(elements.editAuctionBuyoutError, t("auctionBuyoutMin"));
+        setFieldInvalid(elements.editAuctionBuyout, true);
+      }
+      if (!descValid || !stepValid || !buyoutValid) return;
       payload = {
         description,
         price: "",
@@ -743,6 +752,7 @@ function bindEvents() {
         ad_type: "auction",
         start_price: state.editModal.startPrice,
         min_step: minStep,
+        buyout_price: buyoutPrice,
         // Empty = keep the current end time; a value sets end = now + duration.
         auction_duration_hours: parseInt(elements.editAuctionDuration?.value, 10) || null,
         currency: state.editModal.currency,
@@ -977,6 +987,7 @@ function getAuctionPayloadFields() {
     ad_type: "auction",
     start_price: parseInt(elements.auctionStartPrice?.value, 10) || null,
     min_step: parseInt(elements.auctionMinStep?.value, 10) || null,
+    buyout_price: parseInt(elements.auctionBuyout?.value, 10) || null,
     auction_duration_hours: parseInt(elements.auctionDuration?.value, 10) || 24,
     currency: state.auctionCurrency,
   };
@@ -1009,6 +1020,15 @@ function validateAuctionFields() {
     if (elements.auctionMinStepError) {
       setFieldError(elements.auctionMinStepError, t("auctionMinStepMin"));
       setFieldInvalid(elements.auctionMinStep, true);
+    }
+    valid = false;
+  }
+  // Buyout price is optional, but when set it must beat the starting price.
+  const buyoutPrice = parseInt(elements.auctionBuyout?.value, 10);
+  if (elements.auctionBuyout?.value && (!buyoutPrice || (startPrice && buyoutPrice <= startPrice))) {
+    if (elements.auctionBuyoutError) {
+      setFieldError(elements.auctionBuyoutError, t("auctionBuyoutMin"));
+      setFieldInvalid(elements.auctionBuyout, true);
     }
     valid = false;
   }
@@ -1105,12 +1125,26 @@ function renderBidScreen(data) {
     if (minRequired) elements.bidAmount.min = String(minRequired);
   }
 
+  if (data.buyout_price != null) {
+    addRow(`${t("auctionBuyoutRow")}:`, formatMoney(data.buyout_price, cur));
+  }
+
   if (data.auction_end_at) {
     addRow(`${t("auctionEndAt")}:`, formatAuctionEnd(data.auction_end_at));
   }
 
   if (data.bids_count > 0) {
     addRow(`${t("auctionBidsCount")}:`, String(data.bids_count));
+  }
+
+  // "Buy now" wins the auction on the spot at the seller's buyout price.
+  state.bidBuyoutPrice = data.buyout_price || null;
+  state.bidBuyoutLabel = data.buyout_price != null ? formatMoney(data.buyout_price, cur) : null;
+  if (elements.bidBuyoutBtn) {
+    elements.bidBuyoutBtn.hidden = data.buyout_price == null;
+    if (elements.bidBuyoutText && state.bidBuyoutLabel) {
+      elements.bidBuyoutText.textContent = t("bidBuyoutBtn").replace("{price}", state.bidBuyoutLabel);
+    }
   }
 }
 
@@ -1151,6 +1185,8 @@ function bidErrorMessage(err) {
       return t("bidAuctionEnded");
     case "own_auction":
       return t("bidOwnAuction");
+    case "no_buyout":
+      return t("bidNoBuyout");
     case "auction_not_found":
       return t("loadFailed");
     default:
@@ -1183,6 +1219,7 @@ async function refreshBidInfo(annId) {
     stopBidPolling();
     if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-ended">${t("bidAuctionEnded")}</div>`;
     if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = true;
+    if (elements.bidBuyoutBtn) elements.bidBuyoutBtn.hidden = true;
     return;
   }
   renderBidScreen(data);
@@ -1196,6 +1233,10 @@ async function openBidScreen(annId) {
   if (elements.bidAmount) elements.bidAmount.value = "";
   if (elements.bidAmountError) setFieldError(elements.bidAmountError, "");
   if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = false;
+  if (elements.bidBuyoutBtn) {
+    elements.bidBuyoutBtn.hidden = true;
+    elements.bidBuyoutBtn.disabled = false;
+  }
   updateBackToPostBtn(null);
 
   try {
@@ -1204,6 +1245,7 @@ async function openBidScreen(annId) {
     if (data.auction_status === "finished") {
       if (elements.bidAuctionInfo) elements.bidAuctionInfo.innerHTML = `<div class="bid-info-ended">${t("bidAuctionEnded")}</div>`;
       if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = true;
+      if (elements.bidBuyoutBtn) elements.bidBuyoutBtn.hidden = true;
       return;
     }
     renderBidScreen(data);
@@ -1321,6 +1363,10 @@ function bindAuctionEvents() {
     setFieldInvalid(elements.auctionMinStep, false);
     if (elements.auctionMinStepError) setFieldError(elements.auctionMinStepError, "");
   });
+  elements.auctionBuyout?.addEventListener("input", () => {
+    setFieldInvalid(elements.auctionBuyout, false);
+    if (elements.auctionBuyoutError) setFieldError(elements.auctionBuyoutError, "");
+  });
   const goToAuctionPost = () => {
     const link = state.bidPostLink;
     if (!link) return;
@@ -1398,6 +1444,40 @@ function bindAuctionEvents() {
       }
     } finally {
       setBusy(false);
+    }
+  });
+  elements.bidBuyoutBtn?.addEventListener("click", () => {
+    const annId = state.bidScreenAnnId;
+    if (!annId || !state.bidBuyoutPrice) return;
+    haptic("medium");
+    const doBuyout = async () => {
+      // Same one-time write-access ask as for bids, so the bot can DM the winner.
+      if (!state.askedWriteAccess) {
+        state.askedWriteAccess = true;
+        await ensureWriteAccess();
+      }
+      setBusy(true, t("busyBuyingOut"));
+      try {
+        await buyoutAuction(annId);
+        showToast(t("bidBuyoutSuccess"), "success");
+        await openBidScreen(annId);
+      } catch (err) {
+        if (err?.status === 401) {
+          if (elements.bidAmountError) setFieldError(elements.bidAmountError, t("bidOpenInTelegram"));
+        } else {
+          // Someone may have bought or finished it first — resync, then explain.
+          await refreshBidInfo(annId);
+          if (elements.bidAmountError) setFieldError(elements.bidAmountError, bidErrorMessage(err));
+        }
+      } finally {
+        setBusy(false);
+      }
+    };
+    const confirmText = t("bidBuyoutConfirm").replace("{price}", state.bidBuyoutLabel || String(state.bidBuyoutPrice));
+    if (tg?.showConfirm) {
+      tg.showConfirm(confirmText, (ok) => { if (ok) void doBuyout(); });
+    } else if (window.confirm(confirmText)) {
+      void doBuyout();
     }
   });
 }

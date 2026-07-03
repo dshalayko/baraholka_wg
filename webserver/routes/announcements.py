@@ -76,7 +76,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
         cursor = await db.execute(
             """
             SELECT id, description, price, price_in_description, contact_info, photo_file_ids, message_ids, timestamp, updated_at, last_published_is_edit, is_reserved,
-                   COALESCE(ad_type,'fixed'), auction_status, start_price, current_price, min_step, auction_end_at, winner_username, auction_duration_hours, currency,
+                   COALESCE(ad_type,'fixed'), auction_status, start_price, current_price, min_step, buyout_price, auction_end_at, winner_username, auction_duration_hours, currency,
                    (SELECT COUNT(*) FROM auction_bids WHERE announcement_id = announcements.id) as bids_count
             FROM announcements WHERE user_id = ?
             """,
@@ -105,6 +105,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
             start_price,
             current_price,
             min_step,
+            buyout_price,
             auction_end_at,
             winner_username,
             auction_duration_hours,
@@ -143,6 +144,7 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
                 "start_price": start_price,
                 "current_price": current_price,
                 "min_step": min_step,
+                "buyout_price": buyout_price,
                 "auction_end_at": auction_end_at,
                 "winner_username": winner_username,
                 "auction_duration_hours": auction_duration_hours,
@@ -198,12 +200,15 @@ async def create_announcement(
     ad_type = payload.ad_type or "fixed"
     auction_duration_hours = payload.auction_duration_hours if ad_type == "auction" else None
     currency = normalize_currency(payload.currency) if ad_type == "auction" else None
+    buyout_price = payload.buyout_price if ad_type == "auction" else None
+    if buyout_price and payload.start_price and buyout_price <= payload.start_price:
+        raise HTTPException(status_code=422, detail="Buyout price must be greater than the start price")
 
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             """
-            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids, updated_at, ad_type, start_price, min_step, auction_duration_hours, owner_language_code, currency)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO announcements (user_id, username, description, price, price_in_description, contact_info, photo_file_ids, updated_at, ad_type, start_price, min_step, buyout_price, auction_duration_hours, owner_language_code, currency)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -217,6 +222,7 @@ async def create_announcement(
                 ad_type,
                 payload.start_price if ad_type == "auction" else None,
                 payload.min_step if ad_type == "auction" else None,
+                buyout_price,
                 auction_duration_hours,
                 user.get("language_code"),
                 currency,
@@ -267,6 +273,9 @@ async def update_announcement(
         update_ad_type = payload.ad_type or "fixed"
         update_duration = payload.auction_duration_hours if update_ad_type == "auction" else None
         update_currency = normalize_currency(payload.currency) if update_ad_type == "auction" else None
+        update_buyout = payload.buyout_price if update_ad_type == "auction" else None
+        if update_buyout and payload.start_price and update_buyout <= payload.start_price:
+            raise HTTPException(status_code=422, detail="Buyout price must be greater than the start price")
         new_end_at = None
         if update_ad_type == "auction" and is_published and payload.auction_duration_hours:
             belgrade_tz = pytz.timezone("Europe/Belgrade")
@@ -277,7 +286,7 @@ async def update_announcement(
         await db.execute(
             """
             UPDATE announcements SET description = ?, price = ?, price_in_description = ?, contact_info = ?, photo_file_ids = ?, updated_at = ?,
-                ad_type = ?, start_price = COALESCE(?, start_price), min_step = ?, auction_duration_hours = COALESCE(?, auction_duration_hours),
+                ad_type = ?, start_price = COALESCE(?, start_price), min_step = ?, buyout_price = ?, auction_duration_hours = COALESCE(?, auction_duration_hours),
                 auction_end_at = COALESCE(?, auction_end_at), currency = COALESCE(?, currency)
             WHERE id = ?
             """,
@@ -291,6 +300,7 @@ async def update_announcement(
                 update_ad_type,
                 payload.start_price if update_ad_type == "auction" else None,
                 payload.min_step if update_ad_type == "auction" else None,
+                update_buyout,
                 update_duration,
                 new_end_at,
                 update_currency,
@@ -450,7 +460,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
             cursor = await db.execute(
                 """
                 SELECT description, price, price_in_description, username, contact_info, photo_file_ids, message_ids, timestamp, is_reserved,
-                       COALESCE(ad_type,'fixed'), auction_status, start_price, min_step, auction_end_at, auction_duration_hours,
+                       COALESCE(ad_type,'fixed'), auction_status, start_price, min_step, buyout_price, auction_end_at, auction_duration_hours,
                        current_price, winner_username, currency
                 FROM announcements WHERE id = ? AND user_id = ?
                 """,
@@ -475,6 +485,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 pub_auction_status,
                 pub_start_price,
                 pub_min_step,
+                pub_buyout_price,
                 pub_auction_end_at,
                 pub_auction_duration_hours,
                 pub_current_price,
@@ -522,6 +533,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 auction_status="active",
                 language_code=owner_language_code,
                 currency=pub_currency,
+                buyout_price=pub_buyout_price,
             )
             # Telegram does not allow inline buttons on media groups (albums), so the
             # bid action is a clickable link inside the caption. This keeps everything

@@ -12,6 +12,7 @@ class AnnouncementIn(BaseModel):
     ad_type: Optional[str] = Field(default="fixed")
     start_price: Optional[int] = None
     min_step: Optional[int] = None
+    buyout_price: Optional[int] = None
     auction_duration_hours: Optional[int] = None
     currency: Optional[str] = None
 
@@ -35,6 +36,7 @@ class AnnouncementOut(BaseModel):
     start_price: Optional[int] = None
     current_price: Optional[int] = None
     min_step: Optional[int] = None
+    buyout_price: Optional[int] = None
     auction_end_at: Optional[str] = None
     winner_username: Optional[str] = None
     bids_count: int = 0

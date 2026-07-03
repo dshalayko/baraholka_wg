@@ -203,6 +203,7 @@ def format_auction_text(
     auction_status,
     language_code=None,
     currency=None,
+    buyout_price=None,
 ) -> str:
     texts = texts_for(language_code)
     description_escaped = _escape_description_with_styles(description)
@@ -248,6 +249,8 @@ def format_auction_text(
             parts.append(escape_markdown_v2(texts.AUCTION_NO_BIDS_YET))
         if min_step is not None:
             parts.append(kv(texts.AUCTION_MIN_STEP, money(min_step)))
+        if buyout_price is not None:
+            parts.append(kv(texts.AUCTION_BUYOUT_PRICE, money(buyout_price)))
         lines.append(sep.join(parts))
         if auction_end_at:
             lines.append(kv(texts.AUCTION_END_AT, auction_end_at))
