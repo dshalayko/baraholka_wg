@@ -74,6 +74,10 @@ NOT_SUBSCRIBED_SHORT = "You are not subscribed to the channel yet."
 
 ANONYMOUS_NAME = "Anonymous"
 
+# --- Dates ---
+# Short month names for readable dates: "29 Jul, 15:18".
+MONTHS_SHORT = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
 # --- Auction (channel post) ---
 AUCTION_HEADER = "💰 AUCTION"
 AUCTION_FINISHED_HEADER = "✅ AUCTION ENDED"

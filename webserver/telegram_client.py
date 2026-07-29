@@ -190,6 +190,19 @@ def make_bid_link_md(ann_id: int, language_code=None) -> str:
     return f"*[{label}]({url})*"
 
 
+def format_auction_end(auction_end_at, language_code=None) -> str:
+    """Turn the stored "2026-07-29 15:18:02" stamp into "29 июл, 15:18".
+    Mirrors formatAuctionEnd() in the mini app so the post and the bid screen
+    show the same thing. Anything unparsable is passed through as-is."""
+    value = str(auction_end_at or "").strip()
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})", value)
+    if not match:
+        return value
+    _year, month, day, hour, minute = (int(part) for part in match.groups())
+    months = texts_for(language_code).MONTHS_SHORT
+    return f"{day} {months[month - 1]}, {hour:02d}:{minute:02d}"
+
+
 def format_auction_text(
     description: str,
     username: str,
@@ -253,7 +266,7 @@ def format_auction_text(
             parts.append(kv(texts.AUCTION_BUYOUT_PRICE, money(buyout_price)))
         lines.append(sep.join(parts))
         if auction_end_at:
-            lines.append(kv(texts.AUCTION_END_AT, auction_end_at))
+            lines.append(kv(texts.AUCTION_END_AT, format_auction_end(auction_end_at, language_code)))
         lines.append("")
         lines.append(contact_block)
 

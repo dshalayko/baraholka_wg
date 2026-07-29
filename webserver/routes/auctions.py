@@ -14,7 +14,7 @@ from webserver.auth import get_user_from_request
 from webserver.models import AnnouncementIn, BidIn
 from webserver.photos import serve_telegram_photo
 from webserver.settings import WEBAPP_URL, logger
-from webserver.telegram_client import bot, format_auction_text, make_bid_link_md, normalize_chat_id, normalize_currency, texts_for
+from webserver.telegram_client import bot, format_auction_end, format_auction_text, make_bid_link_md, normalize_chat_id, normalize_currency, texts_for
 
 # An auction may last at most 2 days minus 10 minutes (mirror of announcements).
 MAX_AUCTION_DURATION = timedelta(days=2) - timedelta(minutes=10)
@@ -330,7 +330,7 @@ async def place_bid(
         )
         if new_end_at:
             notify_text += "\n" + owner_texts.AUCTION_EXTENDED_NOTE.format(
-                minutes=int(ANTISNIPE_WINDOW.total_seconds() // 60), until=new_end_at
+                minutes=int(ANTISNIPE_WINDOW.total_seconds() // 60), until=format_auction_end(new_end_at, owner_language_code)
             )
         bids_keyboard = InlineKeyboardMarkup(
             [[InlineKeyboardButton(owner_texts.AUCTION_VIEW_BIDS_BUTTON, web_app=WebAppInfo(f"{WEBAPP_URL}?bids={ann_id}"))]]
@@ -359,7 +359,7 @@ async def place_bid(
             # tell them how long they still have to answer.
             if new_end_at:
                 outbid_text += "\n" + outbid_texts.AUCTION_EXTENDED_NOTE.format(
-                    minutes=int(ANTISNIPE_WINDOW.total_seconds() // 60), until=new_end_at
+                    minutes=int(ANTISNIPE_WINDOW.total_seconds() // 60), until=format_auction_end(new_end_at, prev_winner_language_code)
                 )
             outbid_keyboard = InlineKeyboardMarkup(
                 [[InlineKeyboardButton(outbid_texts.AUCTION_OUTBID_BUTTON, web_app=WebAppInfo(f"{WEBAPP_URL}?bid={ann_id}"))]]
