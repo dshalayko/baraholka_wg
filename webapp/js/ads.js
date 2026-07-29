@@ -218,6 +218,11 @@ function renderAds() {
   elements.emptyState.hidden = true;
   state.ads.forEach((ad) => {
     const isExpiredFromChannel = !!ad.is_published && isOlderThanDays(ad.published_at, 30);
+    const isAuction = ad.ad_type === "auction";
+    // Everything is editable except a closed auction: /api/auctions/{id}/edit
+    // rejects anything that isn't active, and republishing a finished lot would
+    // put it back in the channel as if it were still up for bids.
+    const canEdit = !ad.is_published || !isAuction || ad.auction_status === "active";
     const card = document.createElement("div");
     card.className = "ad-card";
     card.style.position = "relative";
@@ -225,7 +230,6 @@ function renderAds() {
       card.classList.add("ad-card-expired");
     }
 
-    // Tapping the photo opens the edit screen (same as the edit button).
     const openAdEdit = () => {
       haptic("light");
       if (ad.is_published) {
@@ -233,6 +237,17 @@ function renderAds() {
       } else {
         startEdit(ad);
       }
+    };
+
+    // Tapping a photo is a shortcut to the edit screen; on a card that can't be
+    // edited it just opens the photo full-size instead of a doomed edit.
+    const onPhotoTap = (fileId) => () => {
+      if (canEdit) {
+        openAdEdit();
+        return;
+      }
+      haptic("light");
+      openAuthedPhotoViewer(`/api/announcements/${ad.id}/photo?file_id=${encodeURIComponent(fileId)}`);
     };
 
     const photos = Array.isArray(ad.photo_file_ids) ? ad.photo_file_ids : [];
@@ -253,28 +268,28 @@ function renderAds() {
         img.loading = "lazy";
         setAuthedImage(img, thumbUrl(photos[0]));
         img.alt = ad.description || "photo";
-        img.addEventListener("click", openAdEdit);
+        img.addEventListener("click", onPhotoTap(photos[0]));
         card.appendChild(img);
       } else if (total === 2) {
         gallery.className = "ad-gallery ad-gallery-two";
-        gallery.addEventListener("click", openAdEdit);
         photos.slice(0, 2).forEach((fileId) => {
           const img = document.createElement("img");
           img.className = "ad-gallery-img";
           img.loading = "lazy";
           setAuthedImage(img, thumbUrl(fileId));
           img.alt = ad.description || "photo";
+          img.addEventListener("click", onPhotoTap(fileId));
           gallery.appendChild(img);
         });
         card.appendChild(gallery);
       } else {
         gallery.className = "ad-gallery ad-gallery-three";
-        gallery.addEventListener("click", openAdEdit);
         const top = document.createElement("img");
         top.className = "ad-gallery-img ad-gallery-top";
         top.loading = "lazy";
         setAuthedImage(top, thumbUrl(photos[0]));
         top.alt = ad.description || "photo";
+        top.addEventListener("click", onPhotoTap(photos[0]));
 
         const bottom = document.createElement("div");
         bottom.className = "ad-gallery-bottom";
@@ -285,6 +300,7 @@ function renderAds() {
           img.loading = "lazy";
           setAuthedImage(img, thumbUrl(fileId));
           img.alt = ad.description || "photo";
+          img.addEventListener("click", onPhotoTap(fileId));
           bottom.appendChild(img);
         });
 
@@ -313,7 +329,6 @@ function renderAds() {
       header.appendChild(dateTag);
     }
 
-    const isAuction = ad.ad_type === "auction";
     const statusTag = document.createElement("span");
     statusTag.className = "ad-status-tag";
     if (isExpiredFromChannel) {
@@ -417,9 +432,9 @@ function renderAds() {
     // Consistent action layout on every card: one row with text actions
     // stretching on the left and fixed-size icon buttons pinned to the
     // right; the icon bar wraps below only when the row runs out of room.
-    // Per-type button sets: drafts keep publish/edit/delete; published ads
-    // are edited by tapping the photo, so the pencil only appears when
-    // there is no photo to tap.
+    // Per-type button sets: drafts keep publish/edit/delete; published ads and
+    // running auctions get the pencil too, since tapping the photo is a
+    // shortcut nobody discovers on its own.
     const actions = document.createElement("div");
     actions.className = "ad-actions";
     const actionsMain = document.createElement("div");
@@ -427,7 +442,7 @@ function renderAds() {
     const actionsBar = document.createElement("div");
     actionsBar.className = "ad-actions-bar";
 
-    if (!ad.is_published || !photos.length) {
+    if (canEdit) {
       const editBtn = document.createElement("button");
       editBtn.className = "ghost ad-action ad-action-icon";
       editBtn.type = "button";
