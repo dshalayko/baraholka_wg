@@ -12,7 +12,7 @@ const i18n = {
     languageEn: "English",
     title: "Объявления",
     myAds: "Мои объявления",
-    create: "Создать объявление",
+    create: "Создать",
     yourAds: "Ваши объявления",
     refresh: "Обновить",
     description: "Описание",
