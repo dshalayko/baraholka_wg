@@ -1533,6 +1533,7 @@ closeFeedbackModal();
   } else {
     refreshAds();
     refreshAdminStats();
+    void refreshAppVersion();
   }
   if (!state.sentAppOpenEvent) {
     state.sentAppOpenEvent = true;

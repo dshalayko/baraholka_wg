@@ -15,6 +15,7 @@ const elements = {
   settingsPanel: document.getElementById("settingsPanel"),
   tabSettings: document.getElementById("tabSettings"),
   tabSettingsText: document.getElementById("tabSettingsText"),
+  appVersion: document.getElementById("appVersion"),
   settingsThemeLabel: document.getElementById("settingsThemeLabel"),
   settingsLanguageLabel: document.getElementById("settingsLanguageLabel"),
   themeAutoBtn: document.getElementById("themeAutoBtn"),

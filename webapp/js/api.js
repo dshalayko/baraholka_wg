@@ -145,6 +145,18 @@ async function trackEvent(eventName) {
   }
 }
 
+async function refreshAppVersion() {
+  if (!elements.appVersion) return;
+  try {
+    // noUnauthorizedMode: a missing version must never flip the whole app into
+    // the "unauthorized" screen — it is a footnote, not a feature.
+    const data = await apiFetch("/api/version", { noUnauthorizedMode: true });
+    elements.appVersion.textContent = String(data?.version || "").trim();
+  } catch (err) {
+    // ignore: the line just stays empty
+  }
+}
+
 async function refreshAdminStats() {
   try {
     const data = await apiFetch("/api/stats/summary");

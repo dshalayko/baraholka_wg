@@ -355,6 +355,22 @@ h2 {
   border: none;
 }
 
+/* Build of the running deploy — deliberately faint, but selectable. */
+.app-version {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  opacity: 0.5;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.app-version:empty {
+  display: none;
+}
+
 .list-shell {
   padding: 8px 0 0;
 }

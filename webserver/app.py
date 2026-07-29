@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from version import APP_VERSION
+from webserver.auth import get_user_from_request
 from webserver.db import ensure_db
 from webserver.routes.announcements import router as announcements_router
 from webserver.routes.auctions import router as auctions_router
@@ -67,6 +69,14 @@ async def _startup() -> None:
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(os.path.join(WEBAPP_DIR, "index.html"), headers=NO_CACHE_HEADERS)
+
+
+@app.get("/api/version")
+async def version(request: Request) -> JSONResponse:
+    # Authed like the rest of /api: the branch and commit of the running deploy
+    # are not something to hand out to anonymous callers.
+    get_user_from_request(request)
+    return JSONResponse({"version": APP_VERSION}, headers=NO_CACHE_HEADERS)
 
 
 @app.get("/favicon.ico")
