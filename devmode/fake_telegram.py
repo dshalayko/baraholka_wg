@@ -466,9 +466,13 @@ async def get_discussion_replies_counts(post_message_ids) -> Dict[int, int]:
 
 
 async def delete_channel_messages(message_ids):
+    # Contract: returns the ids that could NOT be deleted, and callers iterate
+    # the result to retry them via the Bot API. The fake never fails, so this
+    # must be an empty list — returning a bool here makes publish/delete blow up
+    # with "'bool' object is not iterable".
     for message_id in message_ids or []:
         await bot.delete_message(chat_id=DEBUG_CHANNEL_ID, message_id=message_id)
-    return True
+    return []
 
 
 async def forward_thread_replies(old_thread_id, new_thread_id):
