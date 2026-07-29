@@ -6,3 +6,4 @@ __pycache__/
 data/*.session
 data/*.db
 data/photo_cache/
+data/debug/

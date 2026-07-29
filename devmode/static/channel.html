@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Виртуальный Telegram — debug</title>
+  <style>
+    :root {
+      --bg: #0e1116; --panel: #161b23; --panel2: #1b2130; --line: #262e3b;
+      --text: #e7ecf3; --muted: #8b97a8; --accent: #5aa7ff; --warn: #ffd166; --danger: #ff8a80;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text); font-size: 14px;
+      font-family: -apple-system, "SF Pro Text", Segoe UI, Roboto, sans-serif;
+    }
+    header {
+      position: sticky; top: 0; z-index: 5; background: rgba(14,17,22,.94);
+      backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+      padding: 12px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 15px; letter-spacing: .02em; }
+    .tag { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: #fff;
+           background: #b3261e; padding: 3px 8px; border-radius: 999px; }
+    .spacer { flex: 1; }
+    button, .linkbtn {
+      background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+      border-radius: 8px; padding: 6px 11px; font-size: 12px; cursor: pointer;
+      text-decoration: none; display: inline-block;
+    }
+    button:hover, .linkbtn:hover { border-color: var(--accent); }
+    .status { color: var(--muted); font-size: 11.5px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 18px; display: grid;
+           grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    section > h2 {
+      margin: 0 0 10px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 14px; margin-bottom: 12px;
+    }
+    .card.deleted { opacity: .5; border-style: dashed; }
+    .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+                 font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+    .mid { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .chip { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; padding: 2px 6px;
+            border-radius: 5px; background: #223049; color: #9ec5ff; }
+    .chip.edit { background: #40360a; color: var(--warn); }
+    .chip.del { background: #3d1b1b; color: var(--danger); }
+    pre {
+      margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12.5px;
+      line-height: 1.5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #dfe6ef; background: #0f141c; border: 1px solid #1f2733;
+      border-radius: 8px; padding: 10px; overflow-x: auto;
+    }
+    .photos { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 9px; }
+    .photos img { width: 84px; height: 63px; object-fit: cover; border-radius: 7px;
+                  border: 1px solid var(--line); cursor: pointer; }
+    .buttons { margin-top: 9px; display: flex; flex-direction: column; gap: 5px; }
+    .tgbtn { display: block; text-align: center; padding: 7px; border-radius: 8px;
+             background: #203450; color: #9ec5ff; border: 1px solid #2c456b;
+             text-decoration: none; font-size: 12px; }
+    .empty { color: var(--muted); font-size: 12.5px; padding: 14px; text-align: center;
+             border: 1px dashed var(--line); border-radius: 12px; }
+    .ev { border-left: 3px solid var(--line); padding-left: 10px; margin-bottom: 12px; }
+    .ev-head { font-size: 11px; color: var(--muted); margin-bottom: 5px; display:flex; gap:8px; flex-wrap:wrap; }
+    .ev.dm { border-left-color: #3f8cff; }
+    .ev.channel_post, .ev.channel_album { border-left-color: #4caf7d; }
+    .ev.edit { border-left-color: var(--warn); }
+    .ev.delete { border-left-color: var(--danger); }
+    .ev.media_upload { border-left-color: #7d6bd8; }
+    dialog { border: none; background: transparent; }
+    dialog img { max-width: 92vw; max-height: 88vh; border-radius: 10px; }
+    dialog::backdrop { background: rgba(0,0,0,.82); }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="tag">DEBUG</span>
+    <h1>Виртуальный Telegram</h1>
+    <span class="status" id="status">загрузка…</span>
+    <span class="spacer"></span>
+    <a class="linkbtn" href="/" target="_blank" rel="noopener">Открыть Mini App</a>
+    <button id="clear">Очистить лог</button>
+    <label class="status"><input type="checkbox" id="auto" checked /> автообновление</label>
+  </header>
+
+  <main>
+    <section>
+      <h2>Посты в канале (текущее состояние)</h2>
+      <div id="posts"></div>
+      <h2 id="deleted-title" hidden>Удалённые посты</h2>
+      <div id="deleted"></div>
+    </section>
+    <section>
+      <h2>Лог отправок: ЛС, правки, загрузки</h2>
+      <div id="events"></div>
+    </section>
+  </main>
+
+  <dialog id="viewer"><img alt="" /></dialog>
+
+  <script>
+    const KIND_LABELS = {
+      channel_post: "пост в канал",
+      channel_album: "альбом в канал",
+      album: "альбом",
+      dm: "личное сообщение",
+      edit: "правка сообщения",
+      delete: "удаление сообщения",
+      media_upload: "загрузка фото в хранилище",
+      comments: "комментарии",
+    };
+
+    const escapeHtml = (value) =>
+      String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    const viewer = document.getElementById("viewer");
+    document.addEventListener("click", (event) => {
+      const img = event.target.closest("img[data-full]");
+      if (img) {
+        viewer.querySelector("img").src = img.dataset.full;
+        viewer.showModal();
+        return;
+      }
+      if (event.target === viewer) viewer.close();
+    });
+    viewer.addEventListener("click", () => viewer.close());
+
+    function photosHtml(fileIds) {
+      if (!fileIds || !fileIds.length) return "";
+      const items = fileIds
+        .map((id) => {
+          const thumb = `/__debug__/photo/${encodeURIComponent(id)}?size=thumb`;
+          const full = `/__debug__/photo/${encodeURIComponent(id)}`;
+          return `<img src="${thumb}" data-full="${full}" alt="${escapeHtml(id)}" title="${escapeHtml(id)}" />`;
+        })
+        .join("");
+      return `<div class="photos">${items}</div>`;
+    }
+
+    function buttonsHtml(rows) {
+      if (!rows || !rows.length) return "";
+      const items = rows
+        .flat()
+        .map((button) => {
+          const label = escapeHtml(button.text || "кнопка");
+          if (button.url) return `<a class="tgbtn" href="${escapeHtml(button.url)}" target="_blank" rel="noopener">${label}</a>`;
+          return `<span class="tgbtn">${label}${button.callback_data ? ` · ${escapeHtml(button.callback_data)}` : ""}</span>`;
+        })
+        .join("");
+      return `<div class="buttons">${items}</div>`;
+    }
+
+    function postCard(post, deleted) {
+      const chips = [];
+      if (post.edits) chips.push(`<span class="chip edit">правок: ${post.edits}</span>`);
+      if (deleted) chips.push('<span class="chip del">удалён</span>');
+      return `
+        <div class="card${deleted ? " deleted" : ""}">
+          <div class="card-head">
+            <span class="chip">message_id</span>
+            <span class="mid">${post.message_id}</span>
+            <span>· ${escapeHtml(post.updated_at)}</span>
+            ${chips.join(" ")}
+          </div>
+          ${photosHtml(post.photo_file_ids)}
+          <pre>${escapeHtml(post.text) || "<без текста>"}</pre>
+          ${buttonsHtml(post.buttons)}
+        </div>`;
+    }
+
+    function eventBlock(event) {
+      const kind = KIND_LABELS[event.kind] || event.kind;
+      const ids = event.message_ids && event.message_ids.length ? ` · id ${event.message_ids.join(", ")}` : "";
+      return `
+        <div class="ev ${escapeHtml(event.kind)}">
+          <div class="ev-head">
+            <span>${escapeHtml(event.at)}</span>
+            <strong>${escapeHtml(event.chat_label)}</strong>
+            <span>${escapeHtml(kind)}${escapeHtml(ids)}</span>
+          </div>
+          ${photosHtml(event.photo_file_ids)}
+          ${event.text ? `<pre>${escapeHtml(event.text)}</pre>` : ""}
+          ${buttonsHtml(event.buttons)}
+        </div>`;
+    }
+
+    async function refresh() {
+      let data;
+      try {
+        const response = await fetch("/__debug__/outbox", { cache: "no-store" });
+        data = await response.json();
+      } catch (err) {
+        document.getElementById("status").textContent = "сервер недоступен";
+        return;
+      }
+
+      const posts = data.channel_posts || [];
+      const deleted = data.deleted_posts || [];
+      const events = data.events || [];
+
+      document.getElementById("posts").innerHTML =
+        posts.length ? posts.map((p) => postCard(p, false)).join("") : '<div class="empty">В канале пока ничего нет.</div>';
+
+      document.getElementById("deleted-title").hidden = deleted.length === 0;
+      document.getElementById("deleted").innerHTML = deleted.map((p) => postCard(p, true)).join("");
+
+      document.getElementById("events").innerHTML =
+        events.length ? events.map(eventBlock).join("") : '<div class="empty">Бот ещё ничего не отправлял.</div>';
+
+      const time = new Date().toLocaleTimeString();
+      document.getElementById("status").textContent =
+        `постов: ${posts.length} · событий: ${events.length} · обновлено ${time}`;
+    }
+
+    document.getElementById("clear").addEventListener("click", async () => {
+      await fetch("/__debug__/outbox/clear", { method: "POST" });
+      refresh();
+    });
+
+    refresh();
+    setInterval(() => {
+      if (document.getElementById("auto").checked && !document.hidden) refresh();
+    }, 4000);
+  </script>
+</body>
+</html>
