@@ -99,6 +99,9 @@ AUCTION_VIEW_BIDS_BUTTON = "📊 View bids"
 AUCTION_OUTBID_MESSAGE = "🔔 You've been outbid!\n\n{desc}\n\nCurrent bid: {amount}\nListing: {link}"
 AUCTION_OUTBID_BUTTON = "🔼 Raise your bid"
 
+# --- Auction (anti-sniping: a bid in the final minutes extends the auction) ---
+AUCTION_EXTENDED_NOTE = "⏱ Bid in the last {minutes} min — auction extended until {until}"
+
 # --- Auction (finish) ---
 AUCTION_SELLER_FINISHED_WIN = "Auction ended!\nWinner: {winner}\nFinal price: {price}\nListing: {link}"
 AUCTION_SELLER_FINISHED_NOBIDS = "Auction ended.\nNo bids were placed.\nListing: {link}"

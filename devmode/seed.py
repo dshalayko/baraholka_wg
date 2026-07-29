@@ -241,6 +241,22 @@ def _catalog() -> List[_Ad]:
             ends_in=timedelta(hours=10),
             currency="EUR",
         ),
+        _Ad(
+            "bidder",
+            "Auction inside the anti-snipe window — ends in 4 minutes.\n"
+            "Switch to 'owner', place a bid and watch the end move 10 min ahead.",
+            photos=1,
+            photo_slug="lens",
+            published=True,
+            published_offset=timedelta(hours=-6),
+            ad_type="auction",
+            auction_status="active",
+            start_price=40,
+            min_step=5,
+            duration_hours=6,
+            ends_in=timedelta(minutes=4),
+            currency="EUR",
+        ),
     ]
 
 

@@ -108,7 +108,9 @@ async def _finish_expired_auctions() -> None:
 
     for ann_id in expired_ids:
         try:
-            await finish_auction(ann_id)
+            # require_expired: re-check the end under the write lock, so an
+            # anti-snipe extension that landed just now isn't overridden.
+            await finish_auction(ann_id, require_expired=True)
         except Exception as exc:
             logger.warning("auction:finish failed ann_id=%s error=%s", ann_id, exc)
 

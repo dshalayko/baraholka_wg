@@ -1611,6 +1611,15 @@
   word-break: break-word;
 }
 
+.bid-info-hint {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border, rgba(0,0,0,0.08));
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--meta-text);
+}
+
 .bid-info-loading,
 .bid-info-ended,
 .bid-info-error {

@@ -1137,6 +1137,14 @@ function renderBidScreen(data) {
     addRow(`${t("auctionBidsCount")}:`, String(data.bids_count));
   }
 
+  // Spell out the anti-snipe rule so a late bid moving the end isn't a surprise.
+  if (data.auction_end_at && data.antisnipe_minutes) {
+    const hint = document.createElement("div");
+    hint.className = "bid-info-hint";
+    hint.textContent = t("auctionAntisnipeHint").replace(/\{minutes\}/g, String(data.antisnipe_minutes));
+    elements.bidAuctionInfo.appendChild(hint);
+  }
+
   // "Buy now" wins the auction on the spot at the seller's buyout price.
   state.bidBuyoutPrice = data.buyout_price || null;
   state.bidBuyoutLabel = data.buyout_price != null ? formatMoney(data.buyout_price, cur) : null;
@@ -1427,9 +1435,18 @@ function bindAuctionEvents() {
     }
     setBusy(true, t("busyBidding"));
     try {
-      await placeBid(annId, amount);
+      const result = await placeBid(annId, amount);
       if (elements.bidSubmitBtn) elements.bidSubmitBtn.disabled = true;
-      showToast(t("bidSuccess"), "success");
+      // A bid inside the anti-snipe window moved the end — say so instead of the
+      // plain "bid accepted", so the new deadline is visible right away.
+      if (result?.extended && result.auction_end_at) {
+        showToast(
+          t("auctionExtendedToast").replace("{until}", formatAuctionEnd(result.auction_end_at)),
+          "success",
+        );
+      } else {
+        showToast(t("bidSuccess"), "success");
+      }
       await openBidScreen(annId);
     } catch (err) {
       if (err?.status === 401) {

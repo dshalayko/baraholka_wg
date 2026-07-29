@@ -99,6 +99,9 @@ AUCTION_VIEW_BIDS_BUTTON = "📊 Посмотреть ставки"
 AUCTION_OUTBID_MESSAGE = "🔔 Вашу ставку перебили!\n\n{desc}\n\nТекущая ставка: {amount}\nОбъявление: {link}"
 AUCTION_OUTBID_BUTTON = "🔼 Поднять ставку"
 
+# --- Аукцион (антиснайпер: ставка в последние минуты продлевает аукцион) ---
+AUCTION_EXTENDED_NOTE = "⏱ Ставка в последние {minutes} мин — аукцион продлён до {until}"
+
 # --- Аукцион (завершение) ---
 AUCTION_SELLER_FINISHED_WIN = "Аукцион завершён!\nПобедитель: {winner}\nФинальная цена: {price}\nОбъявление: {link}"
 AUCTION_SELLER_FINISHED_NOBIDS = "Аукцион завершён.\nСтавок не поступило.\nОбъявление: {link}"

@@ -19,12 +19,39 @@ from webserver.telegram_client import bot, format_auction_text, make_bid_link_md
 # An auction may last at most 2 days minus 10 minutes (mirror of announcements).
 MAX_AUCTION_DURATION = timedelta(days=2) - timedelta(minutes=10)
 
+# Anti-sniping ("антиснайпер"): a bid placed inside this window before the end
+# pushes the end out to now + the same window, so there is always this much time
+# left for others to answer the last bid. Bids outside the window change nothing.
+ANTISNIPE_WINDOW = timedelta(minutes=10)
+
+STAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+
 router = APIRouter()
 
 
 def _get_serbia_now_str() -> str:
     belgrade_tz = pytz.timezone("Europe/Belgrade")
-    return datetime.now(pytz.utc).astimezone(belgrade_tz).strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(pytz.utc).astimezone(belgrade_tz).strftime(STAMP_FORMAT)
+
+
+def _antisnipe_end_at(auction_end_at, now_str: str):
+    """Return the extended end stamp if this bid falls inside the anti-snipe
+    window, or None when no extension is due (bid too early, or no end time).
+
+    Both stamps are Belgrade-local strings in STAMP_FORMAT, so they can be
+    compared as naive datetimes.
+    """
+    if not auction_end_at:
+        return None
+    try:
+        end_dt = datetime.strptime(auction_end_at, STAMP_FORMAT)
+        now_dt = datetime.strptime(now_str, STAMP_FORMAT)
+    except (TypeError, ValueError):
+        logger.warning("auction:antisnipe unparsable end_at=%r", auction_end_at)
+        return None
+    if end_dt - now_dt > ANTISNIPE_WINDOW:
+        return None
+    return (now_dt + ANTISNIPE_WINDOW).strftime(STAMP_FORMAT)
 
 
 @router.get("/api/auctions/{ann_id}")
@@ -86,6 +113,8 @@ async def get_auction(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_
         "photo_file_ids": json.loads(photo_file_ids) if photo_file_ids else [],
         "post_link": post_link,
         "currency": currency or "RSD",
+        # Lets the bid screen spell out the anti-snipe rule without hardcoding it.
+        "antisnipe_minutes": int(ANTISNIPE_WINDOW.total_seconds() // 60),
     }
 
 
@@ -194,18 +223,36 @@ async def place_bid(
                 detail={"code": "bid_too_low", "min_required": min_required, "message": f"Bid must be at least {min_required}"},
             )
 
+        # A bid at or above the buyout price ends the auction outright, so there is
+        # nothing to protect from sniping — skip the extension in that case.
+        wins_by_buyout = buyout_price is not None and payload.amount >= buyout_price
+        new_end_at = None if wins_by_buyout else _antisnipe_end_at(auction_end_at, now_str)
+
         # Insert bid
         await db.execute(
             "INSERT INTO auction_bids (announcement_id, user_id, username, amount, created_at) VALUES (?, ?, ?, ?, ?)",
             (ann_id, user_id, winner_name, payload.amount, now_str),
         )
 
-        # Update announcement
+        # Update announcement. The anti-snipe extension is written under the same
+        # lock as the bid, so the auto-finish job can never see a stale end time.
         await db.execute(
-            "UPDATE announcements SET current_price = ?, winner_user_id = ?, winner_username = ?, winner_language_code = ? WHERE id = ?",
-            (payload.amount, user_id, winner_name, user.get("language_code"), ann_id),
+            """
+            UPDATE announcements
+            SET current_price = ?, winner_user_id = ?, winner_username = ?, winner_language_code = ?,
+                auction_end_at = COALESCE(?, auction_end_at)
+            WHERE id = ?
+            """,
+            (payload.amount, user_id, winner_name, user.get("language_code"), new_end_at, ann_id),
         )
         await db.commit()
+
+        if new_end_at:
+            logger.info(
+                "auction:bid antisnipe extended ann_id=%s old_end=%s new_end=%s",
+                ann_id, auction_end_at, new_end_at,
+            )
+            auction_end_at = new_end_at
 
         # Fetch updated bids count
         cursor2 = await db.execute(
@@ -217,7 +264,7 @@ async def place_bid(
     # A bid at or above the buyout price wins instantly: finish_auction rewrites
     # the post to the finished state and notifies the seller and the winner, so
     # the regular post-edit and notifications below are skipped.
-    if buyout_price is not None and payload.amount >= buyout_price:
+    if wins_by_buyout:
         await finish_auction(ann_id)
         return {"ok": True, "current_price": payload.amount, "won": True}
 
@@ -281,6 +328,10 @@ async def place_bid(
             f"{owner_texts.AUCTION_NEW_BID_FROM}: {winner_name}\n"
             f"{owner_texts.AUCTION_NEW_BID_TOTAL}: {bids_count}"
         )
+        if new_end_at:
+            notify_text += "\n" + owner_texts.AUCTION_EXTENDED_NOTE.format(
+                minutes=int(ANTISNIPE_WINDOW.total_seconds() // 60), until=new_end_at
+            )
         bids_keyboard = InlineKeyboardMarkup(
             [[InlineKeyboardButton(owner_texts.AUCTION_VIEW_BIDS_BUTTON, web_app=WebAppInfo(f"{WEBAPP_URL}?bids={ann_id}"))]]
         )
@@ -304,6 +355,12 @@ async def place_bid(
             outbid_text = outbid_texts.AUCTION_OUTBID_MESSAGE.format(
                 desc=desc_preview, amount=f"{payload.amount} {currency}", link=post_link
             )
+            # The extension is the whole point of the anti-sniper for this user:
+            # tell them how long they still have to answer.
+            if new_end_at:
+                outbid_text += "\n" + outbid_texts.AUCTION_EXTENDED_NOTE.format(
+                    minutes=int(ANTISNIPE_WINDOW.total_seconds() // 60), until=new_end_at
+                )
             outbid_keyboard = InlineKeyboardMarkup(
                 [[InlineKeyboardButton(outbid_texts.AUCTION_OUTBID_BUTTON, web_app=WebAppInfo(f"{WEBAPP_URL}?bid={ann_id}"))]]
             )
@@ -311,7 +368,12 @@ async def place_bid(
         except Exception as exc:
             logger.warning("auction:bid outbid_notify failed ann_id=%s user_id=%s error=%s", ann_id, prev_winner_user_id, exc)
 
-    return {"ok": True, "current_price": payload.amount}
+    return {
+        "ok": True,
+        "current_price": payload.amount,
+        "auction_end_at": auction_end_at,
+        "extended": bool(new_end_at),
+    }
 
 
 @router.post("/api/auctions/{ann_id}/buyout")
@@ -444,7 +506,9 @@ async def list_bids(
     }
 
 
-async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str, Any]:
+async def finish_auction(
+    ann_id: int, expected_user_id: int = None, require_expired: bool = False
+) -> Dict[str, Any]:
     """Finish a single auction: mark it finished, edit the channel post to the
     finished state and notify the seller and winner. Shared by the manual
     "stop" endpoint and the auto-finish background job.
@@ -452,10 +516,18 @@ async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str,
     If expected_user_id is given (manual stop), ownership and active-state are
     enforced with HTTP errors; otherwise (the job) a non-active auction is
     silently skipped.
+
+    require_expired is for the auto-finish job: it re-checks the end time under
+    the write lock, so an anti-snipe extension that landed after the job picked
+    this auction up keeps the auction alive instead of being finished anyway.
+    The buyout path deliberately leaves it False — that auction ends early.
     """
     private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    # Same locking pattern as place_bid: the read-check-write below must not
+    # interleave with a bid that extends the auction.
+    async with aiosqlite.connect(DB_PATH, timeout=15, isolation_level=None) as db:
+        await db.execute("BEGIN IMMEDIATE")
         cursor = await db.execute(
             """
             SELECT user_id, description, username, contact_info, start_price, current_price,
@@ -500,6 +572,11 @@ async def finish_auction(ann_id: int, expected_user_id: int = None) -> Dict[str,
             if expected_user_id is not None:
                 raise HTTPException(status_code=400, detail="Auction is not active")
             return {"ok": False, "reason": "not_active"}
+
+        # A bid extended the auction after the job listed it as expired.
+        if require_expired and auction_end_at and auction_end_at > _get_serbia_now_str():
+            logger.info("auction:finish skipped, extended ann_id=%s end_at=%s", ann_id, auction_end_at)
+            return {"ok": False, "reason": "extended"}
 
         await db.execute(
             "UPDATE announcements SET auction_status = 'finished' WHERE id = ?",
