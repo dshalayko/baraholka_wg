@@ -1366,12 +1366,12 @@
   border-color: var(--danger, #e53935);
 }
 
-/* ---- Auction: card info block ---- */
+/* ---- Auction: card info block ----
+   No padding or panel background: --secondary-bg is the card's own background,
+   so the "panel" never actually rendered — only its inset did, pushing the rows
+   out of line with the description above. Rows align with the card text now. */
 .ad-auction-info {
-  margin: 8px 0 2px;
-  padding: 10px 12px;
-  background: var(--secondary-bg);
-  border-radius: 10px;
+  margin: 8px 0 10px;
 }
 
 .ad-auction-row {
