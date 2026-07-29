@@ -23,12 +23,17 @@ top-left corner of the app.
 
 import argparse
 import asyncio
+import os
 import sys
 
 
 def main() -> int:
+    # PORT lets a launcher assign a free port (the debug URLs, including the bid
+    # links, are built from whatever port we end up on).
+    default_port = int(os.environ.get("PORT") or 8002)
+
     parser = argparse.ArgumentParser(description="Run the Mini App in debug mode with test data.")
-    parser.add_argument("--port", type=int, default=8002, help="HTTP port (default: 8002)")
+    parser.add_argument("--port", type=int, default=default_port, help="HTTP port (default: $PORT or 8002)")
     parser.add_argument("--host", default="127.0.0.1", help="bind address (default: 127.0.0.1)")
     parser.add_argument("--reset", action="store_true", help="wipe and reseed the debug data before starting")
     parser.add_argument("--reload", action="store_true", help="restart on source changes")
@@ -63,8 +68,6 @@ def main() -> int:
 
     if args.reload:
         # Reload needs an import string, so re-enter through devmode.asgi.
-        import os
-
         os.environ["DEVMODE_PORT"] = str(args.port)
         os.environ["DEVMODE_LOG_LEVEL"] = args.log_level
         uvicorn.run("devmode.asgi:app", host=args.host, port=args.port, reload=True)
