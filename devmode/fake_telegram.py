@@ -475,7 +475,7 @@ async def delete_channel_messages(message_ids):
     return []
 
 
-async def forward_thread_replies(old_thread_id, new_thread_id):
+async def forward_thread_replies(old_thread_id, new_thread_id, **kwargs):
     outbox.record(
         "comments",
         DEBUG_DISCUSSION_CHAT_ID,

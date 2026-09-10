@@ -64,6 +64,8 @@ async def limit_request_body(request: Request, call_next):
 async def _startup() -> None:
     await ensure_db()
     asyncio.create_task(_run_auction_job())
+    from publication_jobs import transfer_worker
+    app.state.transfer_task = asyncio.create_task(transfer_worker())
 
 
 @app.get("/")
@@ -129,3 +131,14 @@ app.include_router(auctions_router)
 app.include_router(uploads_router)
 app.include_router(bugs_router)
 app.include_router(stats_router)
+
+
+@app.on_event("shutdown")
+async def _stop_transfer_worker():
+    task = getattr(app.state, 'transfer_task', None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass

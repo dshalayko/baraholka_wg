@@ -354,6 +354,14 @@ function renderAds() {
       statusTag.classList.add("is-published");
     }
     header.appendChild(statusTag);
+    if (ad.comments_pending) {
+      const transferTag = document.createElement("span");
+      transferTag.className = "ad-status-tag is-updated";
+      transferTag.setAttribute("role", "status");
+      const uncertain = ad.transfer_status === "uncertain" || ad.transfer_status === "sending";
+      transferTag.textContent = t(uncertain ? "transferUncertain" : ad.transfer_retrying ? "transferRetrying" : "transferPending");
+      header.appendChild(transferTag);
+    }
 
     const title = document.createElement("h3");
     title.className = "ad-description ad-description-clamped";

@@ -473,6 +473,7 @@ function bindEvents() {
     haptic("medium");
     setBusy(true, t("busyPublishing"));
     let publishSucceeded = false;
+    let publishResult = null;
     try {
       if (!state.editingId) {
         const created = await apiFetch("/api/announcements", {
@@ -480,14 +481,14 @@ function bindEvents() {
           body: JSON.stringify(payload),
         });
         if (created?.id) {
-          await apiFetch(`/api/announcements/${created.id}/publish`, { method: "POST" });
+          publishResult = await apiFetch(`/api/announcements/${created.id}/publish`, { method: "POST" });
         }
       } else {
         await apiFetch(`/api/announcements/${state.editingId}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-        await apiFetch(`/api/announcements/${state.editingId}/publish`, { method: "POST" });
+        publishResult = await apiFetch(`/api/announcements/${state.editingId}/publish`, { method: "POST" });
       }
       publishSucceeded = true;
     } catch (err) {
@@ -511,7 +512,7 @@ function bindEvents() {
     }
     if (!publishSucceeded) return;
     haptic("success");
-    showToast(t("publishedToast"), "success");
+    showToast(t(publishResult?.comments_pending ? "publishedTransferPending" : "publishedToast"), "success");
     resetForm();
     showTab("list");
     await refreshAds();
@@ -796,6 +797,7 @@ function bindEvents() {
     haptic("medium");
     setBusy(true, t("busyPublishing"));
     let publishSucceeded = false;
+    let publishResult = null;
     try {
       if (editInPlace) {
         await editAuctionInPlace(state.editModal.id, payload);
@@ -804,7 +806,7 @@ function bindEvents() {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-        await apiFetch(`/api/announcements/${state.editModal.id}/publish`, { method: "POST" });
+        publishResult = await apiFetch(`/api/announcements/${state.editModal.id}/publish`, { method: "POST" });
       }
       publishSucceeded = true;
     } catch (err) {
@@ -829,7 +831,7 @@ function bindEvents() {
     if (!publishSucceeded) return;
     closeEditModal();
     haptic("success");
-    showToast(t("editedPublished"), "success");
+    showToast(t(publishResult?.comments_pending ? "publishedTransferPending" : "editedPublished"), "success");
     await refreshAds();
   });
   elements.confirmNoBtn.addEventListener("click", closeDeleteConfirm);

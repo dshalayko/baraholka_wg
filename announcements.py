@@ -10,7 +10,8 @@ from telegram.ext import ContextTypes
 
 import texts as texts_ru
 import texts_en
-from comments_manager import forward_thread_replies
+from publication_jobs import guarded_publication, guarded_bot_deletion
+from transfer_store import record_publication, mark_sending
 from config import *
 from logger import logger
 from keyboards import (
@@ -373,6 +374,7 @@ async def send_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, editi
         else:
             await update.callback_query.message.reply_text(message, reply_markup=keyboard, parse_mode='MarkdownV2')
 
+@guarded_publication
 async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYPE, ann_id):
     logger.info(f"📢 [publish_announcement] Публикация объявления с ID {ann_id}")
 
@@ -403,6 +405,7 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
                                              is_updated=show_updated_label, message_ids=old_message_ids,
                                              timestamp=current_timestamp)
 
+    await mark_sending(ann_id, {'timestamp': current_timestamp})
     if photos:
         media = [InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode='MarkdownV2')
                  for idx, photo_id in enumerate(photos)]
@@ -419,38 +422,12 @@ async def publish_announcement(update: Update, context: ContextTypes.DEFAULT_TYP
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('UPDATE announcements SET message_ids = ?, timestamp = ? WHERE id = ?',
                          (json.dumps(new_message_ids), current_timestamp, ann_id))
+        await record_publication(db, ann_id, new_message_ids)
         await db.commit()
-
-    if is_editing and old_message_ids:
-        old_message_id = old_message_ids[0]
-        new_message_id = new_message_ids[0]
-        logger.info(f"🔄 [publish_announcement] Перенос комментариев: {old_message_id} → {new_message_id}")
-
-        transfer_success = await forward_thread_replies(old_message_id, new_message_id)
-
-        if not transfer_success:
-            logger.warning(f"⚠️ [publish_announcement] Не удалось перенести комментарии с {old_message_id} на {new_message_id}, продолжаем выполнение.")
-
-        logger.info(f"🗑️ [publish_announcement] Удаление старых сообщений: {old_message_ids}")
-        for message_id in old_message_ids:
-            try:
-                await context.bot.delete_message(chat_id=PRIVATE_CHANNEL_ID, message_id=message_id)
-                logger.info(f"✅ [publish_announcement] Удалено старое сообщение {message_id} из канала.")
-            except Exception as e:
-                logger.error(f"❌ [publish_announcement] Ошибка при удалении старого объявления {message_id}: {e}")
-                msg_link = get_private_channel_post_link(PRIVATE_CHANNEL_ID, message_id)
-                # Отправляем сообщение админам, чтобы они удалили вручную
-                await context.bot.send_message(
-                    chat_id=SLONSKI_ID,
-                    text=(
-                        "Не удалось удалить сообщение боту:\n"
-                        f"Ссылка: {msg_link}\n"
-                        "Пожалуйста, удалите вручную."
-                    )
-                )
 
     return get_private_channel_post_link(PRIVATE_CHANNEL_ID, new_message_ids[0])
 
+@guarded_bot_deletion
 async def delete_announcement_by_id(ann_id, context, query, is_editing=False):
     logger.info(f"🗑️ [delete_announcement_by_id] Удаление объявления {ann_id}, is_editing={is_editing}")
 

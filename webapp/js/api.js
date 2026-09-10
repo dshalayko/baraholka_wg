@@ -363,8 +363,8 @@ async function deleteAd(id) {
 async function publishAd(id) {
   setBusy(true, t("busyPublishing"));
   try {
-    await apiFetch(`/api/announcements/${id}/publish`, { method: "POST" });
-    showToast(t("publishedToast"), "success");
+    const result = await apiFetch(`/api/announcements/${id}/publish`, { method: "POST" });
+    showToast(t(result?.comments_pending ? "publishedTransferPending" : "publishedToast"), "success");
     await refreshAds();
   } catch (err) {
     const errorId = err?.data?.error_id;

@@ -3,6 +3,8 @@ import html
 import os
 import time
 from typing import Dict, Iterable
+from contextlib import asynccontextmanager
+from transfer_store import ensure_transfer_schema, file_lock, query, execute
 
 from pyrogram import Client
 from pyrogram.enums import MessageEntityType, ParseMode
@@ -147,186 +149,45 @@ def _format_transferred_comment(message, current_user_id=None):
     return f"{author_html}\n{escaped_body}".strip()
 
 
-async def forward_thread_replies(old_thread_id, new_thread_id):
-    logger.info(f"🚀 [forward_thread_replies] Запуск функции с old_thread_id={old_thread_id}, new_thread_id={new_thread_id}")
-    app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH)
+@asynccontextmanager
+async def userbot_session(*, wait=True):
+    await ensure_transfer_schema()
+    async with file_lock('userbot-session', wait=wait) as acquired:
+        if not acquired:
+            yield None
+            return
+        async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, sleep_threshold=0) as app:
+            yield app
 
+
+async def forward_thread_replies(old_thread_id, new_thread_id, *, raise_errors=False):
+    from comment_transfer import transfer_pass
     try:
-        await app.start()
-        current_user = await app.get_me()
-        current_user_id = current_user.id if current_user else None
+        async with userbot_session() as app:
+            return await transfer_pass(app, old_thread_id, new_thread_id)
+    except Exception:
+        logger.exception('Comment transfer incomplete: %s -> %s; old post must be retained', old_thread_id, new_thread_id)
+        if raise_errors:
+            raise
+        return False
 
-        chat_id = await get_supergroup_id(app, CHAT_NAME)
-        if not chat_id:
-            logger.error("❌ [forward_thread_replies] Не удалось получить ID супергруппы.")
-            await app.stop()
-            return False
-
-        found_message_id = new_message_id = None
-
-        # Поиск старого сообщения
-        for attempt in range(5):
-            async for message in app.get_chat_history(chat_id):
-                if getattr(message, "forward_from_message_id", None) == old_thread_id:
-                    found_message_id = message.id
-                    logger.info(f"✅ Найдено старое сообщение ID: {found_message_id}")
-                    break
-            if found_message_id:
-                break
-            logger.warning(f"⚠️ [forward_thread_replies] Не найдено старое сообщение (попытка {attempt+1}/5), ждем 2 сек...")
-            await asyncio.sleep(2)
-
-        if not found_message_id:
-            logger.error(f"❌ [forward_thread_replies] Старое сообщение так и не найдено.")
-            await app.stop()
-            return False
-
-        for attempt in range(5):
-            async for message in app.get_chat_history(chat_id):
-                if getattr(message, "forward_from_message_id", None) == new_thread_id:
-                    new_message_id = message.id
-                    logger.info(f"✅ [forward_thread_replies] Найдено новое сообщение ID: {new_message_id}")
-                    break
-            if new_message_id:
-                break
-            await asyncio.sleep(2)
-
-        if not new_message_id:
-            logger.error(f"❌ [forward_thread_replies] Новое сообщение так и не найдено.")
-            await app.stop()
-            return False
-
-        # Перенос комментариев
-        comments = []
-        async for message in app.get_chat_history(chat_id):
-            if message.reply_to_message_id == found_message_id:
-                comments.append(message)
-
-        logger.info(f"🔄 Отправляем {len(comments)} комментариев в обратном порядке.")
-        ordered_comments = list(reversed(comments))
-        photo_batch = []
-        photo_batch_sender = None
-        photo_batch_author = None
-
-        async def flush_photo_batch():
-            nonlocal photo_batch, photo_batch_sender, photo_batch_author
-            if not photo_batch:
-                return
-            author_line, full_name, username = photo_batch_author
-            await _send_photo_comments(
-                app=app,
-                chat_id=chat_id,
-                reply_to_message_id=new_message_id,
-                photo_comments=photo_batch,
-                author_line=author_line,
-                full_name=full_name,
-                username=username,
-            )
-            photo_batch = []
-            photo_batch_sender = None
-            photo_batch_author = None
-
-        for comment in ordered_comments:
-            try:
-                if comment.text:
-                    formatted_text = _format_transferred_comment(comment, current_user_id)
-                    await app.send_message(
-                        chat_id=chat_id,
-                        text=formatted_text,
-                        reply_to_message_id=new_message_id,
-                        parse_mode=ParseMode.HTML,
-                    )
-                    logger.info(f"📩 Отправлен текстовый комментарий ID {comment.id}")
-
-                elif comment.photo:
-                    caption = _format_transferred_comment(comment, current_user_id)
-                    await app.send_photo(
-                        chat_id=chat_id,
-                        photo=comment.photo.file_id,
-                        caption=caption,
-                        reply_to_message_id=new_message_id,
-                        parse_mode=ParseMode.HTML,
-                    )
-                    logger.info(f"📸 Отправлена фотография ID {comment.id}")
-
-                elif comment.sticker:
-                    await app.send_sticker(chat_id=chat_id, sticker=comment.sticker.file_id, reply_to_message_id=new_message_id)
-                    logger.info(f"🎨 Отправлен стикер ID {comment.id}")
-
-                else:
-                    logger.warning(f"⚠️ Неизвестный тип медиа в сообщении ID {comment.id}")
-
-            except Exception as e:
-                logger.error(f"❌ [forward_thread_replies] Ошибка при отправке комментария ID {comment.id}: {e}")
-
-        try:
-            await flush_photo_batch()
-        except Exception as e:
-            if photo_batch:
-                logger.error(f"❌ [forward_thread_replies] Ошибка при отправке фотогруппы, последний ID {photo_batch[-1].id}: {e}")
-            else:
-                logger.error(f"❌ [forward_thread_replies] Ошибка при финальной отправке фотогруппы: {e}")
-
-        await app.stop()
-        logger.info(f"✅ [forward_thread_replies] Перенос комментариев завершен успешно.")
-        return True
-
-    except Exception as e:
-        logger.error(f"❌ Общая ошибка при переносе комментариев: {e}")
-        await app.stop()
-        raise
-
-
-async def forward_thread_replies(old_thread_id, new_thread_id):
-    async with _forward_lock:
-        for attempt in range(3):
-            try:
-                return await _forward_thread_replies_once(old_thread_id, new_thread_id)
-            except Exception as e:
-                err_text = str(e).lower()
-                if "database is locked" in err_text and attempt < 2:
-                    await asyncio.sleep(2 + attempt * 2)
-                    continue
-                return False
 
 async def get_message_id_by_thread_id(thread_id):
-    """Ищет сообщение, у которого message_id == thread_id, и возвращает его. Логирует ВСЕ сообщения в группе."""
-    logger.info(f"🔍 [get_message_id_by_thread_id] Поиск сообщения с message_id={thread_id}")
-
-    async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH) as app:
-        try:
-            chat_id = await get_supergroup_id(app, CHAT_NAME)
-            if not chat_id:
-                logger.error("❌ [get_message_id_by_thread_id] Не удалось получить ID супергруппы.")
-                return None
-
-            logger.info(f"📥 [get_message_id_by_thread_id] Получаем историю сообщений из чата {chat_id}...")
-
-            for attempt in range(5):  # 5 попыток с интервалом 2 сек
-                found_message = None
-                async for message in app.get_chat_history(chat_id):
-
-                    # 🔍 Если message_id совпадает с thread_id
-                    if message.id == thread_id:
-                        found_message = message.forward_from_message_id
-
-                    if found_message:
-                        logger.info(
-                            f"✅ [get_message_id_by_thread_id] Найдено сообщение с message_id={found_message} "
-                            f"(совпадает с thread_id={thread_id})"
-                        )
-                        return found_message
-
-                logger.warning(
-                    f"⚠️ [get_message_id_by_thread_id] Не найден message_id (попытка {attempt + 1}/5), ждем 2 сек..."
-                )
-                await asyncio.sleep(2)
-
-            logger.error(f"❌ [get_message_id_by_thread_id] Не найдено сообщение с message_id={thread_id} после 5 попыток.")
-
-        except Exception as e:
-            logger.error(f"❌ [get_message_id_by_thread_id] Ошибка при поиске message_id: {e}")
-            return None
+    await ensure_transfer_schema()
+    cached = await query('SELECT channel_message_id FROM discussion_roots WHERE discussion_message_id=?', (thread_id,), one=True)
+    if cached:
+        return cached['channel_message_id']
+    try:
+        async with userbot_session() as app:
+            message = await app.get_messages(int(CHAT_ID), thread_id)
+            source = getattr(message, 'forward_from_message_id', None)
+            channel = getattr(message, 'forward_from_chat', None)
+            if source and channel and channel.id == int(PRIVATE_CHANNEL_ID):
+                await execute('INSERT OR REPLACE INTO discussion_roots VALUES (?,?)', (source, thread_id))
+                return source
+    except Exception:
+        logger.exception('Unable to resolve discussion root %s', thread_id)
+    return None
 
 
 async def get_discussion_replies_counts(post_message_ids: Iterable[int]) -> Dict[int, int]:
@@ -366,7 +227,9 @@ async def get_discussion_replies_counts(post_message_ids: Iterable[int]) -> Dict
 
     async with _forward_lock:
         try:
-            async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, sleep_threshold=0) as app:
+            async with userbot_session(wait=False) as app:
+                if app is None:
+                    return {mid: _comments_count_cache.get(mid, (0, 0))[0] for mid in unique_ids}
                 for msg_id in ids_to_fetch:
                     try:
                         count = await app.get_discussion_replies_count(channel_id, msg_id)
@@ -406,7 +269,7 @@ async def delete_channel_messages(message_ids):
         return ids
     failed = []
     try:
-        async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH) as app:
+        async with userbot_session() as app:
             for mid in ids:
                 try:
                     await app.delete_messages(channel_id, mid)
@@ -417,3 +280,9 @@ async def delete_channel_messages(message_ids):
         logger.warning("🗑️ [delete_channel_messages] client init failed: %s", exc)
         return ids
     return failed
+
+
+async def channel_message_exists(message_id):
+    async with userbot_session() as app:
+        message = await app.get_messages(int(PRIVATE_CHANNEL_ID), message_id)
+        return bool(message and not getattr(message, 'empty', False))

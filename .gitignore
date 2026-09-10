@@ -7,3 +7,4 @@ data/*.session
 data/*.db
 data/photo_cache/
 data/debug/
+.claude/worktrees/

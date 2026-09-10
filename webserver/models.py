@@ -18,6 +18,9 @@ class AnnouncementIn(BaseModel):
 
 
 class AnnouncementOut(BaseModel):
+    transfer_status: Optional[str] = None
+    comments_pending: bool = False
+    transfer_retrying: bool = False
     id: int
     description: str
     price: str

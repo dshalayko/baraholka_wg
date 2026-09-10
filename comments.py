@@ -7,13 +7,20 @@ from config import CHAT_ID
 
 
 from utils import  notify_owner_about_comment
+from transfer_store import ensure_transfer_schema, query
 
 
 
 async def log_group_messages(update: Update, context: CallbackContext):
     try:
+        if not update.message or not update.effective_user:
+            return
         user = update.effective_user
-        user_id = update.effective_user.id
+        user_id = user.id
+        await ensure_transfer_schema()
+        service = await query("SELECT value FROM transfer_settings WHERE key='userbot_id'", one=True)
+        if service and str(user_id) == service['value']:
+            return
         username = update.effective_user.username or "Нет username"
         text = update.message.text or ""
         message_id = update.message.message_id

@@ -10,7 +10,9 @@ from fastapi.responses import Response
 from telegram import InputMediaPhoto
 from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 
-from comments_manager import delete_channel_messages, forward_thread_replies, get_discussion_replies_counts
+from comments_manager import delete_channel_messages, get_discussion_replies_counts
+from publication_jobs import guarded_publication, guarded_mutation
+from transfer_store import mark_sending, record_publication, ensure_transfer_schema, query as transfer_query
 from config import DB_PATH, PRIVATE_CHANNEL_ID, SLONSKI_ID
 from utils import get_private_channel_post_link, get_serbia_time, is_timestamp_older_than_days, parse_timestamp
 from webserver.auth import get_user_from_request
@@ -154,10 +156,17 @@ async def list_announcements(user: Dict[str, Any] = Depends(get_user_from_reques
             }
         )
 
+    await ensure_transfer_schema()
+    transfer_jobs = {row['ann_id']: row for row in await transfer_query(
+        'SELECT j.ann_id,j.phase,j.error FROM publication_jobs j JOIN announcements a ON a.id=j.ann_id WHERE a.user_id=?', (user.get('id'),))}
     comments_counts = await get_discussion_replies_counts(published_root_message_ids) if published_root_message_ids else {}
     for item in pending_items:
         root_message_id = item.pop("_root_message_id", None)
         item["comments_count"] = comments_counts.get(root_message_id, 0) if root_message_id else 0
+        job = transfer_jobs.get(item['id'])
+        item['transfer_status'] = job['phase'] if job else None
+        item['comments_pending'] = bool(job and job['phase'] != 'done')
+        item['transfer_retrying'] = bool(job and job['error'])
         items.append(AnnouncementOut(**item).dict())
     
     def _sort_dt(raw: Dict[str, Any]) -> datetime:
@@ -235,6 +244,7 @@ async def create_announcement(
 
 
 @router.put("/api/announcements/{ann_id}")
+@guarded_mutation
 async def update_announcement(
     ann_id: int, payload: AnnouncementIn, user: Dict[str, Any] = Depends(get_user_from_request)
 ) -> Dict[str, Any]:
@@ -313,6 +323,7 @@ async def update_announcement(
 
 
 @router.delete("/api/announcements/{ann_id}")
+@guarded_mutation
 async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
     user_id = user.get("id")
     private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)
@@ -445,6 +456,7 @@ async def delete_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_us
 
 
 @router.post("/api/announcements/{ann_id}/publish")
+@guarded_publication
 async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
     try:
         user_id = user.get("id")
@@ -540,6 +552,12 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
             # — all photos + text + bid link — in a single message.
             logger.info("ann:publish auction bid_link ann_id=%s", ann_id)
             message = message + "\n\n" + make_bid_link_md(ann_id, owner_language_code)
+            await mark_sending(ann_id, {
+                'timestamp': get_serbia_time(), 'updated_at': get_serbia_time(),
+                'last_published_is_edit': 0 if is_auction else int(show_updated_label),
+                **({'auction_status': 'active', 'owner_language_code': user.get('language_code'),
+                    'auction_end_at': pub_auction_end_at} if is_auction else {}),
+            })
             if photos:
                 logger.info("ann:publish auction step=send_media_group ann_id=%s photos=%s", ann_id, len(photos))
                 media = [
@@ -566,6 +584,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                     "UPDATE announcements SET message_ids = ?, timestamp = ?, updated_at = ?, last_published_is_edit = 0, auction_status = 'active', owner_language_code = ?, auction_end_at = ? WHERE id = ?",
                     (json.dumps(new_message_ids), get_serbia_time(), get_serbia_time(), owner_language_code, pub_auction_end_at, ann_id),
                 )
+                await record_publication(db, ann_id, new_message_ids)
                 await db.commit()
             logger.info("ann:publish auction step=done ann_id=%s", ann_id)
         else:
@@ -580,6 +599,12 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                 is_reserved=bool(is_reserved),
             )
 
+            await mark_sending(ann_id, {
+                'timestamp': get_serbia_time(), 'updated_at': get_serbia_time(),
+                'last_published_is_edit': 0 if is_auction else int(show_updated_label),
+                **({'auction_status': 'active', 'owner_language_code': user.get('language_code'),
+                    'auction_end_at': pub_auction_end_at} if is_auction else {}),
+            })
             if photos:
                 media = [
                     InputMediaPhoto(photo_id, caption=message if idx == 0 else None, parse_mode="MarkdownV2")
@@ -603,73 +628,8 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
                     "UPDATE announcements SET message_ids = ?, timestamp = ?, updated_at = ?, last_published_is_edit = ? WHERE id = ?",
                     (json.dumps(new_message_ids), get_serbia_time(), get_serbia_time(), 1 if show_updated_label else 0, ann_id),
                 )
+                await record_publication(db, ann_id, new_message_ids)
                 await db.commit()
-
-        delete_failures: list[str] = []
-        if is_editing and old_message_ids:
-            transfer_success = await forward_thread_replies(old_message_ids[0], new_message_ids[0])
-            if not transfer_success:
-                logger.warning(
-                    "ann:publish comments transfer failed ann_id=%s old_message_id=%s new_message_id=%s",
-                    ann_id,
-                    old_message_ids[0],
-                    new_message_ids[0],
-                )
-
-            # Delete old posts via the user account first (no 48h Bot API limit),
-            # then fall back to the bot for anything that's left.
-            remaining_to_delete = await delete_channel_messages(old_message_ids)
-            for message_id in remaining_to_delete:
-                try:
-                    await bot.delete_message(chat_id=private_channel_id, message_id=message_id)
-                except Exception as exc:
-                    link = get_private_channel_post_link(private_channel_id, message_id)
-                    delete_failures.append(f"{message_id} ({link}) -> {exc}")
-                    logger.warning(
-                        "ann:publish old message delete failed user_id=%s ann_id=%s message_id=%s error=%s",
-                        user_id,
-                        ann_id,
-                        message_id,
-                        exc,
-                    )
-            if delete_failures and admin_id is not None:
-                try:
-                    await bot.send_message(
-                        chat_id=admin_id,
-                        text=(
-                            "Не удалось удалить старые сообщения при обновлении объявления:\n"
-                            f"ann_id: {ann_id}\n"
-                            f"user_id: {user_id}\n"
-                            f"details:\n- " + "\n- ".join(delete_failures) + "\n"
-                            "Пожалуйста, удалите вручную."
-                        ),
-                    )
-                except Exception:
-                    logger.exception("ann:publish failed to notify admin delete issues ann_id=%s", ann_id)
-            if delete_failures and bug_chat_id is not None:
-                try:
-                    await bot.send_message(
-                        chat_id=bug_chat_id,
-                        text=(
-                            "BUG REPORT\n"
-                            f"Time: {get_serbia_time()}\n"
-                            f"User ID: {user_id}\n"
-                            f"Username: {user.get('username') or 'None'}\n"
-                            f"Name: {' '.join(filter(None, [user.get('first_name'), user.get('last_name')])).strip() or 'None'}\n"
-                            "Action: publish_ad_old_message_delete\n"
-                            f"Ad ID: {ann_id}\n"
-                            "Status: warning\n"
-                            "Error ID: None\n"
-                            "Message: Failed to delete old message(s) after publish. Publish completed.\n"
-                            f"Detail: {'; '.join(delete_failures)}\n"
-                            f"Post link: {get_private_channel_post_link(private_channel_id, new_message_ids[0])}\n"
-                            "Client time: None\n"
-                            "Language: None\n"
-                            "User-Agent: None\n"
-                        ),
-                    )
-                except Exception:
-                    logger.exception("ann:publish failed to send bug report ann_id=%s", ann_id)
 
         post_link = get_private_channel_post_link(private_channel_id, new_message_ids[0])
         logger.info("ann:publish done ann_id=%s post_link=%s", ann_id, post_link)
@@ -688,6 +648,7 @@ async def publish_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_u
 
 
 @router.post("/api/announcements/{ann_id}/reserve")
+@guarded_mutation
 async def reserve_announcement(ann_id: int, user: Dict[str, Any] = Depends(get_user_from_request)) -> Dict[str, Any]:
     user_id = user.get("id")
     private_channel_id = normalize_chat_id(PRIVATE_CHANNEL_ID)

@@ -28,9 +28,24 @@ from config import (
 )
 
 
+async def start_transfer_worker(application):
+    from publication_jobs import transfer_worker
+    application.bot_data['transfer_task'] = asyncio.create_task(transfer_worker())
+
+
+async def stop_transfer_worker(application):
+    task = application.bot_data.get('transfer_task')
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
 async def main():
     await init_db()
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).post_init(start_transfer_worker).post_shutdown(stop_transfer_worker).build()
 
     conv_handler = ConversationHandler(
         entry_points=[
