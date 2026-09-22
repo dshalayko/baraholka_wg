@@ -30,7 +30,7 @@ from config import (
 
 async def start_transfer_worker(application):
     from publication_jobs import transfer_worker
-    application.bot_data['transfer_task'] = asyncio.create_task(transfer_worker())
+    application.bot_data['transfer_task'] = asyncio.create_task(transfer_worker(application.bot))
 
 
 async def stop_transfer_worker(application):

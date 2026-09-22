@@ -104,7 +104,7 @@ def guarded_publication(func):
     return wrapped
 
 
-async def process_job(ann_id):
+async def process_job(ann_id, fallback_bot=None):
     import comments_manager
     async with file_lock(f'publication-{ann_id}',wait=False) as acquired:
         if not acquired:
@@ -141,8 +141,21 @@ async def process_job(ann_id):
                 await set_job(ann_id,phase='cleanup',error=None)
             if sources:
                 failed = await comments_manager.delete_channel_messages(sources)
+                bot_errors = []
+                if failed and fallback_bot is not None:
+                    remaining = []
+                    for message_id in failed:
+                        try:
+                            await fallback_bot.delete_message(
+                                chat_id=int(PRIVATE_CHANNEL_ID), message_id=message_id)
+                        except Exception as exc:
+                            remaining.append(message_id)
+                            bot_errors.append(f'{message_id}: {type(exc).__name__}: {exc}')
+                    failed = remaining
                 if failed:
-                    raise RuntimeError(f'Old post deletion pending: {failed}')
+                    detail = '; '.join(bot_errors) or 'userbot deletion failed; no bot fallback available'
+                    raise RuntimeError(f'Old post deletion pending: {failed}; {detail}')
+                logger.info('publication old posts deleted ann_id=%s message_ids=%s', ann_id, sources)
             await set_job(ann_id,phase='done',error=None,retry_at=0)
         except Exception as exc:
             attempts = job['attempts']+1
@@ -152,13 +165,13 @@ async def process_job(ann_id):
             logger.exception('publication transfer pending ann_id=%s attempt=%s',ann_id,attempts)
 
 
-async def transfer_worker():
+async def transfer_worker(fallback_bot=None):
     await ensure_transfer_schema()
     while True:
         try:
             jobs = await query("SELECT j.ann_id FROM publication_jobs j JOIN announcements a ON a.id=j.ann_id WHERE j.phase IN ('transfer','cleanup') AND j.retry_at<=? ORDER BY j.updated_at LIMIT 50",(time.time(),))
             for job in jobs:
-                await process_job(job['ann_id'])
+                await process_job(job['ann_id'], fallback_bot=fallback_bot)
         except asyncio.CancelledError:
             raise
         except Exception:

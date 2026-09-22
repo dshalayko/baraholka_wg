@@ -65,7 +65,8 @@ async def _startup() -> None:
     await ensure_db()
     asyncio.create_task(_run_auction_job())
     from publication_jobs import transfer_worker
-    app.state.transfer_task = asyncio.create_task(transfer_worker())
+    from webserver.telegram_client import bot
+    app.state.transfer_task = asyncio.create_task(transfer_worker(bot))
 
 
 @app.get("/")

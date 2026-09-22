@@ -16,6 +16,14 @@ class TransferIncomplete(RuntimeError):
     pass
 
 
+def is_transfer_sender(message, user_id):
+    """Telegram may send the userbot's messages as an anonymous group admin."""
+    if getattr(getattr(message, 'from_user', None), 'id', None) == user_id:
+        return True
+    sender_id = getattr(getattr(message, 'sender_chat', None), 'id', None)
+    return sender_id in {int(CHAT_ID), int(PRIVATE_CHANNEL_ID)}
+
+
 def utf16len(text):
     return len(text.encode('utf-16-le')) // 2
 
@@ -114,7 +122,9 @@ async def snapshot(app, old_root, new_root, user_id):
         if message.id == old_root or getattr(message, 'service', None) or getattr(message, 'empty', False):
             continue
         previous = await query('SELECT * FROM transferred_parts WHERE message_id=?', (message.id,), one=True)
-        is_ours = getattr(getattr(message, 'from_user', None), 'id', None) == user_id
+        # Anonymous identity alone is not proof of a historical transfer.
+        # Only the durable message-ID record authorizes reusing its origin.
+        is_ours = is_transfer_sender(message, user_id)
         if previous and is_ours and previous['primary_id'] != message.id:
             continue
         source_id = message.id
@@ -127,7 +137,7 @@ async def snapshot(app, old_root, new_root, user_id):
         if previous and is_ours and origin.get('media'):
             origin['media'] = media_info(message)
         # One-time compatibility with copies made by the old implementation.
-        if is_ours and not previous:
+        if getattr(getattr(message, 'from_user', None), 'id', None) == user_id and not previous:
             from comments_manager import _extract_preserved_author
             author, body = _extract_preserved_author(message)
             if author:
@@ -149,7 +159,7 @@ def header(origin):
     name = author['name'][:160]
     date = origin.get('date')
     stamp = datetime.fromisoformat(date).astimezone(ZoneInfo('Europe/Belgrade')).strftime('%d.%m.%Y %H:%M') if date else 'дата не сохранена'
-    text = f'{name} · {stamp}\nПеренесено\n'
+    text = f'{name} · {stamp}\n'
     entities = [{'type':'BOLD','offset':0,'length':utf16len(name)}]
     if author.get('link'):
         entities.append({'type':'TEXT_LINK','offset':0,'length':utf16len(name),'url':author['link']})
@@ -169,8 +179,11 @@ def formatted_parts(origin, limit, key):
     result = []
     for i, (body, entities) in enumerate(split_formatted(origin['text'], origin['entities'], available)):
         shifted = [dict(e, offset=e['offset']+utf16len(prefix)) for e in entities]
-        marked = prefix_entities + [{'type':'TEXT_LINK','offset':utf16len(prefix)-utf16len('Перенесено\n'),
-                                    'length':utf16len('Перенесено'),'url':marker_url(key,i)}]
+        # Keep the reconciliation marker on the existing date, without an
+        # extra visible service label. Old payload markers still match by URL.
+        date_offset = utf16len(origin['author']['name'][:160] + ' · ')
+        marked = prefix_entities + [{'type':'TEXT_LINK','offset':date_offset,
+                                    'length':utf16len(prefix)-date_offset-1,'url':marker_url(key,i)}]
         result.append({'text':prefix+body,'entities':marked+shifted,'marker':marker_url(key,i),'source_id':int(key.split(':')[2])})
     return result
 
@@ -179,10 +192,33 @@ def message_has_marker(message, marker):
     return any(getattr(e,'url',None) == marker for e in (message.entities or message.caption_entities or []))
 
 
+def remove_legacy_label(item):
+    """Upgrade queued payloads without removing words from the user's body."""
+    text = item.get('text', '')
+    first, separator, rest = text.partition('\n')
+    label = 'Перенесено\n'
+    if not separator or not rest.startswith(label) or ' · ' not in first:
+        return item
+    start = utf16len(first + '\n')
+    marker = next((e for e in item['entities'] if e.get('url') == item.get('marker')
+                   and e['offset'] == start and e['length'] == utf16len('Перенесено')), None)
+    if marker is None:
+        return item
+    name, stamp = first.rsplit(' · ', 1)
+    removed = utf16len(label)
+    entities = []
+    for entity in item['entities']:
+        if entity is marker:
+            entities.append(dict(entity, offset=utf16len(name + ' · '), length=utf16len(stamp)))
+        else:
+            entities.append(dict(entity, offset=entity['offset']-removed if entity['offset'] >= start+removed else entity['offset']))
+    return dict(item, text=first+'\n'+rest[len(label):], entities=entities)
+
+
 async def reconcile(app, root, payload, user_id):
     found = [None] * len(payload['items'])
     async for message in app.get_discussion_replies(int(CHAT_ID), root):
-        if getattr(getattr(message,'from_user',None),'id',None) != user_id:
+        if not is_transfer_sender(message, user_id):
             continue
         for index, item in enumerate(payload['items']):
             if item.get('marker') and message_has_marker(message,item['marker']):
@@ -194,12 +230,36 @@ async def reconcile(app, root, payload, user_id):
     return found
 
 
-def extract_sent_ids(response, random_ids):
+def extract_sent_ids(response, random_ids, payload=None):
     if isinstance(response, raw.types.UpdateShortSentMessage) and len(random_ids) == 1:
         return [response.id]
     mapped = {u.random_id:u.id for u in getattr(response,'updates',[]) if isinstance(u,raw.types.UpdateMessageID)}
     if all(r in mapped for r in random_ids):
         return [mapped[r] for r in random_ids]
+    # Telegram also returns full messages without UpdateMessageID. Match the
+    # actual response by destination, reply target and per-item marker instead
+    # of depending on from_user (absent for anonymous administrators).
+    if payload:
+        candidates = []
+        for update in getattr(response, 'updates', []):
+            if not isinstance(update, (raw.types.UpdateNewMessage, raw.types.UpdateNewChannelMessage)):
+                continue
+            message = update.message
+            peer_id = getattr(getattr(message, 'peer_id', None), 'channel_id', None)
+            reply_id = getattr(getattr(message, 'reply_to', None), 'reply_to_msg_id', None)
+            if peer_id == int(str(CHAT_ID).removeprefix('-100')) and reply_id == payload['reply_to']:
+                candidates.append(message)
+        found = []
+        for item in payload['items']:
+            matches = [m for m in candidates if item.get('marker') and any(
+                getattr(e, 'url', None) == item['marker'] for e in (m.entities or []))]
+            if not matches and item.get('bare_media') and len(payload['items']) == 1:
+                matches = [m for m in candidates if getattr(m, 'media', None)]
+            if len(matches) != 1:
+                return None
+            found.append(matches[0].id)
+        if len(set(found)) == len(random_ids):
+            return found
     return None
 
 
@@ -214,6 +274,8 @@ async def send_operation(app, key, root, payload, user_id):
     complete = json.loads(row['destination_ids'])
     if complete:
         return complete
+    payload['items'] = [remove_legacy_label(item) for item in payload['items']]
+    await execute('UPDATE comment_operations SET payload=? WHERE key=?', (json.dumps(payload), key))
     if row['attempted']:
         found = await reconcile(app,root,payload,user_id)
         if all(found):
@@ -250,7 +312,7 @@ async def send_operation(app, key, root, payload, user_id):
     await execute('UPDATE comment_operations SET attempted=1 WHERE key=?',(key,))
     try:
         response = await app.invoke(request)
-        ids = extract_sent_ids(response,random_ids)
+        ids = extract_sent_ids(response,random_ids,payload)
         if not ids:
             ids = await reconcile(app,root,payload,user_id)
         if not all(ids):

@@ -144,6 +144,104 @@ class TransferTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.threads[200]),1)
         self.assertEqual(len(app.sent),1)
 
+    async def test_anonymous_admin_copy_is_reconciled_after_lost_response(self):
+        app=FakeClient([message(101)])
+        app.fail_after_delivery=True
+        with self.assertRaises(TimeoutError):
+            await ct.transfer_pass(app,10,20)
+        copied=app.threads[200][0]
+        copied.from_user=None
+        copied.sender_chat=NS(id=-100123,title='Baraholka chat',username=None)
+        # Telegram may acknowledge a repeated random_id with no new updates.
+        app.invoke=AsyncMock(return_value=NS(updates=[]))
+        self.assertTrue(await ct.transfer_pass(app,10,20))
+        app.invoke.assert_not_awaited()
+
+    async def test_anonymous_copy_preserves_original_author_on_next_republish(self):
+        app=FakeClient([message(101)])
+        await ct.transfer_pass(app,10,20)
+        copied=app.threads[200][0]
+        copied.from_user=None
+        copied.sender_chat=NS(id=-100123,title='Baraholka chat',username=None)
+        self.assertTrue(await ct.transfer_pass(app,20,30))
+        self.assertIn('Анна 😀',app.threads[300][0].text)
+        self.assertNotIn('Baraholka chat',app.threads[300][0].text)
+        self.assertNotIn('Перенесено',app.threads[300][0].text)
+
+    async def test_unrelated_sender_cannot_supply_a_reconciliation_marker(self):
+        app=FakeClient([message(101)])
+        app.fail_after_delivery=True
+        with self.assertRaises(TimeoutError):
+            await ct.transfer_pass(app,10,20)
+        row=await store.query('SELECT * FROM comment_operations',one=True)
+        app.threads[200][0].from_user=NS(id=777)
+        self.assertEqual(await ct.reconcile(app,200,json.loads(row['payload']),99),[None])
+
+    async def test_full_message_acknowledgement_without_random_id_update(self):
+        payload={'reply_to':200,'items':[{'marker':'https://example.test/unique-marker'}]}
+        msg=raw.types.Message(id=501,peer_id=raw.types.PeerChannel(channel_id=123),
+            from_id=raw.types.PeerChannel(channel_id=123),date=1,message='author · date\ntext',
+            reply_to=raw.types.MessageReplyHeader(reply_to_msg_id=200),
+            entities=[raw.types.MessageEntityTextUrl(offset=9,length=4,url=payload['items'][0]['marker'])])
+        response=NS(updates=[raw.types.UpdateNewChannelMessage(message=msg,pts=1,pts_count=1)])
+        self.assertEqual(ct.extract_sent_ids(response,[111],payload),[501])
+        payload['reply_to']=999
+        self.assertIsNone(ct.extract_sent_ids(response,[111],payload))
+
+    async def test_worker_deletes_old_post_after_anonymous_full_message_ack(self):
+        app=FakeClient([message(101)])
+        invoke=app.invoke
+        async def anonymous_invoke(request):
+            response=await invoke(request)
+            updates=[]
+            for acknowledged in response.updates:
+                msg=await app.get_messages(-100123,acknowledged.id)
+                msg.from_user=None
+                msg.sender_chat=NS(id=-100123,title='Baraholka chat')
+                raw_message=raw.types.Message(id=msg.id,peer_id=raw.types.PeerChannel(channel_id=123),
+                    from_id=raw.types.PeerChannel(channel_id=123),date=1,message=msg.text,
+                    reply_to=raw.types.MessageReplyHeader(reply_to_msg_id=msg.reply_to_message_id),
+                    entities=[await e.write() for e in msg.entities])
+                updates.append(raw.types.UpdateNewChannelMessage(message=raw_message,pts=1,pts_count=1))
+            return NS(updates=updates)
+        app.invoke=anonymous_invoke
+        async def transfer(old_id,new_id,**kwargs):
+            return await ct.transfer_pass(app,old_id,new_id)
+        await self.make_job()
+        with patch('comments_manager.forward_thread_replies',side_effect=transfer),patch('comments_manager.delete_channel_messages',AsyncMock(return_value=[])) as delete:
+            await jobs.process_job(1)
+            delete.assert_not_awaited()
+            await store.set_job(1,quiet_since=0,retry_at=0)
+            await jobs.process_job(1)
+            delete.assert_awaited_once_with([10])
+            self.assertEqual((await store.get_job(1))['phase'],'done')
+            self.assertEqual(len(app.threads[200]),1)
+
+    async def test_pending_legacy_label_is_still_reconciled(self):
+        app=FakeClient([message(101)])
+        app.fail_after_delivery=True
+        with self.assertRaises(TimeoutError):
+            await ct.transfer_pass(app,10,20)
+        copied=app.threads[200][0]
+        copied.text='Анна · 09.09.2026\nПеренесено\nhello'
+        # Reconciliation depends on the marker URL, not the label or its text.
+        copied.from_user=None
+        copied.sender_chat=NS(id=-100123,title='Baraholka chat')
+        app.invoke=AsyncMock(return_value=NS(updates=[]))
+        self.assertTrue(await ct.transfer_pass(app,10,20))
+        app.invoke.assert_not_awaited()
+
+    def test_queued_legacy_payload_removes_only_the_service_label(self):
+        prefix='Анна 😀 · 09.09.2026 14:30\n'
+        label='Перенесено\n'
+        item={'text':prefix+label+'Перенесено пользователем', 'marker':'https://example.test/copy',
+              'entities':[{'type':'TEXT_LINK','offset':ct.utf16len(prefix),'length':10,'url':'https://example.test/copy'},
+                          {'type':'BOLD','offset':ct.utf16len(prefix+label),'length':10}]}
+        clean=ct.remove_legacy_label(item)
+        self.assertEqual(clean['text'],prefix+'Перенесено пользователем')
+        self.assertEqual(clean['entities'][1]['offset'],ct.utf16len(prefix))
+        self.assertEqual(ct.remove_legacy_label(clean),clean)
+
     async def test_partial_transfer_resumes_parent_mapping(self):
         app=FakeClient([message(101),message(102,parent=101)])
         app.fail_before_number=1
@@ -171,7 +269,7 @@ class TransferTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await ct.transfer_pass(app,20,30))
         text=app.threads[300][0].text
         self.assertEqual(text.count('Анна 😀'),1)
-        self.assertEqual(text.count('Перенесено'),1)
+        self.assertEqual(text.count('Перенесено'),0)
         self.assertTrue(text.endswith('hello'))
 
     async def test_long_text_utf16_entities_and_fragment_replies(self):
@@ -245,6 +343,35 @@ class TransferTests(unittest.IsolatedAsyncioTestCase):
             await jobs.process_job(1)
             delete.assert_awaited_once_with([10])
             self.assertEqual((await store.get_job(1))['phase'],'done')
+
+    async def test_bot_fallback_deletes_only_posts_userbot_could_not_delete(self):
+        await self.make_job()
+        await store.execute("UPDATE publication_jobs SET source_ids='[10,11]' WHERE ann_id=1")
+        await store.set_job(1,quiet_since=0)
+        bot=NS(delete_message=AsyncMock(return_value=True))
+        with patch('comments_manager.forward_thread_replies',AsyncMock(return_value=True)),patch('comments_manager.delete_channel_messages',AsyncMock(return_value=[11])):
+            await jobs.process_job(1,fallback_bot=bot)
+        bot.delete_message.assert_awaited_once_with(chat_id=-100456,message_id=11)
+        self.assertEqual((await store.get_job(1))['phase'],'done')
+
+    async def test_bot_fallback_does_not_bypass_failed_transfer(self):
+        await self.make_job()
+        bot=NS(delete_message=AsyncMock())
+        with patch('comments_manager.forward_thread_replies',AsyncMock(return_value=False)),patch('comments_manager.delete_channel_messages',AsyncMock()) as delete:
+            await jobs.process_job(1,fallback_bot=bot)
+        delete.assert_not_awaited()
+        bot.delete_message.assert_not_awaited()
+
+    async def test_failed_bot_fallback_keeps_cleanup_job_and_records_error(self):
+        await self.make_job()
+        await store.set_job(1,quiet_since=0)
+        bot=NS(delete_message=AsyncMock(side_effect=RuntimeError('not enough rights')))
+        with patch('comments_manager.forward_thread_replies',AsyncMock(return_value=True)),patch('comments_manager.delete_channel_messages',AsyncMock(return_value=[10])):
+            await jobs.process_job(1,fallback_bot=bot)
+        job=await store.get_job(1)
+        self.assertEqual(job['phase'],'cleanup')
+        self.assertIn('not enough rights',job['error'])
+        self.assertGreater(job['retry_at'],0)
 
     async def test_flood_wait_controls_retry_time(self):
         await self.make_job()
